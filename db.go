@@ -1,6 +1,8 @@
 package dynamo
 
 import (
+	"net/http"
+
 	"github.com/awslabs/aws-sdk-go/aws"
 	"github.com/awslabs/aws-sdk-go/gen/dynamodb"
 )

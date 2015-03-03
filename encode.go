@@ -55,3 +55,15 @@ func marshal(v interface{}) (av dynamodb.AttributeValue, err error) {
 	}
 	return
 }
+
+func marshalSlice(values []interface{$}) ([]dynamodb.AttributeValue, error) {
+	avs := make([]dynamodb.AttributeValue, 0, len(values))
+	for _, v := range values {
+		av, err := marshal(v)
+		if err != nil {
+			return nil, err
+		}
+		avs = append(avs, av)
+	}
+	return avs, nil
+}

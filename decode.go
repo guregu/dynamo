@@ -30,6 +30,7 @@ func unmarshal(av dynamodb.AttributeValue, out interface{}) error {
 	return nil
 }
 
+// unmarshals one value
 func unmarshalReflect(av dynamodb.AttributeValue, rv reflect.Value) error {
 	// TODO: fix fix fix
 	switch rv.Kind() {
@@ -48,6 +49,10 @@ func unmarshalReflect(av dynamodb.AttributeValue, rv reflect.Value) error {
 		}
 		rv.SetInt(n)
 	case reflect.String:
+		// TODO: unmarshal len=1 lists to single string etc
+		if av.S == nil {
+			return errors.New("expected S to be non-nil")
+		}
 		rv.SetString(*av.S)
 	default:
 		var iface = rv.Interface()
@@ -63,6 +68,8 @@ func unmarshalReflect(av dynamodb.AttributeValue, rv reflect.Value) error {
 	return nil
 }
 
+// unmarshals a struct
+// TODO: unmarshal to map[string]interface{} too
 func unmarshalItem(item map[string]dynamodb.AttributeValue, out interface{}) error {
 	rv := reflect.ValueOf(out)
 
@@ -82,7 +89,7 @@ func unmarshalItem(item map[string]dynamodb.AttributeValue, out interface{}) err
 				name = field.Name
 			}
 
-			fmt.Println("unmarshal reflect", name, field.Name)
+			fmt.Println("unmarshal reflect", name, field.Name, item[name])
 
 			if av, ok := item[name]; ok {
 				if innerErr := unmarshalReflect(av, rv.Elem().Field(i)); innerErr != nil {
@@ -97,6 +104,7 @@ func unmarshalItem(item map[string]dynamodb.AttributeValue, out interface{}) err
 	return err
 }
 
+// unmarshals to a slice
 func unmarshalAll(items []map[string]dynamodb.AttributeValue, out interface{}) error {
 	// cribbed from mgo
 	resultv := reflect.ValueOf(out)

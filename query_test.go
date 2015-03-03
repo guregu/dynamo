@@ -16,7 +16,7 @@ type hit struct {
 	Page      int
 }
 
-func TestGetOne(t *testing.T) {
+func TestGetCount(t *testing.T) {
 	creds := aws.DetectCreds("", "", "")
 	db := New(creds, "ap-southeast-1", nil)
 	hits := db.Table("TestDB")
@@ -31,12 +31,31 @@ func TestGetAll(t *testing.T) {
 	db := New(creds, "ap-southeast-1", nil)
 	hits := db.Table("TestDB")
 	q := hits.Get("UserID", 613)
+	// q.Range("Date", Between, 1425279050, 1425279200)
+	// q.Range("Date", Equals, 1425279099)
+	// q.Consistent(true)
+	// q.Project("UserID", "Date", "ContentID", "Page", "Test[1]")
 
 	var records []hit
 	err := q.All(&records)
 
-	t.Logf("all %#v %v", records, err)
+	t.Logf("all %+v %v", records, err)
+
+	for _, r := range records {
+		t.Log(r.Date.String())
+	}
+
 	t.Fail()
+}
+
+func TestGetOne(t *testing.T) {
+	creds := aws.DetectCreds("", "", "")
+	db := New(creds, "ap-southeast-1", nil)
+	hits := db.Table("TestDB")
+
+	var h hit
+	err := hits.Get("UserID", 613).Range("Date", Equals, 1425279099).One(&h)
+	t.Fatalf("%+v %v", h, err)
 }
 
 type unixTime struct {

@@ -83,17 +83,12 @@ func unmarshalItem(item map[string]dynamodb.AttributeValue, out interface{}) err
 	case reflect.Struct:
 		for i := 0; i < rv.Elem().Type().NumField(); i++ {
 			field := rv.Elem().Type().Field(i)
-			name := field.Tag.Get("dynamo")
-			switch name {
-			case "":
-				// no tag, use the field name
-				name = field.Name
-			case "-":
-				// skip fields tagged "-"
+
+			name, _ := fieldName(field)
+			if name == "-" {
+				// skip
 				continue
 			}
-
-			// fmt.Println("unmarshal reflect", name, field.Name, item[name])
 
 			if av, ok := item[name]; ok {
 				if innerErr := unmarshalReflect(av, rv.Elem().Field(i)); innerErr != nil {

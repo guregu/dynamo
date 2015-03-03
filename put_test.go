@@ -19,6 +19,7 @@ func TestPutItem(t *testing.T) {
 		ContentID: "監獄学園",
 		Page:      1,
 		SkipThis:  "i should disappear",
+		Bonus:     123,
 	}
 
 	err := hits.Put(&h)

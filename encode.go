@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 
 	"github.com/awslabs/aws-sdk-go/aws"
 	"github.com/awslabs/aws-sdk-go/gen/dynamodb"
@@ -26,23 +27,24 @@ func marshalStruct(v interface{}) (item map[string]dynamodb.AttributeValue, err 
 
 	for i := 0; i < rv.Type().NumField(); i++ {
 		field := rv.Type().Field(i)
-		name := field.Tag.Get("dynamo")
-		switch name {
-		case "":
-			// no tag, use the field name
-			name = field.Name
-		case "-":
-			// skip fields tagged "-"
+		fv := rv.Field(i)
+
+		name, special := fieldName(field)
+		switch {
+		case name == "-":
+			// skip
 			continue
+		case special == "omitempty":
+			// skip if empty
+			if isZero(fv) {
+				continue
+			}
 		}
 
-		// fmt.Println("marshal reflect", name, field.Name, item[name])
-
-		av, err := marshal(rv.Field(i).Interface())
+		av, err := marshal(fv.Interface())
 		if err != nil {
 			return nil, err
 		}
-
 		item[name] = av
 	}
 	return
@@ -102,4 +104,48 @@ func marshalSlice(values []interface{}) ([]dynamodb.AttributeValue, error) {
 		avs = append(avs, av)
 	}
 	return avs, nil
+}
+
+func fieldName(field reflect.StructField) (name, special string) {
+	name = field.Tag.Get("dynamo")
+	switch name {
+	case "":
+		// no tag, use the field name
+		name = field.Name
+	default:
+		if idx := strings.IndexRune(name, ','); idx != -1 {
+			special = name[idx+1:]
+			if idx > 0 {
+				name = name[:idx]
+			} else {
+				name = field.Name
+			}
+		}
+	}
+	return
+}
+
+// thanks James Henstridge
+// TODO: tweak
+// TODO: IsZero() interface support
+func isZero(rv reflect.Value) bool {
+	switch rv.Kind() {
+	case reflect.Func, reflect.Map, reflect.Slice:
+		return rv.IsNil()
+	case reflect.Array:
+		z := true
+		for i := 0; i < rv.Len(); i++ {
+			z = z && isZero(rv.Index(i))
+		}
+		return z
+	case reflect.Struct:
+		z := true
+		for i := 0; i < rv.NumField(); i++ {
+			z = z && isZero(rv.Field(i))
+		}
+		return z
+	}
+	// Compare other types directly:
+	z := reflect.Zero(rv.Type())
+	return rv.Interface() == z.Interface()
 }

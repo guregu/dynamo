@@ -15,6 +15,7 @@ type hit struct {
 	ContentID string
 	Page      int
 	SkipThis  string `dynamo:"-"`
+	Bonus     int    `dynamo:",omitempty"`
 }
 
 func TestGetCount(t *testing.T) {

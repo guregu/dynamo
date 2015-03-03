@@ -34,6 +34,12 @@ func unmarshal(av dynamodb.AttributeValue, out interface{}) error {
 func unmarshalReflect(av dynamodb.AttributeValue, rv reflect.Value) error {
 	// TODO: fix fix fix
 	switch rv.Kind() {
+	case reflect.Ptr:
+		pt := reflect.New(rv.Type().Elem())
+		rv.Set(pt)
+		if av.NULL == nil || !(*av.NULL) {
+			return unmarshalReflect(av, rv.Elem())
+		}
 	case reflect.Bool:
 		if av.BOOL == nil {
 			return errors.New("expected BOOL to be non-nil")

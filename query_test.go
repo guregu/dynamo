@@ -15,7 +15,7 @@ type hit struct {
 	ContentID string
 	Page      int
 	SkipThis  string `dynamo:"-"`
-	Bonus     int    `dynamo:",omitempty"`
+	Bonus     *int   `dynamo:",omitempty"`
 }
 
 func TestGetCount(t *testing.T) {
@@ -32,7 +32,7 @@ func TestGetAll(t *testing.T) {
 	creds := aws.DetectCreds("", "", "")
 	db := New(creds, "ap-southeast-1", nil)
 	hits := db.Table("TestDB")
-	q := hits.Get("UserID", 613)
+	q := hits.Get("UserID", 666)
 	// q.Range("Date", Between, 1425279050, 1425279200)
 	// q.Range("Date", Equals, 1425279099)
 	// q.Consistent(true)

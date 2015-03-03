@@ -32,10 +32,8 @@ func marshalStruct(v interface{}) (item map[string]dynamodb.AttributeValue, err 
 		name, special := fieldName(field)
 		switch {
 		case name == "-":
-			// skip
 			continue
 		case special == "omitempty":
-			// skip if empty
 			if isZero(fv) {
 				continue
 			}
@@ -88,8 +86,31 @@ func marshal(v interface{}) (av dynamodb.AttributeValue, err error) {
 	case []string:
 		av.SS = x
 	default:
-		// TODO: use reflect
-		err = fmt.Errorf("dynamo marshal: unknown type %T", v)
+		return marshalReflect(reflect.ValueOf(x))
+	}
+	return
+}
+
+func marshalReflect(rv reflect.Value) (av dynamodb.AttributeValue, err error) {
+	// TODO: byte arrays and array of arrays
+	// TODO: other kinds of arrays
+	// TODO: structs
+	// TODO: maps
+	switch rv.Kind() {
+	case reflect.Ptr:
+		if rv.IsNil() {
+			av.NULL = aws.Boolean(true)
+		} else {
+			return marshal(rv.Elem().Interface())
+		}
+	case reflect.Bool:
+		av.BOOL = aws.Boolean(rv.Bool())
+	case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
+		av.N = aws.String(strconv.FormatInt(rv.Int(), 10))
+	case reflect.String:
+		av.S = aws.String(rv.String())
+	default:
+		err = fmt.Errorf("dynamo marshal: unknown type %s", rv.Type().String())
 	}
 	return
 }

@@ -61,7 +61,6 @@ func unmarshalReflect(av dynamodb.AttributeValue, rv reflect.Value) error {
 		}
 
 		if u, ok := iface.(Unmarshaler); ok {
-			fmt.Println("!!!")
 			return u.UnmarshalDynamo(av)
 		}
 	}
@@ -77,7 +76,7 @@ func unmarshalItem(item map[string]dynamodb.AttributeValue, out interface{}) err
 		return fmt.Errorf("not a pointer: %T", out)
 	}
 
-	fmt.Printf("unmarshal item %T %v %v\n", out, rv.Type().Kind(), rv.Kind())
+	// fmt.Printf("unmarshal item %T %v %v\n", out, rv.Type().Kind(), rv.Kind())
 
 	var err error
 	switch rv.Elem().Kind() {
@@ -85,11 +84,16 @@ func unmarshalItem(item map[string]dynamodb.AttributeValue, out interface{}) err
 		for i := 0; i < rv.Elem().Type().NumField(); i++ {
 			field := rv.Elem().Type().Field(i)
 			name := field.Tag.Get("dynamo")
-			if name == "" {
+			switch name {
+			case "":
+				// no tag, use the field name
 				name = field.Name
+			case "-":
+				// skip fields tagged "-"
+				continue
 			}
 
-			fmt.Println("unmarshal reflect", name, field.Name, item[name])
+			// fmt.Println("unmarshal reflect", name, field.Name, item[name])
 
 			if av, ok := item[name]; ok {
 				if innerErr := unmarshalReflect(av, rv.Elem().Field(i)); innerErr != nil {

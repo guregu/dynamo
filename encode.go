@@ -2,6 +2,7 @@ package dynamo
 
 import (
 	"fmt"
+	"reflect"
 	"strconv"
 
 	"github.com/awslabs/aws-sdk-go/aws"
@@ -10,6 +11,41 @@ import (
 
 type Marshaler interface {
 	MarshalDynamo() (dynamodb.AttributeValue, error)
+}
+
+func marshalStruct(v interface{}) (item map[string]dynamodb.AttributeValue, err error) {
+	item = make(map[string]dynamodb.AttributeValue)
+	rv := reflect.ValueOf(v)
+
+	if rv.Type().Kind() != reflect.Struct {
+		if rv.Type().Kind() == reflect.Ptr {
+			return marshalStruct(rv.Elem().Interface())
+		}
+		return nil, fmt.Errorf("marshal struct invalid type: %T (%+v)", v, v)
+	}
+
+	for i := 0; i < rv.Type().NumField(); i++ {
+		field := rv.Type().Field(i)
+		name := field.Tag.Get("dynamo")
+		switch name {
+		case "":
+			// no tag, use the field name
+			name = field.Name
+		case "-":
+			// skip fields tagged "-"
+			continue
+		}
+
+		// fmt.Println("marshal reflect", name, field.Name, item[name])
+
+		av, err := marshal(rv.Field(i).Interface())
+		if err != nil {
+			return nil, err
+		}
+
+		item[name] = av
+	}
+	return
 }
 
 func marshal(v interface{}) (av dynamodb.AttributeValue, err error) {

@@ -14,6 +14,7 @@ type hit struct {
 	Date      unixTime
 	ContentID string
 	Page      int
+	SkipThis  string `dynamo:"-"`
 }
 
 func TestGetCount(t *testing.T) {

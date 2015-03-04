@@ -10,7 +10,8 @@ import (
 )
 
 type Query struct {
-	table Table
+	table    Table
+	startKey map[string]dynamodb.AttributeValue
 
 	hashKey   string
 	hashValue dynamodb.AttributeValue
@@ -104,14 +105,31 @@ func (q *Query) All(out interface{}) error {
 		return q.err
 	}
 
-	req := q.queryInput()
+	// TODO: make this smarter by appending to the result array
+	var items []map[string]dynamodb.AttributeValue
+	for {
+		req := q.queryInput()
 
-	res, err := q.table.db.client.Query(req)
-	if err != nil {
-		return err
+		res, err := q.table.db.client.Query(req)
+		if err != nil {
+			return err
+		}
+
+		if items == nil {
+			items = res.Items
+		} else {
+			items = append(items, res.Items...)
+		}
+
+		// do we need to check for more results?
+		// TODO: Query.Next() or something to continue manually
+		q.startKey = res.LastEvaluatedKey
+		if res.LastEvaluatedKey == nil || q.limit > 0 {
+			break
+		}
 	}
 
-	return unmarshalAll(res.Items, out)
+	return unmarshalAll(items, out)
 }
 
 func (q *Query) Count() (int, error) {
@@ -135,8 +153,9 @@ func (q *Query) Count() (int, error) {
 
 func (q *Query) queryInput() *dynamodb.QueryInput {
 	req := &dynamodb.QueryInput{
-		TableName:     aws.String(q.table.Name),
-		KeyConditions: q.keyConditions(),
+		TableName:         aws.String(q.table.Name),
+		KeyConditions:     q.keyConditions(),
+		ExclusiveStartKey: q.startKey,
 	}
 	if q.consistent {
 		req.ConsistentRead = aws.Boolean(q.consistent)

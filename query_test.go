@@ -7,6 +7,7 @@ import (
 
 	"github.com/awslabs/aws-sdk-go/aws"
 	"github.com/awslabs/aws-sdk-go/gen/dynamodb"
+	"github.com/guregu/toki"
 )
 
 type hit struct {
@@ -16,6 +17,8 @@ type hit struct {
 	Page      int
 	SkipThis  string `dynamo:"-"`
 	Bonus     *int   `dynamo:",omitempty"`
+
+	TestText toki.Time
 }
 
 func TestGetCount(t *testing.T) {

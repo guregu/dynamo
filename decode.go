@@ -1,6 +1,7 @@
 package dynamo
 
 import (
+	"encoding"
 	"errors"
 	"fmt"
 	"reflect"
@@ -33,6 +34,24 @@ func unmarshal(av dynamodb.AttributeValue, out interface{}) error {
 // unmarshals one value
 func unmarshalReflect(av dynamodb.AttributeValue, rv reflect.Value) error {
 	// TODO: fix fix fix
+
+	// first try interface unmarshal stuff
+	if rv.CanInterface() {
+		var iface = rv.Interface()
+		// TODO: try non-pointer types too, for compatibility
+		if rv.CanAddr() {
+			iface = rv.Addr().Interface()
+		}
+		if u, ok := iface.(Unmarshaler); ok {
+			return u.UnmarshalDynamo(av)
+		}
+		if u, ok := iface.(encoding.TextUnmarshaler); ok {
+			if av.S != nil {
+				return u.UnmarshalText([]byte(*av.S))
+			}
+		}
+	}
+
 	switch rv.Kind() {
 	case reflect.Ptr:
 		pt := reflect.New(rv.Type().Elem())
@@ -69,6 +88,8 @@ func unmarshalReflect(av dynamodb.AttributeValue, rv reflect.Value) error {
 		if u, ok := iface.(Unmarshaler); ok {
 			return u.UnmarshalDynamo(av)
 		}
+
+		return fmt.Errorf("can't unmarshal to type: %T (%+v)", iface, iface)
 	}
 	return nil
 }

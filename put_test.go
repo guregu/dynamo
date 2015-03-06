@@ -6,6 +6,7 @@ import (
 
 	"github.com/awslabs/aws-sdk-go/aws"
 	// "github.com/awslabs/aws-sdk-go/gen/dynamodb"
+	"github.com/guregu/toki"
 )
 
 func TestPutItem(t *testing.T) {
@@ -20,6 +21,7 @@ func TestPutItem(t *testing.T) {
 		Page:      1,
 		SkipThis:  "i should disappear",
 		Bonus:     &i,
+		TestText:  toki.MustParseTime("1:2:3"),
 	}
 
 	err := hits.Put(&h)

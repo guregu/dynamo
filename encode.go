@@ -1,6 +1,7 @@
 package dynamo
 
 import (
+	"encoding"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -52,6 +53,12 @@ func marshal(v interface{}) (av dynamodb.AttributeValue, err error) {
 	switch x := v.(type) {
 	case Marshaler:
 		return x.MarshalDynamo()
+	case encoding.TextMarshaler:
+		text, err := x.MarshalText()
+		if err != nil {
+			return av, err
+		}
+		av.S = aws.String(string(text))
 
 	case []byte:
 		av.B = x

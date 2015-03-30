@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/awslabs/aws-sdk-go/aws"
-	"github.com/awslabs/aws-sdk-go/gen/dynamodb"
+	"github.com/awslabs/aws-sdk-go/service/dynamodb"
 	"github.com/guregu/toki"
 )
 
@@ -56,7 +56,7 @@ func TestGetOne(t *testing.T) {
 	hits := db.Table("TestDB")
 
 	var h hit
-	err := hits.Get("UserID", 613).Range("Date", Equals, 1425279099).One(&h)
+	err := hits.Get("UserID", 613).Range("Date", Equals, 1425630170).One(&h)
 	t.Fatalf("%+v %v", h, err)
 }
 
@@ -66,15 +66,15 @@ type unixTime struct {
 
 var _ Unmarshaler = &unixTime{}
 
-func (ut unixTime) MarshalDynamo() (dynamodb.AttributeValue, error) {
+func (ut unixTime) MarshalDynamo() (*dynamodb.AttributeValue, error) {
 	num := strconv.FormatInt(ut.Unix(), 10)
-	av := dynamodb.AttributeValue{
+	av := &dynamodb.AttributeValue{
 		N: aws.String(num),
 	}
 	return av, nil
 }
 
-func (ut *unixTime) UnmarshalDynamo(av dynamodb.AttributeValue) error {
+func (ut *unixTime) UnmarshalDynamo(av *dynamodb.AttributeValue) error {
 	sec, err := strconv.ParseInt(*av.N, 10, 64)
 	if err != nil {
 		return err

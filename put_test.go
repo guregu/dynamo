@@ -4,8 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/awslabs/aws-sdk-go/aws"
-	// "github.com/awslabs/aws-sdk-go/gen/dynamodb"
 	"github.com/guregu/toki"
 )
 

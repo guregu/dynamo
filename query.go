@@ -27,6 +27,8 @@ type Query struct {
 	err error
 }
 
+var ErrNotFound = errors.New("dynamo: no record found")
+
 type Operator *string
 
 var (
@@ -102,6 +104,10 @@ func (q *Query) One(out interface{}) error {
 	res, err := q.table.db.client.GetItem(req)
 	if err != nil {
 		return err
+	}
+
+	if res.Item == nil {
+		return ErrNotFound
 	}
 
 	return unmarshalItem(res.Item, out)

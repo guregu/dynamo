@@ -1,19 +1,17 @@
 package dynamo
 
 import (
-	"net/http"
-
 	"github.com/awslabs/aws-sdk-go/aws"
-	"github.com/awslabs/aws-sdk-go/gen/dynamodb"
+	"github.com/awslabs/aws-sdk-go/service/dynamodb"
 )
 
 type DB struct {
 	client *dynamodb.DynamoDB
 }
 
-func New(creds aws.CredentialsProvider, region string, client *http.Client) *DB {
+func New(cfg *aws.Config) *DB {
 	db := &DB{
-		client: dynamodb.New(creds, region, client),
+		dynamodb.New(cfg),
 	}
 	return db
 }

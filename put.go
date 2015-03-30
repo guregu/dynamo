@@ -5,7 +5,7 @@ import (
 	// "strings"
 
 	"github.com/awslabs/aws-sdk-go/aws"
-	"github.com/awslabs/aws-sdk-go/gen/dynamodb"
+	"github.com/awslabs/aws-sdk-go/service/dynamodb"
 	// "github.com/davecgh/go-spew/spew"
 )
 

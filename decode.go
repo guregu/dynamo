@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"strconv"
 
-	"github.com/awslabs/aws-sdk-go/gen/dynamodb"
+	"github.com/awslabs/aws-sdk-go/service/dynamodb"
 )
 
 /*
@@ -24,15 +24,15 @@ SS 	[]string
 */
 
 type Unmarshaler interface {
-	UnmarshalDynamo(av dynamodb.AttributeValue) error
+	UnmarshalDynamo(av *dynamodb.AttributeValue) error
 }
 
-func unmarshal(av dynamodb.AttributeValue, out interface{}) error {
+func unmarshal(av *dynamodb.AttributeValue, out interface{}) error {
 	return nil
 }
 
 // unmarshals one value
-func unmarshalReflect(av dynamodb.AttributeValue, rv reflect.Value) error {
+func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 	// TODO: fix fix fix
 
 	// first try interface unmarshal stuff
@@ -96,7 +96,8 @@ func unmarshalReflect(av dynamodb.AttributeValue, rv reflect.Value) error {
 
 // unmarshals a struct
 // TODO: unmarshal to map[string]interface{} too
-func unmarshalItem(item map[string]dynamodb.AttributeValue, out interface{}) error {
+func unmarshalItem(itemptr *map[string]*dynamodb.AttributeValue, out interface{}) error {
+	item := *itemptr
 	rv := reflect.ValueOf(out)
 
 	if rv.Kind() != reflect.Ptr {
@@ -131,7 +132,7 @@ func unmarshalItem(item map[string]dynamodb.AttributeValue, out interface{}) err
 }
 
 // unmarshals to a slice
-func unmarshalAll(items []map[string]dynamodb.AttributeValue, out interface{}) error {
+func unmarshalAll(items []*map[string]*dynamodb.AttributeValue, out interface{}) error {
 	// cribbed from mgo
 	resultv := reflect.ValueOf(out)
 	if resultv.Kind() != reflect.Ptr || resultv.Elem().Kind() != reflect.Slice {

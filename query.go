@@ -5,45 +5,54 @@ import (
 	"strings"
 
 	"github.com/awslabs/aws-sdk-go/aws"
-	"github.com/awslabs/aws-sdk-go/gen/dynamodb"
+	"github.com/awslabs/aws-sdk-go/service/dynamodb"
 	// "github.com/davecgh/go-spew/spew"
 )
 
 type Query struct {
 	table    Table
-	startKey map[string]dynamodb.AttributeValue
+	startKey *map[string]*dynamodb.AttributeValue
 
 	hashKey   string
-	hashValue dynamodb.AttributeValue
+	hashValue *dynamodb.AttributeValue
 
 	rangeKey    string
-	rangeValues []dynamodb.AttributeValue
+	rangeValues []*dynamodb.AttributeValue
 	rangeOp     Operator
 
 	projection string
 	consistent bool
-	limit      int
+	limit      int64
 
 	err error
 }
 
-type Operator aws.StringValue
+var ErrNotFound = errors.New("dynamo: no record found")
+
+type Operator *string
 
 var (
 	// These are OK in key comparisons
-	Equals         Operator = Operator(aws.String(dynamodb.ComparisonOperatorEq))
-	LessOrEqual             = Operator(aws.String(dynamodb.ComparisonOperatorLe))
-	Less                    = Operator(aws.String(dynamodb.ComparisonOperatorLt))
-	GreaterOrEqual          = Operator(aws.String(dynamodb.ComparisonOperatorGe))
-	Greater                 = Operator(aws.String(dynamodb.ComparisonOperatorGt))
-	BeginsWith              = Operator(aws.String(dynamodb.ComparisonOperatorBeginsWith))
-	Between                 = Operator(aws.String(dynamodb.ComparisonOperatorBetween))
+	Equals         Operator = Operator(aws.String("EQ"))
+	NotEquals               = Operator(aws.String("NE"))
+	LessOrEqual             = Operator(aws.String("LE"))
+	Less                    = Operator(aws.String("LT"))
+	GreaterOrEqual          = Operator(aws.String("GE"))
+	Greater                 = Operator(aws.String("GT"))
+	BeginsWith              = Operator(aws.String("BEGINS_WITH"))
+	Between                 = Operator(aws.String("BETWEEN"))
 	// These can't be used in key comparions
-	IsNull      Operator = Operator(aws.String(dynamodb.ComparisonOperatorNull))
-	NotNull              = Operator(aws.String(dynamodb.ComparisonOperatorNotNull))
-	Contains             = Operator(aws.String(dynamodb.ComparisonOperatorContains))
-	NotContains          = Operator(aws.String(dynamodb.ComparisonOperatorNotContains))
-	In                   = Operator(aws.String(dynamodb.ComparisonOperatorIn))
+	IsNull      Operator = Operator(aws.String("NULL"))
+	NotNull              = Operator(aws.String("NOT_NULL"))
+	Contains             = Operator(aws.String("CONTAINS"))
+	NotContains          = Operator(aws.String("NOT_CONTAINS"))
+	In                   = Operator(aws.String("IN"))
+)
+
+var (
+	selectAllAttributes      = aws.String("ALL_ATTRIBUTES")
+	selectCount              = aws.String("COUNT")
+	selectSpecificAttributes = aws.String("SPECIFIC_ATTRIBUTES")
 )
 
 func (table Table) Get(key string, value interface{}) *Query {
@@ -74,7 +83,7 @@ func (q *Query) Consistent(on bool) *Query {
 	return q
 }
 
-func (q *Query) Limit(limit int) *Query {
+func (q *Query) Limit(limit int64) *Query {
 	q.limit = limit
 	return q
 }
@@ -97,6 +106,10 @@ func (q *Query) One(out interface{}) error {
 		return err
 	}
 
+	if res.Item == nil {
+		return ErrNotFound
+	}
+
 	return unmarshalItem(res.Item, out)
 }
 
@@ -106,7 +119,7 @@ func (q *Query) All(out interface{}) error {
 	}
 
 	// TODO: make this smarter by appending to the result array
-	var items []map[string]dynamodb.AttributeValue
+	var items []*map[string]*dynamodb.AttributeValue
 	for {
 		req := q.queryInput()
 
@@ -138,7 +151,7 @@ func (q *Query) Count() (int, error) {
 	}
 
 	req := q.queryInput()
-	req.Select = aws.String(dynamodb.SelectCount)
+	req.Select = selectCount
 
 	res, err := q.table.db.client.Query(req)
 	if err != nil {
@@ -161,28 +174,28 @@ func (q *Query) queryInput() *dynamodb.QueryInput {
 		req.ConsistentRead = aws.Boolean(q.consistent)
 	}
 	if q.limit > 0 {
-		req.Limit = aws.Integer(q.limit)
+		req.Limit = aws.Long(q.limit)
 	}
 	if q.projection != "" {
-		req.ProjectionExpression = aws.String(q.projection)
+		req.ProjectionExpression = &q.projection
 	}
 	return req
 }
 
-func (q *Query) keyConditions() map[string]dynamodb.Condition {
-	conds := map[string]dynamodb.Condition{
-		q.hashKey: dynamodb.Condition{
-			AttributeValueList: []dynamodb.AttributeValue{q.hashValue},
-			ComparisonOperator: aws.StringValue(Equals),
+func (q *Query) keyConditions() *map[string]*dynamodb.Condition {
+	conds := map[string]*dynamodb.Condition{
+		q.hashKey: &dynamodb.Condition{
+			AttributeValueList: []*dynamodb.AttributeValue{q.hashValue},
+			ComparisonOperator: Equals,
 		},
 	}
 	if q.rangeKey != "" && q.rangeOp != nil {
-		conds[q.rangeKey] = dynamodb.Condition{
+		conds[q.rangeKey] = &dynamodb.Condition{
 			AttributeValueList: q.rangeValues,
-			ComparisonOperator: aws.StringValue(q.rangeOp),
+			ComparisonOperator: q.rangeOp,
 		}
 	}
-	return conds
+	return &conds
 }
 
 func (q *Query) getItemInput() *dynamodb.GetItemInput {
@@ -199,14 +212,14 @@ func (q *Query) getItemInput() *dynamodb.GetItemInput {
 	return req
 }
 
-func (q *Query) keys() map[string]dynamodb.AttributeValue {
-	keys := map[string]dynamodb.AttributeValue{
+func (q *Query) keys() *map[string]*dynamodb.AttributeValue {
+	keys := map[string]*dynamodb.AttributeValue{
 		q.hashKey: q.hashValue,
 	}
 	if q.rangeKey != "" && len(q.rangeValues) > 0 {
 		keys[q.rangeKey] = q.rangeValues[0]
 	}
-	return keys
+	return &keys
 }
 
 func (q *Query) setError(err error) {

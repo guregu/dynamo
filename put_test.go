@@ -10,8 +10,7 @@ import (
 )
 
 func TestPutItem(t *testing.T) {
-	creds := aws.DetectCreds("", "", "")
-	db := New(creds, "ap-southeast-1", nil)
+	db := testDB()
 	hits := db.Table("TestDB")
 	i := 777777
 	h := hit{

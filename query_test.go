@@ -22,8 +22,7 @@ type hit struct {
 }
 
 func TestGetCount(t *testing.T) {
-	creds := aws.DetectCreds("", "", "")
-	db := New(creds, "ap-southeast-1", nil)
+	db := testDB()
 	hits := db.Table("TestDB")
 	q := hits.Get("UserID", 613)
 	ct, err := q.Count()
@@ -32,8 +31,7 @@ func TestGetCount(t *testing.T) {
 }
 
 func TestGetAll(t *testing.T) {
-	creds := aws.DetectCreds("", "", "")
-	db := New(creds, "ap-southeast-1", nil)
+	db := testDB()
 	hits := db.Table("TestDB")
 	q := hits.Get("UserID", 666)
 	// q.Range("Date", Between, 1425279050, 1425279200)
@@ -54,8 +52,7 @@ func TestGetAll(t *testing.T) {
 }
 
 func TestGetOne(t *testing.T) {
-	creds := aws.DetectCreds("", "", "")
-	db := New(creds, "ap-southeast-1", nil)
+	db := testDB()
 	hits := db.Table("TestDB")
 
 	var h hit

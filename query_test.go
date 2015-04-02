@@ -24,7 +24,7 @@ type hit struct {
 func TestGetCount(t *testing.T) {
 	db := testDB()
 	hits := db.Table("TestDB")
-	q := hits.Get("UserID", 613)
+	q := hits.Get("UserID", 666)
 	ct, err := q.Count()
 	t.Log("count", ct, err)
 	t.Fail()

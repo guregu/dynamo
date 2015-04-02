@@ -145,23 +145,32 @@ func (q *Query) All(out interface{}) error {
 	return unmarshalAll(items, out)
 }
 
-func (q *Query) Count() (int, error) {
+func (q *Query) Count() (int64, error) {
 	if q.err != nil {
 		return 0, q.err
 	}
 
-	req := q.queryInput()
-	req.Select = selectCount
+	var count int64
+	for {
+		req := q.queryInput()
+		req.Select = selectCount
 
-	res, err := q.table.db.client.Query(req)
-	if err != nil {
-		return 0, err
-	}
-	if res.Count == nil {
-		return 0, errors.New("nil count")
+		res, err := q.table.db.client.Query(req)
+		if err != nil {
+			return 0, err
+		}
+		if res.Count == nil {
+			return 0, errors.New("nil count")
+		}
+		count += *res.Count
+
+		q.startKey = res.LastEvaluatedKey
+		if res.LastEvaluatedKey == nil || q.limit > 0 {
+			break
+		}
 	}
 
-	return int(*res.Count), nil
+	return count, nil
 }
 
 func (q *Query) queryInput() *dynamodb.QueryInput {

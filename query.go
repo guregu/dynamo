@@ -15,6 +15,7 @@ type Query struct {
 
 	hashKey   string
 	hashValue *dynamodb.AttributeValue
+	index     string
 
 	rangeKey    string
 	rangeValues []*dynamodb.AttributeValue
@@ -23,6 +24,7 @@ type Query struct {
 	projection string
 	consistent bool
 	limit      int64
+	order      Order
 
 	err error
 }
@@ -49,6 +51,13 @@ var (
 	In                   = Operator(aws.String("IN"))
 )
 
+type Order *bool
+
+var (
+	Ascending  Order = Order(aws.Boolean(true))  // ScanIndexForward = true
+	Descending Order = Order(aws.Boolean(false)) // ScanIndexForward = false
+)
+
 var (
 	selectAllAttributes      = aws.String("ALL_ATTRIBUTES")
 	selectCount              = aws.String("COUNT")
@@ -73,6 +82,11 @@ func (q *Query) Range(key string, op Operator, values ...interface{}) *Query {
 	return q
 }
 
+func (q *Query) Index(name string) *Query {
+	q.index = name
+	return q
+}
+
 func (q *Query) Project(expr ...string) *Query {
 	q.projection = strings.Join(expr, ", ")
 	return q
@@ -85,6 +99,11 @@ func (q *Query) Consistent(on bool) *Query {
 
 func (q *Query) Limit(limit int64) *Query {
 	q.limit = limit
+	return q
+}
+
+func (q *Query) Order(order Order) *Query {
+	q.order = order
 	return q
 }
 
@@ -187,6 +206,12 @@ func (q *Query) queryInput() *dynamodb.QueryInput {
 	}
 	if q.projection != "" {
 		req.ProjectionExpression = &q.projection
+	}
+	if q.index != "" {
+		req.IndexName = &q.index
+	}
+	if q.order != nil {
+		req.ScanIndexForward = q.order
 	}
 	return req
 }

@@ -38,6 +38,7 @@ func TestGetAll(t *testing.T) {
 	// q.Range("Date", Equals, 1425279099)
 	// q.Consistent(true)
 	// q.Project("UserID", "Date", "ContentID", "Page", "Test[1]")
+	// q.Order(Descending)
 
 	var records []hit
 	err := q.All(&records)

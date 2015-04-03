@@ -1,6 +1,8 @@
 package dynamo
 
 import (
+	"time"
+
 	"github.com/awslabs/aws-sdk-go/aws"
 	"github.com/awslabs/aws-sdk-go/service/dynamodb"
 )
@@ -8,6 +10,8 @@ import (
 type DB struct {
 	client *dynamodb.DynamoDB
 }
+
+const retryTimeout = 1 * time.Minute // TODO: make this configurable
 
 func New(cfg *aws.Config) *DB {
 	db := &DB{

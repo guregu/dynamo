@@ -1,9 +1,6 @@
 package dynamo
 
 import (
-	// "errors"
-	// "strings"
-
 	"github.com/awslabs/aws-sdk-go/aws"
 	"github.com/awslabs/aws-sdk-go/service/dynamodb"
 	// "github.com/davecgh/go-spew/spew"
@@ -22,6 +19,9 @@ func (table Table) Put(item interface{}) error {
 		Item:      encoded,
 	}
 
-	_, err = table.db.client.PutItem(req)
+	err = retry(func() error {
+		_, err := table.db.client.PutItem(req)
+		return err
+	})
 	return err
 }

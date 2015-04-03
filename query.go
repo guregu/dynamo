@@ -120,13 +120,20 @@ func (q *Query) One(out interface{}) error {
 	// otherwise use GetItem
 	req := q.getItemInput()
 
-	res, err := q.table.db.client.GetItem(req)
+	var res *dynamodb.GetItemOutput
+	err := retry(func() error {
+		var err error
+		res, err = q.table.db.client.GetItem(req)
+		if err != nil {
+			return err
+		}
+		if res.Item == nil {
+			return ErrNotFound
+		}
+		return nil
+	})
 	if err != nil {
 		return err
-	}
-
-	if res.Item == nil {
-		return ErrNotFound
 	}
 
 	return unmarshalItem(res.Item, out)
@@ -142,15 +149,23 @@ func (q *Query) All(out interface{}) error {
 	for {
 		req := q.queryInput()
 
-		res, err := q.table.db.client.Query(req)
+		var res *dynamodb.QueryOutput
+		err := retry(func() error {
+			var err error
+			res, err = q.table.db.client.Query(req)
+			if err != nil {
+				return err
+			}
+
+			if items == nil {
+				items = res.Items
+			} else {
+				items = append(items, res.Items...)
+			}
+			return nil
+		})
 		if err != nil {
 			return err
-		}
-
-		if items == nil {
-			items = res.Items
-		} else {
-			items = append(items, res.Items...)
 		}
 
 		// do we need to check for more results?
@@ -170,18 +185,26 @@ func (q *Query) Count() (int64, error) {
 	}
 
 	var count int64
+	var res *dynamodb.QueryOutput
 	for {
 		req := q.queryInput()
 		req.Select = selectCount
 
-		res, err := q.table.db.client.Query(req)
+		err := retry(func() error {
+			var err error
+			res, err = q.table.db.client.Query(req)
+			if err != nil {
+				return err
+			}
+			if res.Count == nil {
+				return errors.New("nil count")
+			}
+			count += *res.Count
+			return nil
+		})
 		if err != nil {
 			return 0, err
 		}
-		if res.Count == nil {
-			return 0, errors.New("nil count")
-		}
-		count += *res.Count
 
 		q.startKey = res.LastEvaluatedKey
 		if res.LastEvaluatedKey == nil || q.limit > 0 {

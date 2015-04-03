@@ -1,7 +1,6 @@
 package dynamo
 
 import (
-	"log"
 	"time"
 
 	"github.com/awslabs/aws-sdk-go/aws"
@@ -25,11 +24,9 @@ func retry(f func() error) error {
 		}
 
 		if next = b.NextBackOff(); next == backoff.Stop {
-			log.Println("backoff: giving up", b.GetElapsedTime())
 			return err
 		}
 
-		log.Println("sleeping fr", next)
 		time.Sleep(next)
 	}
 }

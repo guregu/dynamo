@@ -12,15 +12,15 @@ import (
 
 /*
 types
-B 	[]byte
+B 	 []byte
 BOOL bool
-BS 	[][]byte
-L 	[]any
-M 	map[string]any
-N 	int64 or float64
+BS 	 [][]byte
+L 	 []any
+M 	 map[string]any
+N 	 int64 or float64
 NULL bool?
-S 	string
-SS 	[]string
+S 	 string
+SS 	 []string
 */
 
 type Unmarshaler interface {

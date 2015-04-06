@@ -19,3 +19,9 @@ func New(cfg *aws.Config) *DB {
 	}
 	return db
 }
+
+// Iter is an iterator for query results.
+type Iter interface {
+	Next(out interface{}) bool
+	Err() error
+}

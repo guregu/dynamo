@@ -12,10 +12,10 @@ import (
 type Query struct {
 	table    Table
 	startKey *map[string]*dynamodb.AttributeValue
+	index    string
 
 	hashKey   string
 	hashValue *dynamodb.AttributeValue
-	index     string
 
 	rangeKey    string
 	rangeValues []*dynamodb.AttributeValue

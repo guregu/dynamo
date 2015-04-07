@@ -41,12 +41,22 @@ func (q *Scan) Filter(expr string) *Scan {
 }
 
 func (q *Scan) Iter() Iter {
-	return &scanIter{scan: q}
+	return &scanIter{
+		scan:      q,
+		unmarshal: unmarshalItem,
+	}
 }
 
-// func (q *Scan) All(out interface{}) error {
-// 	return nil
-// }
+func (q *Scan) All(out interface{}) error {
+	itr := &scanIter{
+		scan:      q,
+		unmarshal: unmarshalAppend,
+	}
+	for itr.Next(out) {
+
+	}
+	return itr.Err()
+}
 
 func (q *Scan) scanInput() *dynamodb.ScanInput {
 	input := &dynamodb.ScanInput{
@@ -75,6 +85,8 @@ type scanIter struct {
 	output *dynamodb.ScanOutput
 	err    error
 	idx    int
+
+	unmarshal func(*map[string]*dynamodb.AttributeValue, interface{}) error
 }
 
 func (itr *scanIter) Next(out interface{}) bool {
@@ -86,7 +98,7 @@ func (itr *scanIter) Next(out interface{}) bool {
 	// can we use results we already have?
 	if itr.output != nil && itr.idx < len(itr.output.Items) {
 		item := itr.output.Items[itr.idx]
-		itr.err = unmarshalItem(item, out)
+		itr.err = itr.unmarshal(item, out)
 		itr.idx++
 		return itr.err == nil
 	}
@@ -121,7 +133,7 @@ func (itr *scanIter) Next(out interface{}) bool {
 		return false
 	}
 
-	itr.err = unmarshalItem(itr.output.Items[itr.idx], out)
+	itr.err = itr.unmarshal(itr.output.Items[itr.idx], out)
 	itr.idx++
 	fmt.Println("err", itr.err)
 	return itr.err == nil

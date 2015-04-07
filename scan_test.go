@@ -13,5 +13,9 @@ func TestScan(t *testing.T) {
 	for itr.Next(&item) {
 		t.Logf("-- item %#v %v \n", item, itr.Err())
 	}
+
+	var items []hit
+	hits.Scan().All(&items)
+	t.Log("ITEMS", items)
 	t.Fail()
 }

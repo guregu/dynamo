@@ -158,3 +158,21 @@ func unmarshalAll(items []*map[string]*dynamodb.AttributeValue, out interface{})
 	resultv.Elem().Set(slicev.Slice(0, len(items)))
 	return nil
 }
+
+func unmarshalAppend(item *map[string]*dynamodb.AttributeValue, out interface{}) error {
+	resultv := reflect.ValueOf(out)
+	if resultv.Kind() != reflect.Ptr || resultv.Elem().Kind() != reflect.Slice {
+		panic("result argument must be a slice address")
+	}
+
+	slicev := resultv.Elem()
+	elemt := slicev.Type().Elem()
+	elemp := reflect.New(elemt)
+	if err := unmarshalItem(item, elemp.Interface()); err != nil {
+		return err
+	}
+	slicev = reflect.Append(slicev, elemp.Elem())
+
+	resultv.Elem().Set(slicev)
+	return nil
+}

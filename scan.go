@@ -1,7 +1,6 @@
 package dynamo
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/awslabs/aws-sdk-go/aws"
@@ -128,14 +127,8 @@ func (itr *scanIter) Next(out interface{}) bool {
 		return false
 	}
 
-	// ran out of results
-	if len(itr.output.Items) == 0 {
-		return false
-	}
-
 	itr.err = itr.unmarshal(itr.output.Items[itr.idx], out)
 	itr.idx++
-	fmt.Println("err", itr.err)
 	return itr.err == nil
 }
 

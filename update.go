@@ -11,7 +11,8 @@ import (
 )
 
 type Update struct {
-	table Table
+	table      Table
+	returnType string
 
 	hashKey   string
 	hashValue *dynamodb.AttributeValue
@@ -84,8 +85,39 @@ func (u *Update) Remove(names ...string) *Update {
 }
 
 func (u *Update) Run() error {
+	if u.err != nil {
+		return u.err
+	}
+
+	u.returnType = "NONE"
 	_, err := u.run()
 	return err
+}
+
+func (u *Update) Value(out interface{}) error {
+	if u.err != nil {
+		return u.err
+	}
+
+	u.returnType = "ALL_NEW"
+	output, err := u.run()
+	if err != nil {
+		return err
+	}
+	return unmarshalItem(output.Attributes, out)
+}
+
+func (u *Update) OldValue(out interface{}) error {
+	if u.err != nil {
+		return u.err
+	}
+
+	u.returnType = "ALL_OLD"
+	output, err := u.run()
+	if err != nil {
+		return err
+	}
+	return unmarshalItem(output.Attributes, out)
 }
 
 func (u *Update) run() (*dynamodb.UpdateItemOutput, error) {
@@ -107,6 +139,7 @@ func (u *Update) updateInput() *dynamodb.UpdateItemInput {
 		UpdateExpression:          u.updateExpr(),
 		ExpressionAttributeNames:  u.nameMap(),
 		ExpressionAttributeValues: u.expvals(),
+		ReturnValues:              &u.returnType,
 	}
 	return input
 }

@@ -6,8 +6,6 @@ import (
 
 	"github.com/awslabs/aws-sdk-go/aws"
 	"github.com/awslabs/aws-sdk-go/service/dynamodb"
-
-	"github.com/davecgh/go-spew/spew"
 )
 
 type Update struct {
@@ -122,7 +120,6 @@ func (u *Update) OldValue(out interface{}) error {
 
 func (u *Update) run() (*dynamodb.UpdateItemOutput, error) {
 	input := u.updateInput()
-	spew.Dump(input)
 	var output *dynamodb.UpdateItemOutput
 	err := retry(func() error {
 		var err error

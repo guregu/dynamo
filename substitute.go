@@ -27,7 +27,6 @@ func (s *subber) substitute(name string) string {
 
 		sub := fmt.Sprintf("#s%d", len(s.nameExpr))
 		s.nameExpr[sub] = aws.String(name)
-		fmt.Println("subbing", name, sub)
 		return sub
 	}
 	return name

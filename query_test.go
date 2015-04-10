@@ -18,7 +18,8 @@ type hit struct {
 	SkipThis  string `dynamo:"-"`
 	Bonus     *int   `dynamo:",omitempty"`
 
-	TestText toki.Time
+	TestText  toki.Time
+	SkipMePlz time.Time `dynamo:",omitempty"`
 }
 
 func TestGetCount(t *testing.T) {

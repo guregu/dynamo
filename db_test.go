@@ -8,7 +8,7 @@ func testDB() *DB {
 	creds := aws.DetectCreds("", "", "")
 	return New(&aws.Config{
 		Credentials: creds,
-		Region:      "ap-southeast-1",
+		Region:      "us-west-2",
 		HTTPClient:  nil,
 	})
 }

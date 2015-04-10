@@ -35,7 +35,8 @@ func marshalStruct(v interface{}) (*map[string]*dynamodb.AttributeValue, error) 
 		switch {
 		case name == "-":
 			continue
-		case special == "omitempty":
+		case special == "omitempty",
+			field.Type.Kind() == reflect.String: // automatically omit empty strings
 			if isZero(fv) {
 				continue
 			}
@@ -161,10 +162,21 @@ func fieldName(field reflect.StructField) (name, special string) {
 	return
 }
 
+type isZeroer interface {
+	IsZero() bool
+}
+
 // thanks James Henstridge
 // TODO: tweak
 // TODO: IsZero() interface support
 func isZero(rv reflect.Value) bool {
+	// use IsZero for supported types
+	if rv.CanInterface() {
+		if zeroer, ok := rv.Interface().(isZeroer); ok {
+			return zeroer.IsZero()
+		}
+	}
+
 	switch rv.Kind() {
 	case reflect.Func, reflect.Map, reflect.Slice:
 		return rv.IsNil()

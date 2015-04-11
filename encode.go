@@ -33,6 +33,8 @@ func marshalStruct(v interface{}) (*map[string]*dynamodb.AttributeValue, error) 
 
 		name, special := fieldName(field)
 		switch {
+		case !fv.CanInterface():
+			continue
 		case name == "-":
 			continue
 		case special == "omitempty",
@@ -98,6 +100,7 @@ func marshal(v interface{}) (*dynamodb.AttributeValue, error) {
 		// why are these pointers amazon seriously
 		strptrs := make([]*string, 0, len(x))
 		for _, s := range x {
+			s := s
 			strptrs = append(strptrs, &s)
 		}
 		return &dynamodb.AttributeValue{SS: strptrs}, nil

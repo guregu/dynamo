@@ -79,6 +79,29 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 			return errors.New("expected S to be non-nil")
 		}
 		rv.SetString(*av.S)
+	case reflect.Slice:
+		switch rv.Type().Elem().Kind() {
+		case reflect.String:
+			if av.SS == nil {
+				return errors.New("string slice but SS is nil")
+			}
+			slicev := rv.Slice(0, rv.Cap())
+			for i, sptr := range av.SS {
+				slicev = reflectAppend(i, *sptr, slicev)
+			}
+		case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
+			if av.NS == nil {
+				return errors.New("int slice but NS is nil")
+			}
+			slicev := rv.Slice(0, rv.Cap())
+			for i, nptr := range av.NS {
+				n, err := strconv.ParseInt(*nptr, 10, 64)
+				if err != nil {
+					return err
+				}
+				slicev = reflectAppend(i, n, slicev)
+			}
+		}
 	default:
 		var iface = rv.Interface()
 		if rv.CanAddr() {
@@ -92,6 +115,17 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 		return fmt.Errorf("can't unmarshal to type: %T (%+v)", iface, iface)
 	}
 	return nil
+}
+
+func reflectAppend(i int, iface interface{}, slicev reflect.Value) reflect.Value {
+	iv := reflect.ValueOf(iface)
+	if slicev.Len() == i {
+		slicev = reflect.Append(slicev, iv)
+		slicev = slicev.Slice(0, slicev.Cap())
+	} else {
+		slicev.Index(i).Set(iv)
+	}
+	return slicev
 }
 
 // unmarshals a struct

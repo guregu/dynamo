@@ -20,6 +20,8 @@ type hit struct {
 
 	TestText  toki.Time
 	SkipMePlz time.Time `dynamo:",omitempty"`
+
+	StringSlice []string
 }
 
 func TestGetCount(t *testing.T) {

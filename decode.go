@@ -81,25 +81,45 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 		rv.SetString(*av.S)
 	case reflect.Slice:
 		switch rv.Type().Elem().Kind() {
+		// []string
 		case reflect.String:
-			if av.SS == nil {
-				return errors.New("string slice but SS is nil")
-			}
-			slicev := rv.Slice(0, rv.Cap())
-			for i, sptr := range av.SS {
-				slicev = reflectAppend(i, *sptr, slicev)
-			}
-		case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
-			if av.NS == nil {
-				return errors.New("int slice but NS is nil")
-			}
-			slicev := rv.Slice(0, rv.Cap())
-			for i, nptr := range av.NS {
-				n, err := strconv.ParseInt(*nptr, 10, 64)
-				if err != nil {
-					return err
+			switch {
+			case av.SS != nil:
+				slicev := rv.Slice(0, rv.Cap())
+				for i, sptr := range av.SS {
+					slicev = reflectAppend(i, *sptr, slicev)
 				}
-				slicev = reflectAppend(i, n, slicev)
+			case av.L != nil:
+				slicev := rv.Slice(0, rv.Cap())
+				for i, listAV := range av.L {
+					slicev = reflectAppend(i, *listAV.S, slicev)
+				}
+			default:
+				return errors.New("string slice but SS and L are nil")
+			}
+		// []int family
+		case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
+			switch {
+			case av.NS != nil:
+				slicev := rv.Slice(0, rv.Cap())
+				for i, nptr := range av.NS {
+					n, err := strconv.ParseInt(*nptr, 10, 64)
+					if err != nil {
+						return err
+					}
+					slicev = reflectAppend(i, n, slicev)
+				}
+			case av.L != nil:
+				slicev := rv.Slice(0, rv.Cap())
+				for i, listAV := range av.L {
+					n, err := strconv.ParseInt(*listAV.N, 10, 64)
+					if err != nil {
+						return err
+					}
+					slicev = reflectAppend(i, n, slicev)
+				}
+			default:
+				return errors.New("int slice but NS and L are nil")
 			}
 		}
 	default:

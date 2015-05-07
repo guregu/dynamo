@@ -5,9 +5,8 @@ import (
 )
 
 func testDB() *DB {
-	creds := aws.DetectCreds("", "", "")
 	return New(&aws.Config{
-		Credentials: creds,
+		Credentials: aws.DefaultChainCredentials,
 		Region:      "us-west-2",
 		HTTPClient:  nil,
 	})

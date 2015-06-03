@@ -12,11 +12,11 @@ type subber struct {
 	nameExpr map[string]*string
 }
 
-func (s *subber) nameMap() *map[string]*string {
+func (s *subber) nameMap() map[string]*string {
 	if len(s.nameExpr) == 0 {
 		return nil
 	}
-	return &s.nameExpr
+	return s.nameExpr
 }
 
 func (s *subber) substitute(name string) string {

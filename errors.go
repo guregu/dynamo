@@ -3,7 +3,8 @@ package dynamo
 import (
 	"time"
 
-	"github.com/awslabs/aws-sdk-go/aws"
+	//"github.com/awslabs/aws-sdk-go/aws"
+	"github.com/awslabs/aws-sdk-go/aws/awserr"
 	"github.com/cenkalti/backoff"
 )
 
@@ -32,12 +33,12 @@ func retry(f func() error) error {
 }
 
 func canRetry(err error) bool {
-	if ae, ok := err.(aws.APIError); ok {
-		switch ae.StatusCode {
+	if ae, ok := err.(awserr.RequestFailure); ok {
+		switch ae.StatusCode() {
 		case 500, 503:
 			return true
 		case 400:
-			switch ae.Code {
+			switch ae.Code() {
 			case "ProvisionedThroughputExceededException",
 				"ThrottlingException":
 				return true

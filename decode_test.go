@@ -17,7 +17,7 @@ func TestUnmarshalAppend(t *testing.T) {
 	}
 
 	for range [15]struct{}{} {
-		unmarshalAppend(&item, &results)
+		unmarshalAppend(item, &results)
 	}
 	log.Println(results)
 

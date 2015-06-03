@@ -15,7 +15,7 @@ type Marshaler interface {
 	MarshalDynamo() (*dynamodb.AttributeValue, error)
 }
 
-func marshalStruct(v interface{}) (*map[string]*dynamodb.AttributeValue, error) {
+func marshalStruct(v interface{}) (map[string]*dynamodb.AttributeValue, error) {
 	item := make(map[string]*dynamodb.AttributeValue)
 	var err error
 	rv := reflect.ValueOf(v)
@@ -50,7 +50,7 @@ func marshalStruct(v interface{}) (*map[string]*dynamodb.AttributeValue, error) 
 		}
 		item[name] = av
 	}
-	return &item, err
+	return item, err
 }
 
 func marshal(v interface{}) (*dynamodb.AttributeValue, error) {

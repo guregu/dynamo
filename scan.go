@@ -9,7 +9,7 @@ import (
 
 type Scan struct {
 	table    Table
-	startKey *map[string]*dynamodb.AttributeValue
+	startKey map[string]*dynamodb.AttributeValue
 	index    string
 
 	projection string
@@ -85,7 +85,7 @@ type scanIter struct {
 	err    error
 	idx    int
 
-	unmarshal func(*map[string]*dynamodb.AttributeValue, interface{}) error
+	unmarshal func(map[string]*dynamodb.AttributeValue, interface{}) error
 }
 
 func (itr *scanIter) Next(out interface{}) bool {

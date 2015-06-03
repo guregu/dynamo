@@ -11,7 +11,7 @@ import (
 
 type Query struct {
 	table    Table
-	startKey *map[string]*dynamodb.AttributeValue
+	startKey map[string]*dynamodb.AttributeValue
 	index    string
 
 	hashKey   string
@@ -145,7 +145,7 @@ func (q *Query) All(out interface{}) error {
 	}
 
 	// TODO: make this smarter by appending to the result array
-	var items []*map[string]*dynamodb.AttributeValue
+	var items []map[string]*dynamodb.AttributeValue
 	for {
 		req := q.queryInput()
 
@@ -239,7 +239,7 @@ func (q *Query) queryInput() *dynamodb.QueryInput {
 	return req
 }
 
-func (q *Query) keyConditions() *map[string]*dynamodb.Condition {
+func (q *Query) keyConditions() map[string]*dynamodb.Condition {
 	conds := map[string]*dynamodb.Condition{
 		q.hashKey: &dynamodb.Condition{
 			AttributeValueList: []*dynamodb.AttributeValue{q.hashValue},
@@ -252,7 +252,7 @@ func (q *Query) keyConditions() *map[string]*dynamodb.Condition {
 			ComparisonOperator: q.rangeOp,
 		}
 	}
-	return &conds
+	return conds
 }
 
 func (q *Query) getItemInput() *dynamodb.GetItemInput {
@@ -269,14 +269,14 @@ func (q *Query) getItemInput() *dynamodb.GetItemInput {
 	return req
 }
 
-func (q *Query) keys() *map[string]*dynamodb.AttributeValue {
+func (q *Query) keys() map[string]*dynamodb.AttributeValue {
 	keys := map[string]*dynamodb.AttributeValue{
 		q.hashKey: q.hashValue,
 	}
 	if q.rangeKey != "" && len(q.rangeValues) > 0 {
 		keys[q.rangeKey] = q.rangeValues[0]
 	}
-	return &keys
+	return keys
 }
 
 func (q *Query) setError(err error) {

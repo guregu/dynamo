@@ -150,8 +150,7 @@ func reflectAppend(i int, iface interface{}, slicev reflect.Value) reflect.Value
 
 // unmarshals a struct
 // TODO: unmarshal to map[string]interface{} too
-func unmarshalItem(itemptr *map[string]*dynamodb.AttributeValue, out interface{}) error {
-	item := *itemptr
+func unmarshalItem(item map[string]*dynamodb.AttributeValue, out interface{}) error {
 	rv := reflect.ValueOf(out)
 
 	if rv.Kind() != reflect.Ptr {
@@ -186,7 +185,7 @@ func unmarshalItem(itemptr *map[string]*dynamodb.AttributeValue, out interface{}
 }
 
 // unmarshals to a slice
-func unmarshalAll(items []*map[string]*dynamodb.AttributeValue, out interface{}) error {
+func unmarshalAll(items []map[string]*dynamodb.AttributeValue, out interface{}) error {
 	// cribbed from mgo
 	resultv := reflect.ValueOf(out)
 	if resultv.Kind() != reflect.Ptr || resultv.Elem().Kind() != reflect.Slice {
@@ -213,7 +212,7 @@ func unmarshalAll(items []*map[string]*dynamodb.AttributeValue, out interface{})
 	return nil
 }
 
-func unmarshalAppend(item *map[string]*dynamodb.AttributeValue, out interface{}) error {
+func unmarshalAppend(item map[string]*dynamodb.AttributeValue, out interface{}) error {
 	resultv := reflect.ValueOf(out)
 	if resultv.Kind() != reflect.Ptr || resultv.Elem().Kind() != reflect.Slice {
 		panic("result argument must be a slice address")

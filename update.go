@@ -141,14 +141,14 @@ func (u *Update) updateInput() *dynamodb.UpdateItemInput {
 	return input
 }
 
-func (u *Update) key() *map[string]*dynamodb.AttributeValue {
+func (u *Update) key() map[string]*dynamodb.AttributeValue {
 	key := map[string]*dynamodb.AttributeValue{
 		u.hashKey: u.hashValue,
 	}
 	if u.rangeKey != "" {
 		key[u.rangeKey] = u.rangeValue
 	}
-	return &key
+	return key
 }
 
 func (u *Update) updateExpr() *string {
@@ -192,7 +192,7 @@ func (u *Update) updateExpr() *string {
 	return aws.String(strings.Join(expr, " "))
 }
 
-func (u *Update) expvals() *map[string]*dynamodb.AttributeValue {
+func (u *Update) expvals() map[string]*dynamodb.AttributeValue {
 	l := len(u.set) + len(u.add) + len(u.del)
 	if l == 0 {
 		return nil
@@ -213,7 +213,7 @@ func (u *Update) expvals() *map[string]*dynamodb.AttributeValue {
 		ev := fmt.Sprintf(":d%s", k)
 		expvals[ev] = v
 	}
-	return &expvals
+	return expvals
 }
 
 func (u *Update) setError(err error) {

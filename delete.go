@@ -65,14 +65,14 @@ func (d *Delete) deleteInput() *dynamodb.DeleteItemInput {
 	return input
 }
 
-func (d *Delete) key() *map[string]*dynamodb.AttributeValue {
+func (d *Delete) key() map[string]*dynamodb.AttributeValue {
 	key := map[string]*dynamodb.AttributeValue{
 		d.hashKey: d.hashValue,
 	}
 	if d.rangeKey != "" {
 		key[d.rangeKey] = d.rangeValue
 	}
-	return &key
+	return key
 }
 
 func (d *Delete) setError(err error) {

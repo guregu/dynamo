@@ -1,7 +1,7 @@
 package dynamo
 
 import (
-	"github.com/awslabs/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"testing"
 
 	"log"

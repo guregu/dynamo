@@ -62,6 +62,9 @@ func marshal(v interface{}) (*dynamodb.AttributeValue, error) {
 		if err != nil {
 			return nil, err
 		}
+		if len(text) == 0 {
+			return &dynamodb.AttributeValue{NULL: aws.Boolean(true)}, nil
+		}
 		return &dynamodb.AttributeValue{S: aws.String(string(text))}, err
 
 	case []byte:
@@ -97,6 +100,10 @@ func marshal(v interface{}) (*dynamodb.AttributeValue, error) {
 	case *string:
 		return &dynamodb.AttributeValue{S: x}, nil
 	case []string:
+		if len(x) == 0 {
+			return &dynamodb.AttributeValue{NULL: aws.Boolean(true)}, nil
+		}
+
 		// why are these pointers amazon seriously
 		strptrs := make([]*string, 0, len(x))
 		for _, s := range x {
@@ -105,6 +112,10 @@ func marshal(v interface{}) (*dynamodb.AttributeValue, error) {
 		}
 		return &dynamodb.AttributeValue{SS: strptrs}, nil
 	case []*string:
+		if len(x) == 0 {
+			return &dynamodb.AttributeValue{NULL: aws.Boolean(true)}, nil
+		}
+
 		return &dynamodb.AttributeValue{SS: x}, nil
 	default:
 		return marshalReflect(reflect.ValueOf(x))

@@ -94,6 +94,9 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 				for i, listAV := range av.L {
 					slicev = reflectAppend(i, *listAV.S, slicev)
 				}
+			case av.NULL != nil && *av.NULL:
+				rv.Set(reflect.Zero(rv.Type()))
+				return nil
 			default:
 				return errors.New("string slice but SS and L are nil")
 			}

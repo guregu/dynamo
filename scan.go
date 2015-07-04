@@ -52,7 +52,6 @@ func (q *Scan) All(out interface{}) error {
 		unmarshal: unmarshalAppend,
 	}
 	for itr.Next(out) {
-
 	}
 	return itr.Err()
 }

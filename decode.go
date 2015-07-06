@@ -85,17 +85,18 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 		case reflect.String:
 			switch {
 			case av.SS != nil:
-				slicev := rv.Slice(0, rv.Cap())
+				slicev := reflect.MakeSlice(rv.Type(), len(av.SS), len(av.SS))
+				// slicev := rv.Slice(0, rv.Cap())
 				for i, sptr := range av.SS {
 					slicev = reflectAppend(i, *sptr, slicev)
 				}
-				rv.Set(slicev.Slice(0, len(av.SS)))
+				rv.Set(slicev)
 			case av.L != nil:
-				slicev := rv.Slice(0, rv.Cap())
+				slicev := reflect.MakeSlice(rv.Type(), len(av.L), len(av.L))
 				for i, listAV := range av.L {
 					slicev = reflectAppend(i, *listAV.S, slicev)
 				}
-				rv.Set(slicev.Slice(0, len(av.SS)))
+				rv.Set(slicev)
 			case av.NULL != nil && *av.NULL:
 				rv.Set(reflect.Zero(rv.Type()))
 			default:
@@ -105,7 +106,7 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 		case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
 			switch {
 			case av.NS != nil:
-				slicev := rv.Slice(0, rv.Cap())
+				slicev := reflect.MakeSlice(rv.Type(), len(av.NS), len(av.NS))
 				for i, nptr := range av.NS {
 					n, err := strconv.ParseInt(*nptr, 10, 64)
 					if err != nil {
@@ -113,9 +114,9 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 					}
 					slicev = reflectAppend(i, n, slicev)
 				}
-				rv.Set(slicev.Slice(0, len(av.SS)))
+				rv.Set(slicev)
 			case av.L != nil:
-				slicev := rv.Slice(0, rv.Cap())
+				slicev := reflect.MakeSlice(rv.Type(), len(av.L), len(av.L))
 				for i, listAV := range av.L {
 					n, err := strconv.ParseInt(*listAV.N, 10, 64)
 					if err != nil {
@@ -123,7 +124,7 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 					}
 					slicev = reflectAppend(i, n, slicev)
 				}
-				rv.Set(slicev.Slice(0, len(av.SS)))
+				rv.Set(slicev)
 			default:
 				return errors.New("int slice but NS and L are nil")
 			}

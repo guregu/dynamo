@@ -85,12 +85,10 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 		case reflect.String:
 			switch {
 			case av.SS != nil:
-				fmt.Println("AHHHHHH", av)
 				slicev := rv.Slice(0, rv.Cap())
 				for i, sptr := range av.SS {
 					slicev = reflectAppend(i, *sptr, slicev)
 				}
-				fmt.Println("result", slicev.Interface())
 				rv.Set(slicev.Slice(0, len(av.SS)))
 			case av.L != nil:
 				slicev := rv.Slice(0, rv.Cap())
@@ -180,7 +178,6 @@ func unmarshalItem(item map[string]*dynamodb.AttributeValue, out interface{}) er
 			}
 
 			if av, ok := item[name]; ok {
-				fmt.Println("unmarshal", name)
 				if innerErr := unmarshalReflect(av, rv.Elem().Field(i)); innerErr != nil {
 					err = innerErr
 				}

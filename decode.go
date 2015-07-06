@@ -85,18 +85,21 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 		case reflect.String:
 			switch {
 			case av.SS != nil:
+				fmt.Println("AHHHHHH", av)
 				slicev := rv.Slice(0, rv.Cap())
 				for i, sptr := range av.SS {
 					slicev = reflectAppend(i, *sptr, slicev)
 				}
+				fmt.Println("result", slicev.Interface())
+				rv.Set(slicev.Slice(0, len(av.SS)))
 			case av.L != nil:
 				slicev := rv.Slice(0, rv.Cap())
 				for i, listAV := range av.L {
 					slicev = reflectAppend(i, *listAV.S, slicev)
 				}
+				rv.Set(slicev.Slice(0, len(av.SS)))
 			case av.NULL != nil && *av.NULL:
 				rv.Set(reflect.Zero(rv.Type()))
-				return nil
 			default:
 				return errors.New("string slice but SS and L are nil")
 			}
@@ -112,6 +115,7 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 					}
 					slicev = reflectAppend(i, n, slicev)
 				}
+				rv.Set(slicev.Slice(0, len(av.SS)))
 			case av.L != nil:
 				slicev := rv.Slice(0, rv.Cap())
 				for i, listAV := range av.L {
@@ -121,6 +125,7 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 					}
 					slicev = reflectAppend(i, n, slicev)
 				}
+				rv.Set(slicev.Slice(0, len(av.SS)))
 			default:
 				return errors.New("int slice but NS and L are nil")
 			}
@@ -175,6 +180,7 @@ func unmarshalItem(item map[string]*dynamodb.AttributeValue, out interface{}) er
 			}
 
 			if av, ok := item[name]; ok {
+				fmt.Println("unmarshal", name)
 				if innerErr := unmarshalReflect(av, rv.Elem().Field(i)); innerErr != nil {
 					err = innerErr
 				}

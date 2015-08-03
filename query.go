@@ -54,8 +54,8 @@ var (
 type Order *bool
 
 var (
-	Ascending  Order = Order(aws.Boolean(true))  // ScanIndexForward = true
-	Descending Order = Order(aws.Boolean(false)) // ScanIndexForward = false
+	Ascending  Order = Order(aws.Bool(true))  // ScanIndexForward = true
+	Descending Order = Order(aws.Bool(false)) // ScanIndexForward = false
 )
 
 var (
@@ -222,10 +222,10 @@ func (q *Query) queryInput() *dynamodb.QueryInput {
 		ExclusiveStartKey: q.startKey,
 	}
 	if q.consistent {
-		req.ConsistentRead = aws.Boolean(q.consistent)
+		req.ConsistentRead = aws.Bool(q.consistent)
 	}
 	if q.limit > 0 {
-		req.Limit = aws.Long(q.limit)
+		req.Limit = aws.Int64(q.limit)
 	}
 	if q.projection != "" {
 		req.ProjectionExpression = &q.projection
@@ -261,7 +261,7 @@ func (q *Query) getItemInput() *dynamodb.GetItemInput {
 		Key:       q.keys(),
 	}
 	if q.consistent {
-		req.ConsistentRead = aws.Boolean(q.consistent)
+		req.ConsistentRead = aws.Bool(q.consistent)
 	}
 	if q.projection != "" {
 		req.ProjectionExpression = aws.String(q.projection)

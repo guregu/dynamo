@@ -63,7 +63,7 @@ func marshal(v interface{}) (*dynamodb.AttributeValue, error) {
 			return nil, err
 		}
 		if len(text) == 0 {
-			return &dynamodb.AttributeValue{NULL: aws.Boolean(true)}, nil
+			return &dynamodb.AttributeValue{NULL: aws.Bool(true)}, nil
 		}
 		return &dynamodb.AttributeValue{S: aws.String(string(text))}, err
 
@@ -73,7 +73,7 @@ func marshal(v interface{}) (*dynamodb.AttributeValue, error) {
 		return &dynamodb.AttributeValue{BS: x}, nil
 
 	case bool:
-		return &dynamodb.AttributeValue{BOOL: aws.Boolean(x)}, nil
+		return &dynamodb.AttributeValue{BOOL: aws.Bool(x)}, nil
 
 	case int:
 		return &dynamodb.AttributeValue{N: aws.String(strconv.Itoa(x))}, nil
@@ -93,7 +93,7 @@ func marshal(v interface{}) (*dynamodb.AttributeValue, error) {
 		return &dynamodb.AttributeValue{N: aws.String(strconv.FormatFloat(float64(x), 'f', -1, 32))}, nil
 
 	case nil:
-		return &dynamodb.AttributeValue{NULL: aws.Boolean(true)}, nil
+		return &dynamodb.AttributeValue{NULL: aws.Bool(true)}, nil
 
 	case string:
 		return &dynamodb.AttributeValue{S: aws.String(x)}, nil
@@ -101,7 +101,7 @@ func marshal(v interface{}) (*dynamodb.AttributeValue, error) {
 		return &dynamodb.AttributeValue{S: x}, nil
 	case []string:
 		if len(x) == 0 {
-			return &dynamodb.AttributeValue{NULL: aws.Boolean(true)}, nil
+			return &dynamodb.AttributeValue{NULL: aws.Bool(true)}, nil
 		}
 
 		// why are these pointers amazon seriously
@@ -113,7 +113,7 @@ func marshal(v interface{}) (*dynamodb.AttributeValue, error) {
 		return &dynamodb.AttributeValue{SS: strptrs}, nil
 	case []*string:
 		if len(x) == 0 {
-			return &dynamodb.AttributeValue{NULL: aws.Boolean(true)}, nil
+			return &dynamodb.AttributeValue{NULL: aws.Bool(true)}, nil
 		}
 
 		return &dynamodb.AttributeValue{SS: x}, nil
@@ -130,12 +130,12 @@ func marshalReflect(rv reflect.Value) (*dynamodb.AttributeValue, error) {
 	switch rv.Kind() {
 	case reflect.Ptr:
 		if rv.IsNil() {
-			return &dynamodb.AttributeValue{NULL: aws.Boolean(true)}, nil
+			return &dynamodb.AttributeValue{NULL: aws.Bool(true)}, nil
 		} else {
 			return marshal(rv.Elem().Interface())
 		}
 	case reflect.Bool:
-		return &dynamodb.AttributeValue{BOOL: aws.Boolean(rv.Bool())}, nil
+		return &dynamodb.AttributeValue{BOOL: aws.Bool(rv.Bool())}, nil
 	case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
 		return &dynamodb.AttributeValue{N: aws.String(strconv.FormatInt(rv.Int(), 10))}, nil
 	case reflect.String:

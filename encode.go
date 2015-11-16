@@ -32,13 +32,14 @@ func marshalStruct(v interface{}) (map[string]*dynamodb.AttributeValue, error) {
 		fv := rv.Field(i)
 		kind := fv.Kind()
 
-		name, special := fieldName(field)
+		name, special, omitempty := fieldInfo(field)
+		_ = special // TODO: use this for lists / sets
 		switch {
 		case !fv.CanInterface():
 			continue
 		case name == "-":
 			continue
-		case special == "omitempty":
+		case omitempty:
 			if isZero(rv) {
 				continue
 			}
@@ -205,22 +206,25 @@ func marshalSlice(values []interface{}) ([]*dynamodb.AttributeValue, error) {
 	return avs, nil
 }
 
-func fieldName(field reflect.StructField) (name, special string) {
-	name = field.Tag.Get("dynamo")
-	switch name {
-	case "":
-		// no tag, use the field name
+func fieldInfo(field reflect.StructField) (name, special string, omitempty bool) {
+	tags := strings.Split(field.Tag.Get("dynamo"), ",")
+	if len(tags) == 0 {
+		return field.Name, "", false
+	}
+
+	name = tags[0]
+	if name == "" {
 		name = field.Name
-	default:
-		if idx := strings.IndexRune(name, ','); idx != -1 {
-			special = name[idx+1:]
-			if idx > 0 {
-				name = name[:idx]
-			} else {
-				name = field.Name
-			}
+	}
+
+	for _, t := range tags[1:] {
+		if t == "omitempty" {
+			omitempty = true
+		} else {
+			special = t
 		}
 	}
+
 	return
 }
 

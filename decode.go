@@ -61,12 +61,12 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 		}
 	case reflect.Bool:
 		if av.BOOL == nil {
-			return errors.New("expected BOOL to be non-nil")
+			return errors.New("dynamo: unmarshal bool: expected BOOL to be non-nil")
 		}
 		rv.SetBool(*av.BOOL)
 	case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
 		if av.N == nil {
-			return errors.New("expected N to be non-nil")
+			return errors.New("dynamo: unmarshal int: expected N to be non-nil")
 		}
 		n, err := strconv.ParseInt(*av.N, 10, 64)
 		if err != nil {
@@ -74,12 +74,37 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 		}
 		rv.SetInt(n)
 	case reflect.String:
-		// TODO: unmarshal len=1 lists to single string etc
 		if av.S == nil {
-			return errors.New("expected S to be non-nil")
+			return errors.New("dynamo: unmarshal string: expected S to be non-nil")
 		}
 		rv.SetString(*av.S)
+	case reflect.Struct:
+		if av.M == nil {
+			return errors.New("dynamo: unmarshal struct: expected M to be non-nil")
+		}
+		if err := unmarshalItem(av.M, rv.Addr().Interface()); err != nil {
+			return err
+		}
+	case reflect.Map:
+		if av.M == nil {
+			return errors.New("dynamo: unmarshal map: expected M to be non-nil")
+		}
+		if rv.IsNil() {
+			// TODO: maybe always remake this?
+			// I think the JSON library doesn't...
+			rv.Set(reflect.MakeMap(rv.Type()))
+		}
+
+		// TODO: this is probably slow
+		for k, v := range av.M {
+			innerRV := reflect.New(rv.Type().Elem())
+			if err := unmarshalReflect(v, innerRV.Elem()); err != nil {
+				return err
+			}
+			rv.SetMapIndex(reflect.ValueOf(k), innerRV.Elem())
+		}
 	case reflect.Slice:
+		// TODO: rewrite this it sucks
 		switch rv.Type().Elem().Kind() {
 		// []string
 		case reflect.String:
@@ -100,7 +125,7 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 			case av.NULL != nil && *av.NULL:
 				rv.Set(reflect.Zero(rv.Type()))
 			default:
-				return errors.New("string slice but SS and L are nil")
+				return errors.New("dynamo: unmarshal slice: string slice but SS and L are nil")
 			}
 		// []int family
 		case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
@@ -126,20 +151,12 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 				}
 				rv.Set(slicev)
 			default:
-				return errors.New("int slice but NS and L are nil")
+				return errors.New("dynamo: unmarshal slice: int slice but NS and L are nil")
 			}
 		}
 	default:
-		var iface = rv.Interface()
-		if rv.CanAddr() {
-			iface = rv.Addr().Interface()
-		}
-
-		if u, ok := iface.(Unmarshaler); ok {
-			return u.UnmarshalDynamo(av)
-		}
-
-		return fmt.Errorf("can't unmarshal to type: %T (%+v)", iface, iface)
+		iface := rv.Interface()
+		return fmt.Errorf("dynamo: can't unmarshal to type: %T (%+v)", iface, iface)
 	}
 	return nil
 }
@@ -153,6 +170,36 @@ func reflectAppend(i int, iface interface{}, slicev reflect.Value) reflect.Value
 		slicev.Index(i).Set(iv)
 	}
 	return slicev
+}
+
+func fieldsInStruct(rv reflect.Value) map[string]reflect.Value {
+	if rv.Kind() == reflect.Ptr {
+		return fieldsInStruct(rv.Elem())
+	}
+
+	fields := make(map[string]reflect.Value)
+	for i := 0; i < rv.Type().NumField(); i++ {
+		field := rv.Type().Field(i)
+		fv := rv.Field(i)
+
+		name, _, _ := fieldInfo(field)
+		if name == "-" {
+			// skip
+			continue
+		}
+
+		// embed anonymous structs
+		if fv.Type().Kind() == reflect.Struct && field.Anonymous {
+			innerFields := fieldsInStruct(fv)
+			for k, v := range innerFields {
+				fields[k] = v
+			}
+			continue
+		}
+
+		fields[name] = fv
+	}
+	return fields
 }
 
 // unmarshals a struct
@@ -169,22 +216,16 @@ func unmarshalItem(item map[string]*dynamodb.AttributeValue, out interface{}) er
 	var err error
 	switch rv.Elem().Kind() {
 	case reflect.Struct:
-		for i := 0; i < rv.Elem().Type().NumField(); i++ {
-			field := rv.Elem().Type().Field(i)
-
-			name, _ := fieldName(field)
-			if name == "-" {
-				// skip
-				continue
-			}
-
+		fields := fieldsInStruct(rv.Elem())
+		for name, fv := range fields {
 			if av, ok := item[name]; ok {
-				if innerErr := unmarshalReflect(av, rv.Elem().Field(i)); innerErr != nil {
+				if innerErr := unmarshalReflect(av, fv); innerErr != nil {
 					err = innerErr
 				}
 			}
 		}
 	default:
+		// TODO: support map[string]interface{}
 		return fmt.Errorf("unknown type: %T", out)
 	}
 

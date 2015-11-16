@@ -29,8 +29,8 @@ func marshalStruct(v interface{}) (map[string]*dynamodb.AttributeValue, error) {
 
 	for i := 0; i < rv.Type().NumField(); i++ {
 		field := rv.Type().Field(i)
-		kind := rv.Type().Kind()
 		fv := rv.Field(i)
+		kind := fv.Kind()
 
 		name, special := fieldName(field)
 		switch {
@@ -45,10 +45,11 @@ func marshalStruct(v interface{}) (map[string]*dynamodb.AttributeValue, error) {
 		case kind == reflect.String,
 			kind == reflect.Ptr,
 			kind == reflect.Map,
-			kind == reflect.Slice:
-			// automatically omit these types
+			kind == reflect.Slice,
+			kind == reflect.Interface:
+			// automatically omit these types if nil
 			// DynamoDB can't handle empty stuff in general
-			// and it's better than sending "nil"
+			// and it's better than sending "NULL: true"
 			if isZero(fv) {
 				continue
 			}

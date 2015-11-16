@@ -30,7 +30,7 @@ func TestPutItem(t *testing.T) {
 			"課金":  true,
 			"dlc": true,
 		},
-		Something: "！",
+		Something: nil,
 	}
 
 	err := hits.Put(&h)

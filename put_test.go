@@ -20,6 +20,17 @@ func TestPutItem(t *testing.T) {
 		Bonus:       &i,
 		TestText:    toki.MustParseTime("1:2:3"),
 		StringSlice: []string{"A", "B", "C", "QQQ"},
+		embedMe: embedMe{
+			Extra: true,
+		},
+		Greeting: other{
+			Hello: "world",
+		},
+		Features: map[string]bool{
+			"課金":  true,
+			"dlc": true,
+		},
+		Something: "！",
 	}
 
 	err := hits.Put(&h)

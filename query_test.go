@@ -22,6 +22,20 @@ type hit struct {
 	SkipMePlz time.Time `dynamo:",omitempty"`
 
 	StringSlice []string
+
+	embedMe
+	Greeting other
+
+	Features  map[string]bool
+	Something interface{}
+}
+
+type embedMe struct {
+	Extra bool
+}
+
+type other struct {
+	Hello string
 }
 
 func TestGetCount(t *testing.T) {

@@ -44,6 +44,18 @@ func marshalStruct(v interface{}) (map[string]*dynamodb.AttributeValue, error) {
 			}
 		}
 
+		// embed anonymous structs
+		if fv.Type().Kind() == reflect.Struct && field.Anonymous {
+			avs, err := marshalStruct(fv.Interface())
+			if err != nil {
+				return nil, err
+			}
+			for k, v := range avs {
+				item[k] = v
+			}
+			continue
+		}
+
 		av, err := marshal(fv.Interface())
 		if err != nil {
 			return nil, err
@@ -140,6 +152,25 @@ func marshalReflect(rv reflect.Value) (*dynamodb.AttributeValue, error) {
 		return &dynamodb.AttributeValue{N: aws.String(strconv.FormatInt(rv.Int(), 10))}, nil
 	case reflect.String:
 		return &dynamodb.AttributeValue{S: aws.String(rv.String())}, nil
+	case reflect.Map:
+		if rv.Type().Key().Kind() != reflect.String {
+			return nil, fmt.Errorf("dynamo marshal: map key must be string: %T", rv.Interface())
+		}
+		avs := make(map[string]*dynamodb.AttributeValue)
+		for _, key := range rv.MapKeys() {
+			v, err := marshal(rv.MapIndex(key).Interface())
+			if err != nil {
+				return nil, err
+			}
+			avs[key.String()] = v
+		}
+		return &dynamodb.AttributeValue{M: avs}, nil
+	case reflect.Struct:
+		avs, err := marshalStruct(rv.Interface())
+		if err != nil {
+			return nil, err
+		}
+		return &dynamodb.AttributeValue{M: avs}, nil
 	default:
 		return nil, fmt.Errorf("dynamo marshal: unknown type %s", rv.Type().String())
 	}

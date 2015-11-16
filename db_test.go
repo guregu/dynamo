@@ -7,7 +7,7 @@ import (
 func testDB() *DB {
 	return New(&aws.Config{
 		Credentials: aws.DefaultChainCredentials,
-		Region:      "us-west-2",
+		Region:      aws.String("us-west-2"),
 		HTTPClient:  nil,
 	})
 }

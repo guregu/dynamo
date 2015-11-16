@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
@@ -13,9 +14,9 @@ type DB struct {
 
 const retryTimeout = 1 * time.Minute // TODO: make this configurable
 
-func New(cfg *aws.Config) *DB {
+func New(p client.ConfigProvider, cfgs ...*aws.Config) *DB {
 	db := &DB{
-		dynamodb.New(cfg),
+		dynamodb.New(p, cfgs...),
 	}
 	return db
 }

@@ -71,7 +71,9 @@ func marshalStruct(v interface{}) (map[string]*dynamodb.AttributeValue, error) {
 		if err != nil {
 			return nil, err
 		}
-		item[name] = av
+		if av != nil {
+			item[name] = av
+		}
 	}
 	return item, err
 }
@@ -86,7 +88,7 @@ func marshal(v interface{}) (*dynamodb.AttributeValue, error) {
 			return nil, err
 		}
 		if len(text) == 0 {
-			return &dynamodb.AttributeValue{NULL: aws.Bool(true)}, nil
+			return nil, nil
 		}
 		return &dynamodb.AttributeValue{S: aws.String(string(text))}, err
 
@@ -173,7 +175,9 @@ func marshalReflect(rv reflect.Value) (*dynamodb.AttributeValue, error) {
 			if err != nil {
 				return nil, err
 			}
-			avs[key.String()] = v
+			if v != nil {
+				avs[key.String()] = v
+			}
 		}
 		return &dynamodb.AttributeValue{M: avs}, nil
 	case reflect.Struct:
@@ -194,7 +198,9 @@ func marshalSlice(values []interface{}) ([]*dynamodb.AttributeValue, error) {
 		if err != nil {
 			return nil, err
 		}
-		avs = append(avs, av)
+		if av != nil {
+			avs = append(avs, av)
+		}
 	}
 	return avs, nil
 }
@@ -224,13 +230,21 @@ type isZeroer interface {
 
 // thanks James Henstridge
 // TODO: tweak
-// TODO: IsZero() interface support
 func isZero(rv reflect.Value) bool {
 	// use IsZero for supported types
 	if rv.CanInterface() {
 		if zeroer, ok := rv.Interface().(isZeroer); ok {
 			return zeroer.IsZero()
 		}
+	}
+
+	// always return false for certain interfaces, check these later
+	iface := rv.Interface()
+	switch iface.(type) {
+	case Marshaler:
+		return false
+	case encoding.TextMarshaler:
+		return false
 	}
 
 	switch rv.Kind() {

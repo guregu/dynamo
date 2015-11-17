@@ -38,21 +38,21 @@ func (table Table) Update(hashKey string, value interface{}) *Update {
 		del:    make(map[string]*dynamodb.AttributeValue),
 		remove: make(map[string]struct{}),
 	}
-	u.hashValue, u.err = marshal(value)
+	u.hashValue, u.err = marshal(value, "")
 	return u
 }
 
 func (u *Update) Range(name string, value interface{}) *Update {
 	var err error
 	u.rangeKey = name
-	u.rangeValue, err = marshal(value)
+	u.rangeValue, err = marshal(value, "")
 	u.setError(err)
 	return u
 }
 
 func (u *Update) Set(name string, value interface{}) *Update {
 	name = u.substitute(name)
-	av, err := marshal(value)
+	av, err := marshal(value, "")
 	u.setError(err)
 	u.set[name] = av
 	return u
@@ -60,7 +60,7 @@ func (u *Update) Set(name string, value interface{}) *Update {
 
 func (u *Update) Add(name string, value interface{}) *Update {
 	name = u.substitute(name)
-	av, err := marshal(value)
+	av, err := marshal(value, "")
 	u.setError(err)
 	u.add[name] = av
 	return u
@@ -68,7 +68,7 @@ func (u *Update) Add(name string, value interface{}) *Update {
 
 func (u *Update) Delete(name string, value interface{}) *Update {
 	name = u.substitute(name)
-	av, err := marshal(value) // TODO: marshal slices to sets
+	av, err := marshal(value, "")
 	u.setError(err)
 	u.del[name] = av
 	return u

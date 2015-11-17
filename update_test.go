@@ -16,5 +16,5 @@ func TestUpdate(t *testing.T) {
 	}
 	t.Logf("updated: %#v", ctr)
 
-	t.Fail()
+	// t.Fail()
 }

@@ -7,11 +7,9 @@ import (
 	"github.com/guregu/toki"
 )
 
-func TestPutItem(t *testing.T) {
-	db := testDB()
-	hits := db.Table("TestDB")
-	i := 777777
-	h := hit{
+func BenchmarkEncode(b *testing.B) {
+	i := 500
+	item := hit{
 		User:        666,
 		Date:        unixTime{time.Now()},
 		ContentID:   "監獄学園",
@@ -31,11 +29,9 @@ func TestPutItem(t *testing.T) {
 			"dlc": true,
 		},
 		Something: nil,
-		Check:     makeSuperComplex(),
 	}
 
-	err := hits.Put(&h)
-
-	t.Log(err)
-	// t.Fail()
+	for n := 0; n < b.N; n++ {
+		marshalStruct(&item)
+	}
 }

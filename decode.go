@@ -10,31 +10,12 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
-/*
-types
-B 	 []byte
-BOOL bool
-BS 	 [][]byte
-L 	 []any
-M 	 map[string]any
-N 	 int64 or float64
-NULL bool?
-S 	 string
-SS 	 []string
-*/
-
 type Unmarshaler interface {
 	UnmarshalDynamo(av *dynamodb.AttributeValue) error
 }
 
-func unmarshal(av *dynamodb.AttributeValue, out interface{}) error {
-	return nil
-}
-
 // unmarshals one value
 func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
-	// TODO: fix fix fix
-
 	// first try interface unmarshal stuff
 	if rv.CanInterface() {
 		var iface = rv.Interface()
@@ -89,6 +70,7 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 		if av.M == nil {
 			return errors.New("dynamo: unmarshal map: expected M to be non-nil")
 		}
+
 		if rv.IsNil() {
 			// TODO: maybe always remake this?
 			// I think the JSON library doesn't...
@@ -104,56 +86,7 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 			rv.SetMapIndex(reflect.ValueOf(k), innerRV.Elem())
 		}
 	case reflect.Slice:
-		// TODO: rewrite this it sucks
-		switch rv.Type().Elem().Kind() {
-		// []string
-		case reflect.String:
-			switch {
-			case av.SS != nil:
-				slicev := reflect.MakeSlice(rv.Type(), len(av.SS), len(av.SS))
-				// slicev := rv.Slice(0, rv.Cap())
-				for i, sptr := range av.SS {
-					slicev = reflectAppend(i, *sptr, slicev)
-				}
-				rv.Set(slicev)
-			case av.L != nil:
-				slicev := reflect.MakeSlice(rv.Type(), len(av.L), len(av.L))
-				for i, listAV := range av.L {
-					slicev = reflectAppend(i, *listAV.S, slicev)
-				}
-				rv.Set(slicev)
-			case av.NULL != nil && *av.NULL:
-				rv.Set(reflect.Zero(rv.Type()))
-			default:
-				return errors.New("dynamo: unmarshal slice: string slice but SS and L are nil")
-			}
-		// []int family
-		case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
-			switch {
-			case av.NS != nil:
-				slicev := reflect.MakeSlice(rv.Type(), len(av.NS), len(av.NS))
-				for i, nptr := range av.NS {
-					n, err := strconv.ParseInt(*nptr, 10, 64)
-					if err != nil {
-						return err
-					}
-					slicev = reflectAppend(i, n, slicev)
-				}
-				rv.Set(slicev)
-			case av.L != nil:
-				slicev := reflect.MakeSlice(rv.Type(), len(av.L), len(av.L))
-				for i, listAV := range av.L {
-					n, err := strconv.ParseInt(*listAV.N, 10, 64)
-					if err != nil {
-						return err
-					}
-					slicev = reflectAppend(i, n, slicev)
-				}
-				rv.Set(slicev)
-			default:
-				return errors.New("dynamo: unmarshal slice: int slice but NS and L are nil")
-			}
-		}
+		return unmarshalSlice(av, rv)
 	default:
 		iface := rv.Interface()
 		return fmt.Errorf("dynamo: can't unmarshal to type: %T (%+v)", iface, iface)
@@ -161,15 +94,54 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 	return nil
 }
 
-func reflectAppend(i int, iface interface{}, slicev reflect.Value) reflect.Value {
-	iv := reflect.ValueOf(iface)
-	if slicev.Len() == i {
-		slicev = reflect.Append(slicev, iv)
-		slicev = slicev.Slice(0, slicev.Cap())
-	} else {
-		slicev.Index(i).Set(iv)
+// unmarshal for when rv's Kind is Slice
+func unmarshalSlice(av *dynamodb.AttributeValue, rv reflect.Value) error {
+	switch {
+	case av.L != nil:
+		slicev := reflect.MakeSlice(rv.Type(), 0, len(av.L))
+		for _, innerAV := range av.L {
+			innerRV := reflect.New(rv.Type().Elem())
+			if err := unmarshalReflect(innerAV, innerRV.Elem()); err != nil {
+				return err
+			}
+			slicev = reflect.Append(slicev, innerRV.Elem())
+		}
+		rv.Set(slicev)
+
+	// there's probably a better way to do these
+	case av.BS != nil:
+		slicev := reflect.MakeSlice(rv.Type(), 0, len(av.L))
+		for _, b := range av.BS {
+			innerRV := reflect.New(rv.Type().Elem())
+			if err := unmarshalReflect(&dynamodb.AttributeValue{B: b}, innerRV.Elem()); err != nil {
+				return err
+			}
+			slicev = reflect.Append(slicev, innerRV.Elem())
+		}
+		rv.Set(slicev)
+	case av.SS != nil:
+		slicev := reflect.MakeSlice(rv.Type(), 0, len(av.L))
+		for _, str := range av.SS {
+			innerRV := reflect.New(rv.Type().Elem())
+			if err := unmarshalReflect(&dynamodb.AttributeValue{S: str}, innerRV.Elem()); err != nil {
+				return err
+			}
+			slicev = reflect.Append(slicev, innerRV.Elem())
+		}
+		rv.Set(slicev)
+	case av.NS != nil:
+		slicev := reflect.MakeSlice(rv.Type(), 0, len(av.L))
+		for _, n := range av.NS {
+			innerRV := reflect.New(rv.Type().Elem())
+			if err := unmarshalReflect(&dynamodb.AttributeValue{N: n}, innerRV.Elem()); err != nil {
+				return err
+			}
+			slicev = reflect.Append(slicev, innerRV.Elem())
+		}
+		rv.Set(slicev)
+
 	}
-	return slicev
+	return errors.New("dynamo: unmarshal slice: int slice but L, NS, SS are nil")
 }
 
 func fieldsInStruct(rv reflect.Value) map[string]reflect.Value {
@@ -211,8 +183,6 @@ func unmarshalItem(item map[string]*dynamodb.AttributeValue, out interface{}) er
 		return fmt.Errorf("not a pointer: %T", out)
 	}
 
-	// fmt.Printf("unmarshal item %T %v %v\n", out, rv.Type().Kind(), rv.Kind())
-
 	var err error
 	switch rv.Elem().Kind() {
 	case reflect.Struct:
@@ -226,7 +196,7 @@ func unmarshalItem(item map[string]*dynamodb.AttributeValue, out interface{}) er
 		}
 	default:
 		// TODO: support map[string]interface{}
-		return fmt.Errorf("unknown type: %T", out)
+		return fmt.Errorf("dynamo: unmarshal: unsupported type: %T", out)
 	}
 
 	return err
@@ -234,29 +204,21 @@ func unmarshalItem(item map[string]*dynamodb.AttributeValue, out interface{}) er
 
 // unmarshals to a slice
 func unmarshalAll(items []map[string]*dynamodb.AttributeValue, out interface{}) error {
-	// cribbed from mgo
-	resultv := reflect.ValueOf(out)
-	if resultv.Kind() != reflect.Ptr || resultv.Elem().Kind() != reflect.Slice {
-		panic("result argument must be a slice address")
+	rv := reflect.ValueOf(out)
+	if rv.Kind() != reflect.Ptr || rv.Elem().Kind() != reflect.Slice {
+		return fmt.Errorf("result argument must be a slice address")
 	}
-	slicev := resultv.Elem()
-	slicev = slicev.Slice(0, slicev.Cap())
-	elemt := slicev.Type().Elem()
-	for i, item := range items {
-		if slicev.Len() == i {
-			elemp := reflect.New(elemt)
-			if err := unmarshalItem(item, elemp.Interface()); err != nil {
-				return err
-			}
-			slicev = reflect.Append(slicev, elemp.Elem())
-			slicev = slicev.Slice(0, slicev.Cap())
-		} else {
-			if err := unmarshalItem(item, slicev.Index(i).Addr().Interface()); err != nil {
-				return err
-			}
+	rv = rv.Elem()
+
+	slicev := reflect.MakeSlice(rv.Type(), 0, len(items))
+	for _, av := range items {
+		innerRV := reflect.New(rv.Type().Elem())
+		if err := unmarshalItem(av, innerRV); err != nil {
+			return err
 		}
+		slicev = reflect.Append(slicev, innerRV.Elem())
 	}
-	resultv.Elem().Set(slicev.Slice(0, len(items)))
+	rv.Set(slicev)
 	return nil
 }
 

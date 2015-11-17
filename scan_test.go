@@ -17,5 +17,5 @@ func TestScan(t *testing.T) {
 	var items []hit
 	hits.Scan().All(&items)
 	t.Log("ITEMS", items)
-	t.Fail()
+	// t.Fail()
 }

@@ -33,7 +33,6 @@ func marshalStruct(v interface{}) (map[string]*dynamodb.AttributeValue, error) {
 		kind := fv.Kind()
 
 		name, special, omitempty := fieldInfo(field)
-		_ = special // TODO: use this for lists / sets
 		switch {
 		case !fv.CanInterface():
 			continue
@@ -68,7 +67,7 @@ func marshalStruct(v interface{}) (map[string]*dynamodb.AttributeValue, error) {
 			continue
 		}
 
-		av, err := marshal(fv.Interface())
+		av, err := marshal(fv.Interface(), special)
 		if err != nil {
 			return nil, err
 		}
@@ -79,7 +78,7 @@ func marshalStruct(v interface{}) (map[string]*dynamodb.AttributeValue, error) {
 	return item, err
 }
 
-func marshal(v interface{}) (*dynamodb.AttributeValue, error) {
+func marshal(v interface{}, special string) (*dynamodb.AttributeValue, error) {
 	switch x := v.(type) {
 	case Marshaler:
 		return x.MarshalDynamo()
@@ -92,78 +91,26 @@ func marshal(v interface{}) (*dynamodb.AttributeValue, error) {
 			return nil, nil
 		}
 		return &dynamodb.AttributeValue{S: aws.String(string(text))}, err
-
-	case []byte:
-		return &dynamodb.AttributeValue{B: x}, nil
-	case [][]byte:
-		return &dynamodb.AttributeValue{BS: x}, nil
-
-	case bool:
-		return &dynamodb.AttributeValue{BOOL: aws.Bool(x)}, nil
-
-	case int:
-		return &dynamodb.AttributeValue{N: aws.String(strconv.Itoa(x))}, nil
-	case int64:
-		return &dynamodb.AttributeValue{N: aws.String(strconv.FormatInt(x, 10))}, nil
-	case int32:
-		return &dynamodb.AttributeValue{N: aws.String(strconv.FormatInt(int64(x), 10))}, nil
-	case int16:
-		return &dynamodb.AttributeValue{N: aws.String(strconv.FormatInt(int64(x), 10))}, nil
-	case int8:
-		return &dynamodb.AttributeValue{N: aws.String(strconv.FormatInt(int64(x), 10))}, nil
-	case byte:
-		return &dynamodb.AttributeValue{N: aws.String(strconv.FormatInt(int64(x), 10))}, nil
-	case float64:
-		return &dynamodb.AttributeValue{N: aws.String(strconv.FormatFloat(x, 'f', -1, 64))}, nil
-	case float32:
-		return &dynamodb.AttributeValue{N: aws.String(strconv.FormatFloat(float64(x), 'f', -1, 32))}, nil
-
 	case nil:
 		return &dynamodb.AttributeValue{NULL: aws.Bool(true)}, nil
-
-	case string:
-		return &dynamodb.AttributeValue{S: aws.String(x)}, nil
-	case *string:
-		return &dynamodb.AttributeValue{S: x}, nil
-	case []string:
-		if len(x) == 0 {
-			return &dynamodb.AttributeValue{NULL: aws.Bool(true)}, nil
-		}
-
-		// why are these pointers amazon seriously
-		strptrs := make([]*string, 0, len(x))
-		for _, s := range x {
-			s := s
-			strptrs = append(strptrs, &s)
-		}
-		return &dynamodb.AttributeValue{SS: strptrs}, nil
-	case []*string:
-		if len(x) == 0 {
-			return &dynamodb.AttributeValue{NULL: aws.Bool(true)}, nil
-		}
-
-		return &dynamodb.AttributeValue{SS: x}, nil
-	default:
-		return marshalReflect(reflect.ValueOf(x))
 	}
+	return marshalReflect(reflect.ValueOf(v), special)
 }
 
-func marshalReflect(rv reflect.Value) (*dynamodb.AttributeValue, error) {
-	// TODO: byte arrays and array of arrays
-	// TODO: other kinds of arrays
-	// TODO: structs
-	// TODO: maps
+func marshalReflect(rv reflect.Value, special string) (*dynamodb.AttributeValue, error) {
 	switch rv.Kind() {
 	case reflect.Ptr:
 		if rv.IsNil() {
 			return &dynamodb.AttributeValue{NULL: aws.Bool(true)}, nil
 		} else {
-			return marshal(rv.Elem().Interface())
+			return marshal(rv.Elem().Interface(), special)
 		}
 	case reflect.Bool:
 		return &dynamodb.AttributeValue{BOOL: aws.Bool(rv.Bool())}, nil
 	case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
 		return &dynamodb.AttributeValue{N: aws.String(strconv.FormatInt(rv.Int(), 10))}, nil
+	case reflect.Float32, reflect.Float64:
+		return &dynamodb.AttributeValue{N: aws.String(strconv.FormatFloat(rv.Float(), 'f', -1, 64))}, nil
 	case reflect.String:
 		return &dynamodb.AttributeValue{S: aws.String(rv.String())}, nil
 	case reflect.Map:
@@ -172,7 +119,7 @@ func marshalReflect(rv reflect.Value) (*dynamodb.AttributeValue, error) {
 		}
 		avs := make(map[string]*dynamodb.AttributeValue)
 		for _, key := range rv.MapKeys() {
-			v, err := marshal(rv.MapIndex(key).Interface())
+			v, err := marshal(rv.MapIndex(key).Interface(), "")
 			if err != nil {
 				return nil, err
 			}
@@ -187,15 +134,83 @@ func marshalReflect(rv reflect.Value) (*dynamodb.AttributeValue, error) {
 			return nil, err
 		}
 		return &dynamodb.AttributeValue{M: avs}, nil
+	case reflect.Slice:
+		// special case: byte slice is B
+		if rv.Type().Elem().Kind() == reflect.Int8 {
+			return &dynamodb.AttributeValue{B: rv.Bytes()}, nil
+		}
+
+		if special == "set" {
+			return marshalSet(rv)
+		}
+
+		avs := make([]*dynamodb.AttributeValue, 0, rv.Len())
+		for i := 0; i < rv.Len(); i++ {
+			innerVal := rv.Index(i)
+			av, err := marshal(innerVal.Interface(), "")
+			if err != nil {
+				return nil, err
+			}
+			avs = append(avs, av)
+		}
+		return &dynamodb.AttributeValue{L: avs}, nil
 	default:
 		return nil, fmt.Errorf("dynamo marshal: unknown type %s", rv.Type().String())
 	}
 }
 
+func marshalSet(rv reflect.Value) (*dynamodb.AttributeValue, error) {
+	iface := reflect.Zero(rv.Type().Elem()).Interface()
+	switch iface.(type) {
+	case encoding.TextMarshaler:
+		ss := make([]*string, 0, rv.Len())
+		for i := 0; i < rv.Len(); i++ {
+			tm := rv.Index(i).Interface().(encoding.TextMarshaler)
+			text, err := tm.MarshalText()
+			if err != nil {
+				return nil, err
+			}
+			ss = append(ss, aws.String(string(text)))
+		}
+		return &dynamodb.AttributeValue{NS: ss}, nil
+	}
+
+	switch rv.Type().Elem().Kind() {
+	case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
+		ns := make([]*string, 0, rv.Len())
+		for i := 0; i < rv.Len(); i++ {
+			ns = append(ns, aws.String(strconv.FormatInt(rv.Index(i).Int(), 10)))
+		}
+		return &dynamodb.AttributeValue{NS: ns}, nil
+	case reflect.Float32, reflect.Float64:
+		ns := make([]*string, 0, rv.Len())
+		for i := 0; i < rv.Len(); i++ {
+			ns = append(ns, aws.String(strconv.FormatFloat(rv.Index(i).Float(), 'f', -1, 64)))
+		}
+		return &dynamodb.AttributeValue{NS: ns}, nil
+	case reflect.String:
+		ss := make([]*string, 0, rv.Len())
+		for i := 0; i < rv.Len(); i++ {
+			ss = append(ss, aws.String(rv.Index(i).String()))
+		}
+		return &dynamodb.AttributeValue{NS: ss}, nil
+	case reflect.Slice:
+		if rv.Type().Elem().Kind() == reflect.Int8 {
+			bs := make([][]byte, 0, rv.Len())
+			for i := 0; i < rv.Len(); i++ {
+				bs = append(bs, rv.Index(i).Bytes())
+			}
+			return &dynamodb.AttributeValue{BS: bs}, nil
+		}
+	}
+
+	return nil, fmt.Errorf("dynamo marshal: unknown type for sets %s", rv.Type().String())
+}
+
 func marshalSlice(values []interface{}) ([]*dynamodb.AttributeValue, error) {
 	avs := make([]*dynamodb.AttributeValue, 0, len(values))
 	for _, v := range values {
-		av, err := marshal(v)
+		av, err := marshal(v, "")
 		if err != nil {
 			return nil, err
 		}
@@ -233,7 +248,6 @@ type isZeroer interface {
 }
 
 // thanks James Henstridge
-// TODO: tweak
 func isZero(rv reflect.Value) bool {
 	// use IsZero for supported types
 	if rv.CanInterface() {

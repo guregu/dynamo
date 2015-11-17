@@ -28,6 +28,8 @@ type hit struct {
 
 	Features  map[string]bool
 	Something interface{}
+
+	Check SuperComplex
 }
 
 type embedMe struct {
@@ -38,13 +40,25 @@ type other struct {
 	Hello string
 }
 
+type SuperComplex []struct {
+	HelpMe struct {
+		FFF []int `dynamo:",set"`
+	}
+}
+
+func makeSuperComplex() SuperComplex {
+	sc := make(SuperComplex, 2)
+	sc[0].HelpMe.FFF = []int{1, 2, 3}
+	return sc
+}
+
 func TestGetCount(t *testing.T) {
 	db := testDB()
 	hits := db.Table("TestDB")
 	q := hits.Get("UserID", 666)
 	ct, err := q.Count()
 	t.Log("count", ct, err)
-	t.Fail()
+	// t.Fail()
 }
 
 func TestGetAll(t *testing.T) {
@@ -66,17 +80,17 @@ func TestGetAll(t *testing.T) {
 		t.Log(r.Date.String())
 	}
 
-	t.Fail()
+	// t.Fail()
 }
 
-func TestGetOne(t *testing.T) {
-	db := testDB()
-	hits := db.Table("TestDB")
+// func TestGetOne(t *testing.T) {
+// 	db := testDB()
+// 	hits := db.Table("TestDB")
 
-	var h hit
-	err := hits.Get("UserID", 613).Range("Date", Equals, 1425630170).One(&h)
-	t.Fatalf("%+v %v", h, err)
-}
+// 	var h hit
+// 	err := hits.Get("UserID", 666).Range("Date", Equals, 1447781270).One(&h)
+// 	// t.Fatalf("%+v %v", h, err)
+// }
 
 type unixTime struct {
 	time.Time

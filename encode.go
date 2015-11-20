@@ -39,7 +39,7 @@ func marshalStruct(v interface{}) (map[string]*dynamodb.AttributeValue, error) {
 		case name == "-":
 			continue
 		case omitempty:
-			if isZero(rv) {
+			if isZero(fv) {
 				continue
 			}
 		case kind == reflect.String,
@@ -136,7 +136,7 @@ func marshalReflect(rv reflect.Value, special string) (*dynamodb.AttributeValue,
 		return &dynamodb.AttributeValue{M: avs}, nil
 	case reflect.Slice:
 		// special case: byte slice is B
-		if rv.Type().Elem().Kind() == reflect.Int8 {
+		if rv.Type().Elem().Kind() == reflect.Uint8 {
 			return &dynamodb.AttributeValue{B: rv.Bytes()}, nil
 		}
 
@@ -195,7 +195,7 @@ func marshalSet(rv reflect.Value) (*dynamodb.AttributeValue, error) {
 		}
 		return &dynamodb.AttributeValue{NS: ss}, nil
 	case reflect.Slice:
-		if rv.Type().Elem().Kind() == reflect.Int8 {
+		if rv.Type().Elem().Kind() == reflect.Uint8 {
 			bs := make([][]byte, 0, rv.Len())
 			for i := 0; i < rv.Len(); i++ {
 				bs = append(bs, rv.Index(i).Bytes())

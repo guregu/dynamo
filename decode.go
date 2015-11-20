@@ -124,6 +124,7 @@ func unmarshalSlice(av *dynamodb.AttributeValue, rv reflect.Value) error {
 			slicev = reflect.Append(slicev, innerRV)
 		}
 		rv.Set(slicev)
+		return nil
 
 	// there's probably a better way to do these
 	case av.BS != nil:
@@ -136,6 +137,7 @@ func unmarshalSlice(av *dynamodb.AttributeValue, rv reflect.Value) error {
 			slicev = reflect.Append(slicev, innerRV)
 		}
 		rv.Set(slicev)
+		return nil
 	case av.SS != nil:
 		slicev := reflect.MakeSlice(rv.Type(), 0, len(av.L))
 		for _, str := range av.SS {
@@ -146,6 +148,7 @@ func unmarshalSlice(av *dynamodb.AttributeValue, rv reflect.Value) error {
 			slicev = reflect.Append(slicev, innerRV)
 		}
 		rv.Set(slicev)
+		return nil
 	case av.NS != nil:
 		slicev := reflect.MakeSlice(rv.Type(), 0, len(av.L))
 		for _, n := range av.NS {
@@ -156,7 +159,7 @@ func unmarshalSlice(av *dynamodb.AttributeValue, rv reflect.Value) error {
 			slicev = reflect.Append(slicev, innerRV)
 		}
 		rv.Set(slicev)
-
+		return nil
 	}
 	return errors.New("dynamo: unmarshal slice: int slice but L, NS, SS are nil")
 }
@@ -228,7 +231,7 @@ func unmarshalItem(item map[string]*dynamodb.AttributeValue, out interface{}) er
 			if err := unmarshalReflect(av, innerRV); err != nil {
 				return err
 			}
-			rv.SetMapIndex(k, innerRV)
+			mapv.SetMapIndex(k, innerRV)
 		}
 		return nil
 	}

@@ -18,11 +18,13 @@ type Unmarshaler interface {
 func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 	// first try interface unmarshal stuff
 	if rv.CanInterface() {
-		var iface = rv.Interface()
-		// TODO: try non-pointer types too, for compatibility
+		var iface interface{}
 		if rv.CanAddr() {
 			iface = rv.Addr().Interface()
+		} else {
+			iface = rv.Interface()
 		}
+
 		if u, ok := iface.(Unmarshaler); ok {
 			return u.UnmarshalDynamo(av)
 		}
@@ -40,11 +42,13 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 		if av.NULL == nil || !(*av.NULL) {
 			return unmarshalReflect(av, rv.Elem())
 		}
+		return nil
 	case reflect.Bool:
 		if av.BOOL == nil {
 			return errors.New("dynamo: unmarshal bool: expected BOOL to be non-nil")
 		}
 		rv.SetBool(*av.BOOL)
+		return nil
 	case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
 		if av.N == nil {
 			return errors.New("dynamo: unmarshal int: expected N to be non-nil")
@@ -54,11 +58,13 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 			return err
 		}
 		rv.SetInt(n)
+		return nil
 	case reflect.String:
 		if av.S == nil {
 			return errors.New("dynamo: unmarshal string: expected S to be non-nil")
 		}
 		rv.SetString(*av.S)
+		return nil
 	case reflect.Struct:
 		if av.M == nil {
 			return errors.New("dynamo: unmarshal struct: expected M to be non-nil")
@@ -66,6 +72,7 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 		if err := unmarshalItem(av.M, rv.Addr().Interface()); err != nil {
 			return err
 		}
+		return nil
 	case reflect.Map:
 		if av.M == nil {
 			return errors.New("dynamo: unmarshal map: expected M to be non-nil")
@@ -85,13 +92,23 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 			}
 			rv.SetMapIndex(reflect.ValueOf(k), innerRV.Elem())
 		}
+		return nil
 	case reflect.Slice:
 		return unmarshalSlice(av, rv)
-	default:
-		iface := rv.Interface()
-		return fmt.Errorf("dynamo: can't unmarshal to type: %T (%+v)", iface, iface)
+	case reflect.Interface:
+		// interface{}
+		if rv.NumMethod() == 0 {
+			iface, err := av2iface(av)
+			if err != nil {
+				return err
+			}
+			rv.Set(reflect.ValueOf(iface))
+			return nil
+		}
 	}
-	return nil
+
+	iface := rv.Interface()
+	return fmt.Errorf("dynamo: can't unmarshal to type: %T (%+v)", iface, iface)
 }
 
 // unmarshal for when rv's Kind is Slice
@@ -100,11 +117,11 @@ func unmarshalSlice(av *dynamodb.AttributeValue, rv reflect.Value) error {
 	case av.L != nil:
 		slicev := reflect.MakeSlice(rv.Type(), 0, len(av.L))
 		for _, innerAV := range av.L {
-			innerRV := reflect.New(rv.Type().Elem())
-			if err := unmarshalReflect(innerAV, innerRV.Elem()); err != nil {
+			innerRV := reflect.New(rv.Type().Elem()).Elem()
+			if err := unmarshalReflect(innerAV, innerRV); err != nil {
 				return err
 			}
-			slicev = reflect.Append(slicev, innerRV.Elem())
+			slicev = reflect.Append(slicev, innerRV)
 		}
 		rv.Set(slicev)
 
@@ -112,31 +129,31 @@ func unmarshalSlice(av *dynamodb.AttributeValue, rv reflect.Value) error {
 	case av.BS != nil:
 		slicev := reflect.MakeSlice(rv.Type(), 0, len(av.L))
 		for _, b := range av.BS {
-			innerRV := reflect.New(rv.Type().Elem())
-			if err := unmarshalReflect(&dynamodb.AttributeValue{B: b}, innerRV.Elem()); err != nil {
+			innerRV := reflect.New(rv.Type().Elem()).Elem()
+			if err := unmarshalReflect(&dynamodb.AttributeValue{B: b}, innerRV); err != nil {
 				return err
 			}
-			slicev = reflect.Append(slicev, innerRV.Elem())
+			slicev = reflect.Append(slicev, innerRV)
 		}
 		rv.Set(slicev)
 	case av.SS != nil:
 		slicev := reflect.MakeSlice(rv.Type(), 0, len(av.L))
 		for _, str := range av.SS {
-			innerRV := reflect.New(rv.Type().Elem())
-			if err := unmarshalReflect(&dynamodb.AttributeValue{S: str}, innerRV.Elem()); err != nil {
+			innerRV := reflect.New(rv.Type().Elem()).Elem()
+			if err := unmarshalReflect(&dynamodb.AttributeValue{S: str}, innerRV); err != nil {
 				return err
 			}
-			slicev = reflect.Append(slicev, innerRV.Elem())
+			slicev = reflect.Append(slicev, innerRV)
 		}
 		rv.Set(slicev)
 	case av.NS != nil:
 		slicev := reflect.MakeSlice(rv.Type(), 0, len(av.L))
 		for _, n := range av.NS {
-			innerRV := reflect.New(rv.Type().Elem())
-			if err := unmarshalReflect(&dynamodb.AttributeValue{N: n}, innerRV.Elem()); err != nil {
+			innerRV := reflect.New(rv.Type().Elem()).Elem()
+			if err := unmarshalReflect(&dynamodb.AttributeValue{N: n}, innerRV); err != nil {
 				return err
 			}
-			slicev = reflect.Append(slicev, innerRV.Elem())
+			slicev = reflect.Append(slicev, innerRV)
 		}
 		rv.Set(slicev)
 
@@ -178,14 +195,13 @@ func fieldsInStruct(rv reflect.Value) map[string]reflect.Value {
 // TODO: unmarshal to map[string]interface{} too
 func unmarshalItem(item map[string]*dynamodb.AttributeValue, out interface{}) error {
 	rv := reflect.ValueOf(out)
-
 	if rv.Kind() != reflect.Ptr {
-		return fmt.Errorf("not a pointer: %T", out)
+		return fmt.Errorf("dynamo: unmarshal: not a pointer: %T", out)
 	}
 
-	var err error
 	switch rv.Elem().Kind() {
 	case reflect.Struct:
+		var err error
 		fields := fieldsInStruct(rv.Elem())
 		for name, fv := range fields {
 			if av, ok := item[name]; ok {
@@ -194,12 +210,29 @@ func unmarshalItem(item map[string]*dynamodb.AttributeValue, out interface{}) er
 				}
 			}
 		}
-	default:
-		// TODO: support map[string]interface{}
-		return fmt.Errorf("dynamo: unmarshal: unsupported type: %T", out)
-	}
+		return err
+	case reflect.Map:
+		mapv := rv.Elem()
+		if mapv.Type().Key().Kind() != reflect.String {
+			return fmt.Errorf("dynamo: unmarshal: map key must be a string: %T", mapv.Interface())
+		}
 
-	return err
+		keys := mapv.MapKeys()
+		for _, k := range keys {
+			av, ok := item[k.String()]
+			if !ok {
+				continue
+			}
+
+			innerRV := reflect.New(mapv.Type().Elem()).Elem()
+			if err := unmarshalReflect(av, innerRV); err != nil {
+				return err
+			}
+			rv.SetMapIndex(k, innerRV)
+		}
+		return nil
+	}
+	return fmt.Errorf("dynamo: unmarshal: unsupported type: %T", out)
 }
 
 // unmarshals to a slice
@@ -238,4 +271,57 @@ func unmarshalAppend(item map[string]*dynamodb.AttributeValue, out interface{}) 
 
 	resultv.Elem().Set(slicev)
 	return nil
+}
+
+// av2iface converts an av into interface{}.
+func av2iface(av *dynamodb.AttributeValue) (interface{}, error) {
+	switch {
+	case av.B != nil:
+		return av.B, nil
+	case av.BS != nil:
+		return av.BS, nil
+	case av.N != nil:
+		return strconv.ParseFloat(*av.N, 64)
+	case av.S != nil:
+		return *av.S, nil
+	case av.L != nil:
+		list := make([]interface{}, 0, len(av.L))
+		for _, item := range av.L {
+			iface, err := av2iface(item)
+			if err != nil {
+				return nil, err
+			}
+			list = append(list, iface)
+		}
+		return list, nil
+	case av.NS != nil:
+		set := make([]float64, 0, len(av.NS))
+		for _, n := range av.NS {
+			f, err := strconv.ParseFloat(*n, 64)
+			if err != nil {
+				return nil, err
+			}
+			set = append(set, f)
+		}
+		return set, nil
+	case av.SS != nil:
+		set := make([]string, 0, len(av.SS))
+		for _, s := range av.SS {
+			set = append(set, *s)
+		}
+		return set, nil
+	case av.M != nil:
+		m := make(map[string]interface{}, len(av.M))
+		for k, v := range av.M {
+			iface, err := av2iface(v)
+			if err != nil {
+				return nil, err
+			}
+			m[k] = iface
+		}
+		return m, nil
+	case av.NULL != nil:
+		return nil, nil
+	}
+	return nil, fmt.Errorf("dynamo: unsupported AV: %#v", *av)
 }

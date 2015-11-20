@@ -170,7 +170,9 @@ func marshalSet(rv reflect.Value) (*dynamodb.AttributeValue, error) {
 			if err != nil {
 				return nil, err
 			}
-			ss = append(ss, aws.String(string(text)))
+			if len(text) > 0 {
+				ss = append(ss, aws.String(string(text)))
+			}
 		}
 		return &dynamodb.AttributeValue{NS: ss}, nil
 	}
@@ -193,7 +195,7 @@ func marshalSet(rv reflect.Value) (*dynamodb.AttributeValue, error) {
 		for i := 0; i < rv.Len(); i++ {
 			ss = append(ss, aws.String(rv.Index(i).String()))
 		}
-		return &dynamodb.AttributeValue{NS: ss}, nil
+		return &dynamodb.AttributeValue{SS: ss}, nil
 	case reflect.Slice:
 		if rv.Type().Elem().Kind() == reflect.Uint8 {
 			bs := make([][]byte, 0, rv.Len())

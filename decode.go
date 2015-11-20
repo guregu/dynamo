@@ -59,6 +59,16 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 		}
 		rv.SetInt(n)
 		return nil
+	case reflect.Float64, reflect.Float32:
+		if av.N == nil {
+			return errors.New("dynamo: unmarshal int: expected N to be non-nil")
+		}
+		n, err := strconv.ParseFloat(*av.N, 64)
+		if err != nil {
+			return err
+		}
+		rv.SetFloat(n)
+		return nil
 	case reflect.String:
 		if av.S == nil {
 			return errors.New("dynamo: unmarshal string: expected S to be non-nil")
@@ -114,6 +124,10 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 // unmarshal for when rv's Kind is Slice
 func unmarshalSlice(av *dynamodb.AttributeValue, rv reflect.Value) error {
 	switch {
+	case av.B != nil:
+		rv.SetBytes(av.B)
+		return nil
+
 	case av.L != nil:
 		slicev := reflect.MakeSlice(rv.Type(), 0, len(av.L))
 		for _, innerAV := range av.L {

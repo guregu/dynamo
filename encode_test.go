@@ -94,13 +94,13 @@ func TestMarshalStruct(t *testing.T) {
 				NS2 []float64 `dynamo:",set"`
 			}{
 				SS:  []string{"A", "B"},
-				BS:  [][]byte{[]byte("A"), []byte{"B"}},
+				BS:  [][]byte{[]byte{'A'}, []byte{'B'}},
 				NS1: []int{1, 2},
 				NS2: []float64{1, 2},
 			},
 			out: map[string]*dynamodb.AttributeValue{
 				"SS":  &dynamodb.AttributeValue{SS: []*string{aws.String("A"), aws.String("B")}},
-				"BS":  &dynamodb.AttributeValue{BS: [][]byte{[]byte{"A"}, []byte{"B"}}},
+				"BS":  &dynamodb.AttributeValue{BS: [][]byte{[]byte{'A'}, []byte{'B'}}},
 				"NS1": &dynamodb.AttributeValue{NS: []*string{aws.String("1"), aws.String("2")}},
 				"NS2": &dynamodb.AttributeValue{NS: []*string{aws.String("1"), aws.String("2")}},
 			},

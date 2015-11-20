@@ -197,7 +197,7 @@ func marshalSet(rv reflect.Value) (*dynamodb.AttributeValue, error) {
 		}
 		return &dynamodb.AttributeValue{SS: ss}, nil
 	case reflect.Slice:
-		if rv.Type().Elem().Kind() == reflect.Uint8 {
+		if rv.Type().Elem().Elem().Kind() == reflect.Uint8 {
 			bs := make([][]byte, 0, rv.Len())
 			for i := 0; i < rv.Len(); i++ {
 				bs = append(bs, rv.Index(i).Bytes())

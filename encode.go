@@ -174,7 +174,7 @@ func marshalSet(rv reflect.Value) (*dynamodb.AttributeValue, error) {
 				ss = append(ss, aws.String(string(text)))
 			}
 		}
-		return &dynamodb.AttributeValue{NS: ss}, nil
+		return &dynamodb.AttributeValue{SS: ss}, nil
 	}
 
 	switch rv.Type().Elem().Kind() {

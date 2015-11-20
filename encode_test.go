@@ -88,18 +88,21 @@ func TestMarshalStruct(t *testing.T) {
 		{
 			name: "sets",
 			in: struct {
-				SS  []string  `dynamo:",set"`
-				BS  [][]byte  `dynamo:",set"`
-				NS1 []int     `dynamo:",set"`
-				NS2 []float64 `dynamo:",set"`
+				SS1 []string        `dynamo:",set"`
+				SS2 []textMarshaler `dynamo:",set"`
+				BS  [][]byte        `dynamo:",set"`
+				NS1 []int           `dynamo:",set"`
+				NS2 []float64       `dynamo:",set"`
 			}{
-				SS:  []string{"A", "B"},
+				SS1: []string{"A", "B"},
+				SS2: []textMarshaler{textMarshaler(true), textMarshaler(false)},
 				BS:  [][]byte{[]byte{'A'}, []byte{'B'}},
 				NS1: []int{1, 2},
 				NS2: []float64{1, 2},
 			},
 			out: map[string]*dynamodb.AttributeValue{
-				"SS":  &dynamodb.AttributeValue{SS: []*string{aws.String("A"), aws.String("B")}},
+				"SS1": &dynamodb.AttributeValue{SS: []*string{aws.String("A"), aws.String("B")}},
+				"SS2": &dynamodb.AttributeValue{SS: []*string{aws.String("true"), aws.String("false")}},
 				"BS":  &dynamodb.AttributeValue{BS: [][]byte{[]byte{'A'}, []byte{'B'}}},
 				"NS1": &dynamodb.AttributeValue{NS: []*string{aws.String("1"), aws.String("2")}},
 				"NS2": &dynamodb.AttributeValue{NS: []*string{aws.String("1"), aws.String("2")}},

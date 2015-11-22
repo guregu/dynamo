@@ -144,8 +144,6 @@ func (q *Query) All(out interface{}) error {
 		return q.err
 	}
 
-	// TODO: make this smarter by appending to the result array
-	var items []map[string]*dynamodb.AttributeValue
 	for {
 		req := q.queryInput()
 
@@ -157,10 +155,10 @@ func (q *Query) All(out interface{}) error {
 				return err
 			}
 
-			if items == nil {
-				items = res.Items
-			} else {
-				items = append(items, res.Items...)
+			for _, item := range res.Items {
+				if err := unmarshalAppend(item, out); err != nil {
+					return err
+				}
 			}
 			return nil
 		})
@@ -169,14 +167,13 @@ func (q *Query) All(out interface{}) error {
 		}
 
 		// do we need to check for more results?
-		// TODO: Query.Next() or something to continue manually
 		q.startKey = res.LastEvaluatedKey
 		if res.LastEvaluatedKey == nil || q.limit > 0 {
 			break
 		}
 	}
 
-	return unmarshalAll(items, out)
+	return nil
 }
 
 func (q *Query) Count() (int64, error) {

@@ -175,7 +175,7 @@ func unmarshalSlice(av *dynamodb.AttributeValue, rv reflect.Value) error {
 		rv.Set(slicev)
 		return nil
 	}
-	return errors.New("dynamo: unmarshal slice: int slice but L, NS, SS are nil")
+	return errors.New("dynamo: unmarshal slice: B, L, BS, SS, NS are nil")
 }
 
 func fieldsInStruct(rv reflect.Value) map[string]reflect.Value {
@@ -217,6 +217,9 @@ func unmarshalItem(item map[string]*dynamodb.AttributeValue, out interface{}) er
 	}
 
 	switch rv.Elem().Kind() {
+	case reflect.Ptr:
+		rv.Elem().Set(reflect.New(rv.Elem().Type().Elem()))
+		return unmarshalItem(item, rv.Elem().Interface())
 	case reflect.Struct:
 		var err error
 		fields := fieldsInStruct(rv.Elem())
@@ -233,60 +236,36 @@ func unmarshalItem(item map[string]*dynamodb.AttributeValue, out interface{}) er
 		if mapv.Type().Key().Kind() != reflect.String {
 			return fmt.Errorf("dynamo: unmarshal: map key must be a string: %T", mapv.Interface())
 		}
+		if mapv.IsNil() {
+			mapv.Set(reflect.MakeMap(mapv.Type()))
+		}
 
-		keys := mapv.MapKeys()
-		for _, k := range keys {
-			av, ok := item[k.String()]
-			if !ok {
-				continue
-			}
-
+		for k, av := range item {
 			innerRV := reflect.New(mapv.Type().Elem()).Elem()
 			if err := unmarshalReflect(av, innerRV); err != nil {
 				return err
 			}
-			mapv.SetMapIndex(k, innerRV)
+			mapv.SetMapIndex(reflect.ValueOf(k), innerRV)
 		}
 		return nil
 	}
 	return fmt.Errorf("dynamo: unmarshal: unsupported type: %T", out)
 }
 
-// unmarshals to a slice
-func unmarshalAll(items []map[string]*dynamodb.AttributeValue, out interface{}) error {
+func unmarshalAppend(item map[string]*dynamodb.AttributeValue, out interface{}) error {
 	rv := reflect.ValueOf(out)
 	if rv.Kind() != reflect.Ptr || rv.Elem().Kind() != reflect.Slice {
-		return fmt.Errorf("result argument must be a slice address")
-	}
-	rv = rv.Elem()
-
-	slicev := reflect.MakeSlice(rv.Type(), 0, len(items))
-	for _, av := range items {
-		innerRV := reflect.New(rv.Type().Elem())
-		if err := unmarshalItem(av, innerRV); err != nil {
-			return err
-		}
-		slicev = reflect.Append(slicev, innerRV.Elem())
-	}
-	rv.Set(slicev)
-	return nil
-}
-
-func unmarshalAppend(item map[string]*dynamodb.AttributeValue, out interface{}) error {
-	resultv := reflect.ValueOf(out)
-	if resultv.Kind() != reflect.Ptr || resultv.Elem().Kind() != reflect.Slice {
-		panic("result argument must be a slice address")
+		return fmt.Errorf("dynamo: unmarshal append: result argument must be a slice pointer")
 	}
 
-	slicev := resultv.Elem()
-	elemt := slicev.Type().Elem()
-	elemp := reflect.New(elemt)
-	if err := unmarshalItem(item, elemp.Interface()); err != nil {
+	slicev := rv.Elem()
+	innerRV := reflect.New(slicev.Type().Elem())
+	if err := unmarshalItem(item, innerRV.Interface()); err != nil {
 		return err
 	}
-	slicev = reflect.Append(slicev, elemp.Elem())
+	slicev = reflect.Append(slicev, innerRV.Elem())
 
-	resultv.Elem().Set(slicev)
+	rv.Elem().Set(slicev)
 	return nil
 }
 
@@ -297,6 +276,8 @@ func av2iface(av *dynamodb.AttributeValue) (interface{}, error) {
 		return av.B, nil
 	case av.BS != nil:
 		return av.BS, nil
+	case av.BOOL != nil:
+		return *av.BOOL, nil
 	case av.N != nil:
 		return strconv.ParseFloat(*av.N, 64)
 	case av.S != nil:

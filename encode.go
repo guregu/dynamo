@@ -15,6 +15,31 @@ type Marshaler interface {
 	MarshalDynamo() (*dynamodb.AttributeValue, error)
 }
 
+func marshalItem(v interface{}) (map[string]*dynamodb.AttributeValue, error) {
+	rv := reflect.ValueOf(v)
+	switch rv.Type().Kind() {
+	case reflect.Ptr:
+		return marshalItem(rv.Elem().Interface())
+	case reflect.Struct:
+		return marshalStruct(rv.Interface())
+	case reflect.Map:
+		return marshalMap(rv.Interface())
+	}
+	return nil, fmt.Errorf("dynamo: marshal item: unsupported type %T: %v", rv.Interface(), rv.Interface())
+}
+
+func marshalMap(v interface{}) (map[string]*dynamodb.AttributeValue, error) {
+	// TODO: maybe unify this with the map stuff in marshal
+	av, err := marshal(v, "")
+	if err != nil {
+		return nil, err
+	}
+	if av.M == nil {
+		return nil, fmt.Errorf("dynamo: internal error: encoding map but M was empty")
+	}
+	return av.M, nil
+}
+
 func marshalStruct(v interface{}) (map[string]*dynamodb.AttributeValue, error) {
 	item := make(map[string]*dynamodb.AttributeValue)
 	var err error
@@ -30,7 +55,6 @@ func marshalStruct(v interface{}) (map[string]*dynamodb.AttributeValue, error) {
 	for i := 0; i < rv.Type().NumField(); i++ {
 		field := rv.Type().Field(i)
 		fv := rv.Field(i)
-		kind := fv.Kind()
 
 		name, special, omitempty := fieldInfo(field)
 		switch {
@@ -39,17 +63,6 @@ func marshalStruct(v interface{}) (map[string]*dynamodb.AttributeValue, error) {
 		case name == "-":
 			continue
 		case omitempty:
-			if isZero(fv) {
-				continue
-			}
-		case kind == reflect.String,
-			kind == reflect.Ptr,
-			kind == reflect.Map,
-			kind == reflect.Slice,
-			kind == reflect.Interface:
-			// automatically omit these types if nil
-			// DynamoDB can't handle empty stuff in general
-			// and it's better than sending "NULL: true"
 			if isZero(fv) {
 				continue
 			}
@@ -92,7 +105,7 @@ func marshal(v interface{}, special string) (*dynamodb.AttributeValue, error) {
 		}
 		return &dynamodb.AttributeValue{S: aws.String(string(text))}, err
 	case nil:
-		return &dynamodb.AttributeValue{NULL: aws.Bool(true)}, nil
+		return nil, nil
 	}
 	return marshalReflect(reflect.ValueOf(v), special)
 }
@@ -101,10 +114,9 @@ func marshalReflect(rv reflect.Value, special string) (*dynamodb.AttributeValue,
 	switch rv.Kind() {
 	case reflect.Ptr:
 		if rv.IsNil() {
-			return &dynamodb.AttributeValue{NULL: aws.Bool(true)}, nil
-		} else {
-			return marshal(rv.Elem().Interface(), special)
+			return nil, nil
 		}
+		return marshal(rv.Elem().Interface(), special)
 	case reflect.Bool:
 		return &dynamodb.AttributeValue{BOOL: aws.Bool(rv.Bool())}, nil
 	case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
@@ -112,11 +124,19 @@ func marshalReflect(rv reflect.Value, special string) (*dynamodb.AttributeValue,
 	case reflect.Float32, reflect.Float64:
 		return &dynamodb.AttributeValue{N: aws.String(strconv.FormatFloat(rv.Float(), 'f', -1, 64))}, nil
 	case reflect.String:
-		return &dynamodb.AttributeValue{S: aws.String(rv.String())}, nil
+		s := rv.String()
+		if len(s) == 0 {
+			return nil, nil
+		}
+		return &dynamodb.AttributeValue{S: aws.String(s)}, nil
 	case reflect.Map:
 		if rv.Type().Key().Kind() != reflect.String {
 			return nil, fmt.Errorf("dynamo marshal: map key must be string: %T", rv.Interface())
 		}
+		if rv.Len() == 0 {
+			return nil, nil
+		}
+
 		avs := make(map[string]*dynamodb.AttributeValue)
 		for _, key := range rv.MapKeys() {
 			v, err := marshal(rv.MapIndex(key).Interface(), "")
@@ -135,6 +155,10 @@ func marshalReflect(rv reflect.Value, special string) (*dynamodb.AttributeValue,
 		}
 		return &dynamodb.AttributeValue{M: avs}, nil
 	case reflect.Slice:
+		if rv.Len() == 0 {
+			return nil, nil
+		}
+
 		// special case: byte slice is B
 		if rv.Type().Elem().Kind() == reflect.Uint8 {
 			return &dynamodb.AttributeValue{B: rv.Bytes()}, nil

@@ -45,13 +45,6 @@ func marshalStruct(v interface{}) (map[string]*dynamodb.AttributeValue, error) {
 	var err error
 	rv := reflect.ValueOf(v)
 
-	if rv.Type().Kind() != reflect.Struct {
-		if rv.Type().Kind() == reflect.Ptr {
-			return marshalStruct(rv.Elem().Interface())
-		}
-		return nil, fmt.Errorf("marshal struct invalid type: %T (%+v)", v, v)
-	}
-
 	for i := 0; i < rv.Type().NumField(); i++ {
 		field := rv.Type().Field(i)
 		fv := rv.Field(i)

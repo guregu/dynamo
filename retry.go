@@ -7,6 +7,8 @@ import (
 	"github.com/cenkalti/backoff"
 )
 
+const retryTimeout = 1 * time.Minute // TODO: make this configurable
+
 func retry(f func() error) error {
 	var err error
 	var next time.Duration

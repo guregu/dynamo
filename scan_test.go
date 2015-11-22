@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func TestGetAllCount(t *testing.T) {
+func TestScan(t *testing.T) {
 	if testDB == nil {
 		t.Skip(offlineSkipMsg)
 	}
@@ -25,7 +25,7 @@ func TestGetAllCount(t *testing.T) {
 
 	// now check if get all and count return the same amount of items
 	var result []widget
-	err = table.Get("UserID", 42).Consistent(true).All(&result)
+	err = table.Scan().All(&result)
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
@@ -35,7 +35,7 @@ func TestGetAllCount(t *testing.T) {
 		t.Error("unexpected error:", err)
 	}
 	if int(ct) != len(result) {
-		t.Error("count and GetAll don't match. count: %d, get all: %d", ct, len(result))
+		t.Error("count and scan don't match. count: %d, scan: %d", ct, len(result))
 	}
 
 	// search for our inserted item
@@ -47,16 +47,6 @@ func TestGetAllCount(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Error("exact match of put item not found in get all")
-	}
-
-	// query specifically against the inserted item
-	var one widget
-	err = table.Get("UserID", 42).Range("Time", Equals, item.Time).Consistent(true).One(&one)
-	if err != nil {
-		t.Error("unexpected error:", err)
-	}
-	if !reflect.DeepEqual(one, item) {
-		t.Error("bad result for get one. %v ≠ %v", one, item)
+		t.Error("exact match of put item not found in scan")
 	}
 }

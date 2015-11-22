@@ -6,36 +6,31 @@ import (
 	"time"
 )
 
-func TestPut(t *testing.T) {
+func TestDelete(t *testing.T) {
 	if testDB == nil {
 		t.Skip(offlineSkipMsg)
 	}
 	table := testDB.Table(testTable)
 
-	now := time.Now().UTC()
+	// first, add an item to delete later
 	item := widget{
 		UserID: 42,
-		Time:   now,
-		Msg:    "old",
+		Time:   time.Now().UTC(),
+		Msg:    "hello",
 	}
-
 	err := table.Put(item).Run()
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
 
-	newItem := widget{
-		UserID: 42,
-		Time:   now,
-		Msg:    "new",
-	}
-	var oldValue widget
-	err = table.Put(newItem).OldValue(&oldValue)
+	// delete it
+	var old widget
+	err = table.Delete("UserID", item.UserID).Range("Time", item.Time).OldValue(&old)
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
+	if !reflect.DeepEqual(old, item) {
+		t.Errorf("bad old value. %#v ≠ %#v", old, item)
 
-	if !reflect.DeepEqual(oldValue, item) {
-		t.Errorf("bad old value. %#v ≠ %#v", oldValue, item)
 	}
 }

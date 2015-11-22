@@ -1,7 +1,7 @@
 package dynamo
 
 import (
-	"github.com/aws/aws-sdk-go/aws"
+	// "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
@@ -36,16 +36,28 @@ func (d *Delete) Range(name string, value interface{}) *Delete {
 }
 
 func (d *Delete) Run() error {
-	if d.err != nil {
-		return d.err
-	}
-
 	d.returnType = "NONE"
 	_, err := d.run()
 	return err
 }
 
+func (d *Delete) OldValue(out interface{}) error {
+	d.returnType = "ALL_OLD"
+	output, err := d.run()
+	switch {
+	case err != nil:
+		return err
+	case output.Attributes == nil:
+		return ErrNotFound
+	}
+	return unmarshalItem(output.Attributes, out)
+}
+
 func (d *Delete) run() (*dynamodb.DeleteItemOutput, error) {
+	if d.err != nil {
+		return nil, d.err
+	}
+
 	input := d.deleteInput()
 	var output *dynamodb.DeleteItemOutput
 	err := retry(func() error {
@@ -58,7 +70,7 @@ func (d *Delete) run() (*dynamodb.DeleteItemOutput, error) {
 
 func (d *Delete) deleteInput() *dynamodb.DeleteItemInput {
 	input := &dynamodb.DeleteItemInput{
-		TableName:    aws.String(d.table.Name),
+		TableName:    &d.table.Name,
 		Key:          d.key(),
 		ReturnValues: &d.returnType,
 	}

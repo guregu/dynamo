@@ -12,7 +12,6 @@ func retry(f func() error) error {
 	var next time.Duration
 	b := backoff.NewExponentialBackOff()
 	b.MaxElapsedTime = retryTimeout
-	b.Reset()
 
 	for {
 		if err = f(); err == nil {

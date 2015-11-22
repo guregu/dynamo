@@ -13,7 +13,7 @@ func TestPut(t *testing.T) {
 
 	table := testDB.Table(testTable)
 
-	now := time.Now()
+	now := time.Now().UTC()
 	item := widget{
 		UserID: 42,
 		Time:   now,

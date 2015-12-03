@@ -7,15 +7,15 @@ import (
 	"github.com/guregu/toki"
 )
 
-func BenchmarkEncode(b *testing.B) {
-	i := 500
-	item := fancyObject{
-		User:        666,
+var (
+	arbitraryNumber   = 555
+	veryComplexObject = fancyObject{
+		User:        613,
 		Test:        customMarshaler(1),
 		ContentID:   "監獄学園",
 		Page:        1,
 		SkipThis:    "i should disappear",
-		Bonus:       &i,
+		Bonus:       &arbitraryNumber,
 		TestText:    toki.MustParseTime("1:2:3"),
 		StringSlice: []string{"A", "B", "C", "QQQ"},
 		embedMe: embedMe{
@@ -30,10 +30,83 @@ func BenchmarkEncode(b *testing.B) {
 		},
 		Something: nil,
 	}
+)
+
+func BenchmarkEncodeSimple(b *testing.B) {
+	item := simpleObject{
+		User:  666,
+		Other: "hello",
+	}
 
 	for n := 0; n < b.N; n++ {
-		marshalStruct(&item)
+		marshalItem(&item)
 	}
+}
+
+func BenchmarkEncodeSimpleMap(b *testing.B) {
+	item := map[string]interface{}{
+		"User":  666,
+		"Other": "hello",
+	}
+
+	for n := 0; n < b.N; n++ {
+		marshalItem(&item)
+	}
+}
+
+func BenchmarkDecodeSimple(b *testing.B) {
+	item := simpleObject{
+		User:  666,
+		Other: "hello",
+	}
+	av, _ := marshalItem(item)
+
+	var out simpleObject
+	for n := 0; n < b.N; n++ {
+		unmarshalItem(av, &out)
+	}
+}
+
+func BenchmarkDecodeSimpleMap(b *testing.B) {
+	item := simpleObject{
+		User:  666,
+		Other: "hello",
+	}
+	av, _ := marshalItem(item)
+
+	var out map[string]interface{}
+	for n := 0; n < b.N; n++ {
+		unmarshalItem(av, &out)
+	}
+}
+
+func BenchmarkEncodeVeryComplex(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		marshalItem(&veryComplexObject)
+	}
+}
+
+func BenchmarkDecodeVeryComplex(b *testing.B) {
+	av, _ := marshalItem(veryComplexObject)
+
+	var out fancyObject
+	for n := 0; n < b.N; n++ {
+		unmarshalItem(av, &out)
+	}
+}
+
+func BenchmarkDecodeVeryComplexMap(b *testing.B) {
+	av, _ := marshalItem(veryComplexObject)
+
+	var out map[string]interface{}
+	for n := 0; n < b.N; n++ {
+		unmarshalItem(av, &out)
+	}
+}
+
+type simpleObject struct {
+	User  int
+	Other string
 }
 
 type fancyObject struct {

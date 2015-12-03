@@ -26,4 +26,5 @@ type widget struct {
 	UserID int       // PK
 	Time   time.Time // RK
 	Msg    string
+	Count  int
 }

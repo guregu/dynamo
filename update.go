@@ -18,10 +18,12 @@ type Update struct {
 	rangeKey   string
 	rangeValue *dynamodb.AttributeValue
 
-	set    map[string]*dynamodb.AttributeValue
-	add    map[string]*dynamodb.AttributeValue
-	del    map[string]*dynamodb.AttributeValue
+	set    map[string]string
+	add    map[string]string
+	del    map[string]string
 	remove map[string]struct{}
+
+	condition string
 
 	subber
 
@@ -33,9 +35,9 @@ func (table Table) Update(hashKey string, value interface{}) *Update {
 		table:   table,
 		hashKey: hashKey,
 
-		set:    make(map[string]*dynamodb.AttributeValue),
-		add:    make(map[string]*dynamodb.AttributeValue),
-		del:    make(map[string]*dynamodb.AttributeValue),
+		set:    make(map[string]string),
+		add:    make(map[string]string),
+		del:    make(map[string]string),
 		remove: make(map[string]struct{}),
 	}
 	u.hashValue, u.err = marshal(value, "")
@@ -51,52 +53,55 @@ func (u *Update) Range(name string, value interface{}) *Update {
 }
 
 func (u *Update) Set(name string, value interface{}) *Update {
-	name = u.substitute(name)
-	av, err := marshal(value, "")
+	name = u.subName(name)
+	vsub, err := u.subValue(value)
 	u.setError(err)
-	u.set[name] = av
+	u.set[name] = vsub
 	return u
 }
 
 func (u *Update) Add(name string, value interface{}) *Update {
-	name = u.substitute(name)
-	av, err := marshal(value, "")
+	name = u.subName(name)
+	vsub, err := u.subValue(value)
 	u.setError(err)
-	u.add[name] = av
+	u.add[name] = vsub
 	return u
 }
 
+// Delete removes the given value from the set specified by name.
 func (u *Update) Delete(name string, value interface{}) *Update {
-	name = u.substitute(name)
-	av, err := marshal(value, "")
+	name = u.subName(name)
+	vsub, err := u.subValue(value)
 	u.setError(err)
-	u.del[name] = av
+	u.del[name] = vsub
 	return u
 }
 
 func (u *Update) Remove(names ...string) *Update {
 	for _, n := range names {
-		n = u.substitute(n)
+		n = u.subName(n)
 		u.remove[n] = struct{}{}
 	}
 	return u
 }
 
-func (u *Update) Run() error {
-	if u.err != nil {
-		return u.err
-	}
+// If specifies a conditional expression for this update.
+// Use the placeholder ? within the expression to substitute values, and use $ for names.
+// You need to use placeholder names when the name is a reserved word in DynamoDB.
+func (u *Update) If(expr string, args ...interface{}) *Update {
+	cond, err := u.subExpr(expr, args)
+	u.setError(err)
+	u.condition = cond
+	return u
+}
 
+func (u *Update) Run() error {
 	u.returnType = "NONE"
 	_, err := u.run()
 	return err
 }
 
 func (u *Update) Value(out interface{}) error {
-	if u.err != nil {
-		return u.err
-	}
-
 	u.returnType = "ALL_NEW"
 	output, err := u.run()
 	if err != nil {
@@ -106,10 +111,6 @@ func (u *Update) Value(out interface{}) error {
 }
 
 func (u *Update) OldValue(out interface{}) error {
-	if u.err != nil {
-		return u.err
-	}
-
 	u.returnType = "ALL_OLD"
 	output, err := u.run()
 	if err != nil {
@@ -119,6 +120,10 @@ func (u *Update) OldValue(out interface{}) error {
 }
 
 func (u *Update) run() (*dynamodb.UpdateItemOutput, error) {
+	if u.err != nil {
+		return nil, u.err
+	}
+
 	input := u.updateInput()
 	var output *dynamodb.UpdateItemOutput
 	err := retry(func() error {
@@ -134,10 +139,14 @@ func (u *Update) updateInput() *dynamodb.UpdateItemInput {
 		TableName:                 aws.String(u.table.Name),
 		Key:                       u.key(),
 		UpdateExpression:          u.updateExpr(),
-		ExpressionAttributeNames:  u.nameMap(),
-		ExpressionAttributeValues: u.expvals(),
+		ExpressionAttributeNames:  u.nameExpr,
+		ExpressionAttributeValues: u.valueExpr,
 		ReturnValues:              &u.returnType,
 	}
+	if u.condition != "" {
+		input.ConditionExpression = &u.condition
+	}
+	fmt.Printf("UPDATE: %#v\n", input)
 	return input
 }
 
@@ -155,27 +164,24 @@ func (u *Update) updateExpr() *string {
 	var expr []string
 
 	sets := make([]string, 0, len(u.set))
-	for k, _ := range u.set {
-		n := u.unsub(k)
-		sets = append(sets, fmt.Sprintf("%s = :s%s", k, n))
+	for k, v := range u.set {
+		sets = append(sets, fmt.Sprintf("%s = %s", k, v))
 	}
 	if len(sets) > 0 {
 		expr = append(expr, "SET", strings.Join(sets, ", "))
 	}
 
 	adds := make([]string, 0, len(u.add))
-	for k, _ := range u.add {
-		n := u.unsub(k)
-		adds = append(adds, fmt.Sprintf("%s :a%s", k, n))
+	for k, v := range u.add {
+		adds = append(adds, fmt.Sprintf("%s %s", k, v))
 	}
 	if len(adds) > 0 {
 		expr = append(expr, "ADD", strings.Join(adds, ", "))
 	}
 
 	dels := make([]string, 0, len(u.del))
-	for k, _ := range u.del {
-		n := u.unsub(k)
-		dels = append(dels, fmt.Sprintf("%s :d%s", k, n))
+	for k, v := range u.del {
+		dels = append(dels, fmt.Sprintf("%s %s", k, v))
 	}
 	if len(dels) > 0 {
 		expr = append(expr, "DELETE", strings.Join(dels, ", "))
@@ -190,30 +196,6 @@ func (u *Update) updateExpr() *string {
 	}
 
 	return aws.String(strings.Join(expr, " "))
-}
-
-func (u *Update) expvals() map[string]*dynamodb.AttributeValue {
-	l := len(u.set) + len(u.add) + len(u.del)
-	if l == 0 {
-		return nil
-	}
-	expvals := make(map[string]*dynamodb.AttributeValue, l)
-	for k, v := range u.set {
-		k = u.unsub(k)
-		ev := fmt.Sprintf(":s%s", k)
-		expvals[ev] = v
-	}
-	for k, v := range u.add {
-		k = u.unsub(k)
-		ev := fmt.Sprintf(":a%s", k)
-		expvals[ev] = v
-	}
-	for k, v := range u.del {
-		k = u.unsub(k)
-		ev := fmt.Sprintf(":d%s", k)
-		expvals[ev] = v
-	}
-	return expvals
 }
 
 func (u *Update) setError(err error) {

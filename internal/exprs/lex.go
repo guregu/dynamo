@@ -100,13 +100,6 @@ func (l *lexer) nextItem() Item {
 	return item
 }
 
-// drain drains the output so the lexing goroutine will exit.
-// Called by the parser, not in the lexing goroutine.
-func (l *lexer) drain() {
-	for range l.items {
-	}
-}
-
 func lex(input string) *lexer {
 	l := &lexer{
 		input: input,
@@ -129,16 +122,16 @@ loop:
 		var nextFn stateFn
 		r := l.next()
 		switch r {
+		case eof:
+			break loop
+		default:
+			continue
 		case '\'':
 			nextFn = lexQuotedName
 		case '$':
 			nextFn = lexName
 		case '?':
 			nextFn = lexValue
-		case eof:
-			break loop
-		default:
-			continue
 		}
 
 		// do the needful

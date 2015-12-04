@@ -41,7 +41,7 @@ loop:
 	return expr, expr.err
 }
 
-// TODO: provide a way to disable this cache
+// TODO: provide a way to disable this cache from outside
 // for people with insane query requirements.
 
 // exprCache holds an in-memory cache of already lexed expressions.

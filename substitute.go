@@ -19,16 +19,13 @@ type subber struct {
 }
 
 func (s *subber) subName(name string) string {
-	if needsSub(name) {
-		if s.nameExpr == nil {
-			s.nameExpr = make(map[string]*string)
-		}
-
-		sub := "#s" + encodeName(name)
-		s.nameExpr[sub] = aws.String(name)
-		return sub
+	if s.nameExpr == nil {
+		s.nameExpr = make(map[string]*string)
 	}
-	return name
+
+	sub := "#s" + encodeName(name)
+	s.nameExpr[sub] = aws.String(name)
+	return sub
 }
 
 func (s *subber) subValue(value interface{}) (string, error) {
@@ -79,18 +76,6 @@ func (s *subber) subExpr(expr string, args []interface{}) (string, error) {
 	}
 
 	return buf.String(), nil
-}
-
-// TODO: validate against ASCII and starting with a number etc
-func needsSub(name string) bool {
-	name = strings.ToUpper(name)
-	switch {
-	case reserved[name]:
-		return true
-	case strings.ContainsRune(name, '.'):
-		return true
-	}
-	return false
 }
 
 func encodeName(name string) string {

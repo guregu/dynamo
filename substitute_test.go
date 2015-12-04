@@ -23,8 +23,8 @@ func TestSubExpr(t *testing.T) {
 
 func BenchmarkSubExpr(b *testing.B) {
 	const expr = "'User' = ? AND $ > ?"
-	s := subber{}
 	for i := 0; i < b.N; i++ {
+		s := subber{}
 		s.subExpr(expr, []interface{}{613, "Time", "2015-12-04"})
 	}
 }

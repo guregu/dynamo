@@ -56,7 +56,7 @@ func main() {
 
 ### Integration tests
 
-By default, tests are run in offline mode. Create a table called `TestDB`, or specify the environment variable `DYNAMO_TEST_TABLE`. You must also specify `DYNAMO_TEST_REGION`, setting it to the AWS region where your test table is.
+By default, tests are run in offline mode. Create a table called `TestDB`, with a Number Parition Key called `UserID` and a String Sort Key called `Time`. Change the table name with the environment variable `DYNAMO_TEST_TABLE`. You must specify `DYNAMO_TEST_REGION`, setting it to the AWS region where your test table is.
 
  ```bash
 DYNAMO_TEST_REGION=us-west-2 go test github.com/guregu/dynamo/... -cover

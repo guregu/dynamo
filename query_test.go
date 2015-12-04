@@ -25,17 +25,17 @@ func TestGetAllCount(t *testing.T) {
 
 	// now check if get all and count return the same amount of items
 	var result []widget
-	err = table.Get("UserID", 42).Consistent(true).All(&result)
+	err = table.Get("UserID", 42).Consistent(true).Filter("Msg = ?", item.Msg).All(&result)
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
 
-	ct, err := table.Get("UserID", 42).Consistent(true).Count()
+	ct, err := table.Get("UserID", 42).Consistent(true).Filter("Msg = ?", item.Msg).Count()
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
 	if int(ct) != len(result) {
-		t.Error("count and GetAll don't match. count: %d, get all: %d", ct, len(result))
+		t.Errorf("count and GetAll don't match. count: %d, get all: %d", ct, len(result))
 	}
 
 	// search for our inserted item
@@ -57,6 +57,6 @@ func TestGetAllCount(t *testing.T) {
 		t.Error("unexpected error:", err)
 	}
 	if !reflect.DeepEqual(one, item) {
-		t.Error("bad result for get one. %v ≠ %v", one, item)
+		t.Errorf("bad result for get one. %v ≠ %v", one, item)
 	}
 }

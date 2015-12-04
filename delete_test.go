@@ -23,6 +23,15 @@ func TestDelete(t *testing.T) {
 		t.Error("unexpected error:", err)
 	}
 
+	// fail to delete it
+	err = table.Delete("UserID", item.UserID).
+		Range("Time", item.Time).
+		If("Msg = ?", "wrong msg").
+		Run()
+	if !isConditionalCheckErr(err) {
+		t.Error("expected ConditionalCheckFailedException, not", err)
+	}
+
 	// delete it
 	var old widget
 	err = table.Delete("UserID", item.UserID).Range("Time", item.Time).OldValue(&old)
@@ -31,6 +40,5 @@ func TestDelete(t *testing.T) {
 	}
 	if !reflect.DeepEqual(old, item) {
 		t.Errorf("bad old value. %#v ≠ %#v", old, item)
-
 	}
 }

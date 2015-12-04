@@ -22,9 +22,12 @@ type Query struct {
 	rangeOp     Operator
 
 	projection string
+	filter     string
 	consistent bool
 	limit      int64
 	order      Order
+
+	subber
 
 	err error
 }
@@ -87,8 +90,17 @@ func (q *Query) Index(name string) *Query {
 	return q
 }
 
-func (q *Query) Project(expr ...string) *Query {
-	q.projection = strings.Join(expr, ", ")
+func (q *Query) Project(attribs ...string) *Query {
+	expr, err := q.subExpr(strings.Join(attribs, ", "), nil)
+	q.setError(err)
+	q.projection = expr
+	return q
+}
+
+func (q *Query) Filter(expr string, args ...interface{}) *Query {
+	expr, err := q.subExpr(expr, args)
+	q.setError(err)
+	q.filter = expr
 	return q
 }
 
@@ -114,7 +126,7 @@ func (q *Query) One(out interface{}) error {
 
 	if q.rangeOp != nil && q.rangeOp != Equals {
 		// do a query and return the first result
-		return errors.New("not implemented")
+		return errors.New("not implemented: use All instead")
 	}
 
 	// otherwise use GetItem
@@ -214,18 +226,23 @@ func (q *Query) Count() (int64, error) {
 
 func (q *Query) queryInput() *dynamodb.QueryInput {
 	req := &dynamodb.QueryInput{
-		TableName:         aws.String(q.table.Name),
-		KeyConditions:     q.keyConditions(),
-		ExclusiveStartKey: q.startKey,
+		TableName:                 &q.table.Name,
+		KeyConditions:             q.keyConditions(),
+		ExclusiveStartKey:         q.startKey,
+		ExpressionAttributeNames:  q.nameExpr,
+		ExpressionAttributeValues: q.valueExpr,
 	}
 	if q.consistent {
-		req.ConsistentRead = aws.Bool(q.consistent)
+		req.ConsistentRead = &q.consistent
 	}
 	if q.limit > 0 {
-		req.Limit = aws.Int64(q.limit)
+		req.Limit = &q.limit
 	}
 	if q.projection != "" {
 		req.ProjectionExpression = &q.projection
+	}
+	if q.filter != "" {
+		req.FilterExpression = &q.filter
 	}
 	if q.index != "" {
 		req.IndexName = &q.index
@@ -254,14 +271,15 @@ func (q *Query) keyConditions() map[string]*dynamodb.Condition {
 
 func (q *Query) getItemInput() *dynamodb.GetItemInput {
 	req := &dynamodb.GetItemInput{
-		TableName: aws.String(q.table.Name),
+		TableName: &q.table.Name,
 		Key:       q.keys(),
+		ExpressionAttributeNames: q.nameExpr,
 	}
 	if q.consistent {
-		req.ConsistentRead = aws.Bool(q.consistent)
+		req.ConsistentRead = &q.consistent
 	}
 	if q.projection != "" {
-		req.ProjectionExpression = aws.String(q.projection)
+		req.ProjectionExpression = &q.projection
 	}
 	return req
 }

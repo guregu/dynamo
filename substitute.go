@@ -1,12 +1,15 @@
 package dynamo
 
 import (
+	"bytes"
 	"encoding/base64"
 	"fmt"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+
+	"github.com/guregu/dynamo/internal/exprs"
 )
 
 // subber is a "mixin" for operators for keep track of subtituted keys and values
@@ -43,28 +46,38 @@ func (s *subber) subValue(value interface{}) (string, error) {
 }
 
 func (s *subber) subExpr(expr string, args []interface{}) (string, error) {
-	buf := make([]rune, 0, len(expr)+len(args)*8)
+	// TODO: real parsing?
+	lexed, err := exprs.Parse(expr)
+	if err != nil {
+		return "", err
+	}
 
-	idx := 0
-	for _, chr := range expr {
-		switch chr {
-		case '$': // key placeholder
+	var buf bytes.Buffer
+	var idx int
+	for _, item := range lexed.Items {
+		var err error
+		switch item.Type {
+		case exprs.ItemText:
+			_, err = buf.WriteString(item.Val)
+		case exprs.ItemQuotedName:
+			sub := s.subName(item.Val[1 : len(item.Val)-1]) // trim ""
+			_, err = buf.WriteString(sub)
+		case exprs.ItemNamePlaceholder:
 			sub := s.subName(args[idx].(string))
-			buf = append(buf, []rune(sub)...)
+			_, err = buf.WriteString(sub)
 			idx++
-		case '?': // value placeholder
-			sub, err := s.subValue(args[idx])
-			if err != nil {
-				return "", err
+		case exprs.ItemValuePlaceholder:
+			var sub string
+			if sub, err = s.subValue(args[idx]); err == nil {
+				_, err = buf.WriteString(sub)
 			}
-			buf = append(buf, []rune(sub)...)
-			idx++
-		default:
-			buf = append(buf, chr)
+		}
+		if err != nil {
+			return "", err
 		}
 	}
 
-	return string(buf), nil
+	return buf.String(), nil
 }
 
 // TODO: validate against ASCII and starting with a number etc

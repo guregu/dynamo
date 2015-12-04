@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 )
 
@@ -27,4 +28,11 @@ type widget struct {
 	Time   time.Time // RK
 	Msg    string
 	Count  int
+}
+
+func isConditionalCheckErr(err error) bool {
+	if ae, ok := err.(awserr.RequestFailure); ok {
+		return ae.Code() == "ConditionalCheckFailedException"
+	}
+	return false
 }

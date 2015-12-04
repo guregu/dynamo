@@ -86,8 +86,9 @@ func (u *Update) Remove(names ...string) *Update {
 }
 
 // If specifies a conditional expression for this update.
+// Use single quotes to specificy reserved names inline (like 'Count').
 // Use the placeholder ? within the expression to substitute values, and use $ for names.
-// You need to use placeholder names when the name is a reserved word in DynamoDB.
+// You need to use quoted or placeholder names when the name is a reserved word in DynamoDB.
 func (u *Update) If(expr string, args ...interface{}) *Update {
 	cond, err := u.subExpr(expr, args)
 	u.setError(err)
@@ -146,7 +147,6 @@ func (u *Update) updateInput() *dynamodb.UpdateItemInput {
 	if u.condition != "" {
 		input.ConditionExpression = &u.condition
 	}
-	fmt.Printf("UPDATE: %#v\n", input)
 	return input
 }
 

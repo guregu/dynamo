@@ -3,7 +3,6 @@ package dynamo
 import (
 	"strings"
 
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
@@ -13,9 +12,13 @@ type Scan struct {
 	index    string
 
 	projection string
-	filter     string // TODO
+	filter     string
 	limit      int64
 	segments   int // TODO
+
+	subber
+
+	err error
 }
 
 func (table Table) Scan() *Scan {
@@ -29,51 +32,65 @@ func (s *Scan) Index(name string) *Scan {
 	return s
 }
 
-func (q *Scan) Project(expr ...string) *Scan {
-	q.projection = strings.Join(expr, ", ")
-	return q
+func (s *Scan) Project(attribs ...string) *Scan {
+	expr, err := s.subExpr(strings.Join(attribs, ", "), nil)
+	s.setError(err)
+	s.projection = expr
+	return s
 }
 
-func (q *Scan) Filter(expr string) *Scan {
-	q.filter = expr
-	return q
+func (s *Scan) Filter(expr string, args ...interface{}) *Scan {
+	expr, err := s.subExpr(expr, args)
+	s.setError(err)
+	s.filter = expr
+	return s
 }
 
-func (q *Scan) Iter() Iter {
+func (s *Scan) Iter() Iter {
 	return &scanIter{
-		scan:      q,
+		scan:      s,
 		unmarshal: unmarshalItem,
+		err:       s.err,
 	}
 }
 
-func (q *Scan) All(out interface{}) error {
+func (s *Scan) All(out interface{}) error {
 	itr := &scanIter{
-		scan:      q,
+		scan:      s,
 		unmarshal: unmarshalAppend,
+		err:       s.err,
 	}
 	for itr.Next(out) {
 	}
 	return itr.Err()
 }
 
-func (q *Scan) scanInput() *dynamodb.ScanInput {
+func (s *Scan) scanInput() *dynamodb.ScanInput {
 	input := &dynamodb.ScanInput{
-		ExclusiveStartKey: q.startKey,
-		TableName:         aws.String(q.table.Name),
+		ExclusiveStartKey:         s.startKey,
+		TableName:                 &s.table.Name,
+		ExpressionAttributeNames:  s.nameExpr,
+		ExpressionAttributeValues: s.valueExpr,
 	}
-	if q.index != "" {
-		input.IndexName = aws.String(q.index)
+	if s.index != "" {
+		input.IndexName = &s.index
 	}
-	if q.projection != "" {
-		input.ProjectionExpression = aws.String(q.projection)
+	if s.projection != "" {
+		input.ProjectionExpression = &s.projection
 	}
-	if q.filter != "" {
-		input.FilterExpression = aws.String(q.filter)
+	if s.filter != "" {
+		input.FilterExpression = &s.filter
 	}
-	if q.limit > 0 {
-		input.Limit = &q.limit
+	if s.limit > 0 {
+		input.Limit = &s.limit
 	}
 	return input
+}
+
+func (s *Scan) setError(err error) {
+	if s.err == nil {
+		s.err = err
+	}
 }
 
 // scanIter is the iterator for Scan operations

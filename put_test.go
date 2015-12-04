@@ -38,4 +38,10 @@ func TestPut(t *testing.T) {
 	if !reflect.DeepEqual(oldValue, item) {
 		t.Errorf("bad old value. %#v ≠ %#v", oldValue, item)
 	}
+
+	// putting the same item: this should fail
+	err = table.Put(newItem).If("attribute_not_exists(UserID)").Run()
+	if !isConditionalCheckErr(err) {
+		t.Error("expected ConditionalCheckFailedException, not", err)
+	}
 }

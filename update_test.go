@@ -4,8 +4,6 @@ import (
 	"reflect"
 	"testing"
 	"time"
-
-	"github.com/aws/aws-sdk-go/aws/awserr"
 )
 
 func TestUpdate(t *testing.T) {
@@ -51,9 +49,9 @@ func TestUpdate(t *testing.T) {
 		Range("Time", item.Time).
 		Set("Msg", "shouldn't happen").
 		Add("Count", 1).
-		If("$ > ?", "Count", 100).
+		If("'Count' > ?", 100).
 		Value(&result)
-	if ae := err.(awserr.RequestFailure); ae.Code() != "ConditionalCheckFailedException" {
+	if !isConditionalCheckErr(err) {
 		t.Error("expected ConditionalCheckFailedException, not", err)
 	}
 }

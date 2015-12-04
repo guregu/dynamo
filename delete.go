@@ -1,7 +1,6 @@
 package dynamo
 
 import (
-	// "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
@@ -14,6 +13,9 @@ type Delete struct {
 
 	rangeKey   string
 	rangeValue *dynamodb.AttributeValue
+
+	subber
+	condition string
 
 	err error
 }
@@ -32,6 +34,13 @@ func (d *Delete) Range(name string, value interface{}) *Delete {
 	d.rangeKey = name
 	d.rangeValue, err = marshal(value, "")
 	d.setError(err)
+	return d
+}
+
+func (d *Delete) If(expr string, args ...interface{}) *Delete {
+	expr, err := d.subExpr(expr, args)
+	d.setError(err)
+	d.condition = expr
 	return d
 }
 
@@ -70,9 +79,14 @@ func (d *Delete) run() (*dynamodb.DeleteItemOutput, error) {
 
 func (d *Delete) deleteInput() *dynamodb.DeleteItemInput {
 	input := &dynamodb.DeleteItemInput{
-		TableName:    &d.table.Name,
-		Key:          d.key(),
-		ReturnValues: &d.returnType,
+		TableName:                 &d.table.Name,
+		Key:                       d.key(),
+		ReturnValues:              &d.returnType,
+		ExpressionAttributeNames:  d.nameExpr,
+		ExpressionAttributeValues: d.valueExpr,
+	}
+	if d.condition != "" {
+		input.ConditionExpression = &d.condition
 	}
 	return input
 }

@@ -209,7 +209,6 @@ func fieldsInStruct(rv reflect.Value) map[string]reflect.Value {
 }
 
 // unmarshals a struct
-// TODO: unmarshal to map[string]interface{} too
 func unmarshalItem(item map[string]*dynamodb.AttributeValue, out interface{}) error {
 	rv := reflect.ValueOf(out)
 	if rv.Kind() != reflect.Ptr {

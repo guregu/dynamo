@@ -1,7 +1,6 @@
 package dynamo
 
 import (
-	// "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
@@ -10,7 +9,10 @@ type Put struct {
 	returnType string
 
 	item map[string]*dynamodb.AttributeValue
-	err  error
+	subber
+	condition string
+
+	err error
 }
 
 // Put creates a new item or replaces an existing one.
@@ -21,6 +23,13 @@ func (table Table) Put(item interface{}) *Put {
 		item:  encoded,
 		err:   err,
 	}
+}
+
+func (p *Put) If(expr string, args ...interface{}) *Put {
+	expr, err := p.subExpr(expr, args)
+	p.setError(err)
+	p.condition = expr
+	return p
 }
 
 func (p *Put) Run() error {
@@ -56,15 +65,20 @@ func (p *Put) run() (output *dynamodb.PutItemOutput, err error) {
 
 func (p *Put) input() *dynamodb.PutItemInput {
 	input := &dynamodb.PutItemInput{
-		TableName:    &p.table.Name,
-		Item:         p.item,
-		ReturnValues: &p.returnType,
+		TableName:                 &p.table.Name,
+		Item:                      p.item,
+		ReturnValues:              &p.returnType,
+		ExpressionAttributeNames:  p.nameExpr,
+		ExpressionAttributeValues: p.valueExpr,
+	}
+	if p.condition != "" {
+		input.ConditionExpression = &p.condition
 	}
 	return input
 }
 
-// func (p *Put) setError(err error) {
-// 	if p.err != nil {
-// 		p.err = err
-// 	}
-// }
+func (p *Put) setError(err error) {
+	if p.err != nil {
+		p.err = err
+	}
+}

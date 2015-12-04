@@ -20,6 +20,9 @@ func init() {
 	if region := os.Getenv("DYNAMO_TEST_REGION"); region != "" {
 		testDB = New(session.New(), &aws.Config{Region: aws.String(region)})
 	}
+	if table := os.Getenv("DYNAMO_TEST_TABLE"); table != "" {
+		testTable = table
+	}
 }
 
 // widget is the data structure used for integration tests

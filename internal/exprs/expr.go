@@ -1,3 +1,5 @@
+// Package exprs is the internal package for parsing DyanmoDB "expressions", including
+// condition expressions and filter expressions.
 package exprs
 
 import (

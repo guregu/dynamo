@@ -1,3 +1,4 @@
+// Package dynamo offers a rich DynamoDB client.
 package dynamo
 
 import (

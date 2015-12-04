@@ -117,7 +117,7 @@ func (l *lexer) run() {
 }
 
 func lexText(l *lexer) stateFn {
-loop:
+loop: // Eat text until we find a special character
 	for {
 		var nextFn stateFn
 		r := l.next()
@@ -126,6 +126,7 @@ loop:
 			break loop
 		default:
 			continue
+
 		case '\'':
 			nextFn = lexQuotedName
 		case '$':
@@ -134,7 +135,7 @@ loop:
 			nextFn = lexValue
 		}
 
-		// do the needful
+		// got one
 		l.backup()
 		if l.pos > l.start {
 			l.emit(ItemText)

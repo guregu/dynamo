@@ -30,6 +30,7 @@ func TestUpdate(t *testing.T) {
 		Range("Time", item.Time).
 		Set("Msg", "changed").
 		Add("Count", 1).
+		Add("Test", []string{"A", "B"}).
 		Value(&result)
 	expected := widget{
 		UserID: item.UserID,

@@ -38,7 +38,7 @@ func (d *Delete) Range(name string, value interface{}) *Delete {
 }
 
 func (d *Delete) If(expr string, args ...interface{}) *Delete {
-	expr, err := d.subExpr(expr, args)
+	expr, err := d.subExpr(expr, args...)
 	d.setError(err)
 	d.condition = expr
 	return d

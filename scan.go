@@ -40,7 +40,7 @@ func (s *Scan) Project(attribs ...string) *Scan {
 }
 
 func (s *Scan) Filter(expr string, args ...interface{}) *Scan {
-	expr, err := s.subExpr(expr, args)
+	expr, err := s.subExpr(expr, args...)
 	s.setError(err)
 	s.filter = expr
 	return s

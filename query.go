@@ -98,7 +98,7 @@ func (q *Query) Project(attribs ...string) *Query {
 }
 
 func (q *Query) Filter(expr string, args ...interface{}) *Query {
-	expr, err := q.subExpr(expr, args)
+	expr, err := q.subExpr(expr, args...)
 	q.setError(err)
 	q.filter = expr
 	return q

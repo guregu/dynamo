@@ -8,7 +8,7 @@ import (
 func TestSubExpr(t *testing.T) {
 	s := subber{}
 
-	subbed, err := s.subExpr("$ > ? AND begins_with (Title, ?)", []interface{}{"Count", "1", "foo"})
+	subbed, err := s.subExpr("$ > ? AND begins_with (Title, ?)", "Count", "1", "foo")
 	if err != nil {
 		t.Error(err)
 	}
@@ -25,6 +25,6 @@ func BenchmarkSubExpr(b *testing.B) {
 	const expr = "'User' = ? AND $ > ?"
 	for i := 0; i < b.N; i++ {
 		s := subber{}
-		s.subExpr(expr, []interface{}{613, "Time", "2015-12-04"})
+		s.subExpr(expr, 613, "Time", "2015-12-04")
 	}
 }

@@ -18,6 +18,7 @@ const (
 	ItemQuotedName
 	ItemNamePlaceholder
 	ItemValuePlaceholder
+	ItemMagicLiteral
 )
 
 type Item struct {
@@ -38,7 +39,10 @@ func (i Item) String() string {
 	return i.Val
 }
 
-const eof = -1
+const (
+	eof   = -1
+	magic = '🝕'
+)
 
 type stateFn func(*lexer) stateFn
 
@@ -96,7 +100,6 @@ func (l *lexer) errorf(format string, args ...interface{}) stateFn {
 // Called by the parser, not in the lexing goroutine.
 func (l *lexer) nextItem() Item {
 	item := <-l.items
-	// l.lastPos = item.pos
 	return item
 }
 
@@ -133,6 +136,8 @@ loop: // Eat text until we find a special character
 			nextFn = lexName
 		case '?':
 			nextFn = lexValue
+		case magic:
+			nextFn = lexMagicLiteral
 		}
 
 		// got one
@@ -176,5 +181,12 @@ func lexName(l *lexer) stateFn {
 func lexValue(l *lexer) stateFn {
 	l.next()
 	l.emit(ItemValuePlaceholder)
+	return lexText
+}
+
+// when we're on a ・
+func lexMagicLiteral(l *lexer) stateFn {
+	l.next()
+	l.emit(ItemMagicLiteral)
 	return lexText
 }

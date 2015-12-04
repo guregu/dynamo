@@ -8,6 +8,9 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
+// Update represents changes to an existing item.
+// It uses the UpdateItem API.
+// See: http://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_UpdateItem.html
 type Update struct {
 	table      Table
 	returnType string
@@ -18,7 +21,7 @@ type Update struct {
 	rangeKey   string
 	rangeValue *dynamodb.AttributeValue
 
-	set    map[string]string
+	set    []string
 	add    map[string]string
 	del    map[string]string
 	remove map[string]struct{}
@@ -30,12 +33,13 @@ type Update struct {
 	err error
 }
 
+// Update constructs an operation to modify an existing item.
 func (table Table) Update(hashKey string, value interface{}) *Update {
 	u := &Update{
 		table:   table,
 		hashKey: hashKey,
 
-		set:    make(map[string]string),
+		set:    make([]string, 0),
 		add:    make(map[string]string),
 		del:    make(map[string]string),
 		remove: make(map[string]struct{}),
@@ -44,6 +48,7 @@ func (table Table) Update(hashKey string, value interface{}) *Update {
 	return u
 }
 
+// Range specifies the range key (sort key) for the item to update.
 func (u *Update) Range(name string, value interface{}) *Update {
 	var err error
 	u.rangeKey = name
@@ -52,34 +57,104 @@ func (u *Update) Range(name string, value interface{}) *Update {
 	return u
 }
 
-func (u *Update) Set(name string, value interface{}) *Update {
-	name = u.subName(name)
-	vsub, err := u.subValue(value)
+// Set changes path to the given value.
+// Paths that are reserved words are automatically escaped.
+// Use single quotes to escape complex values like 'User'.'Count'.
+func (u *Update) Set(path string, value interface{}, args ...interface{}) *Update {
+	path, err := u.escape(path)
 	u.setError(err)
-	u.set[name] = vsub
+	expr, err := u.subExpr("🝕 = ?", path, value)
+	u.setError(err)
+	u.set = append(u.set, expr)
 	return u
 }
 
-func (u *Update) Add(name string, value interface{}) *Update {
-	name = u.subName(name)
-	vsub, err := u.subValue(value)
+// Set changes path to the given value, if it does not already exist.
+func (u *Update) SetIfNotExists(path string, value interface{}) *Update {
+	path, err := u.escape(path)
 	u.setError(err)
-	u.add[name] = vsub
+	expr, err := u.subExpr("🝕 = if_not_exists(🝕, ?)", path, path, value)
+	u.setError(err)
+	u.set = append(u.set, expr)
 	return u
 }
 
-// Delete removes the given value from the set specified by name.
-func (u *Update) Delete(name string, value interface{}) *Update {
-	name = u.subName(name)
-	vsub, err := u.subValue(value)
+// Append appends value  to the end of the list specified by path.
+func (u *Update) Append(path string, value interface{}) *Update {
+	path, err := u.escape(path)
 	u.setError(err)
-	u.del[name] = vsub
+	expr, err := u.subExpr("🝕 = list_append(🝕, ?)", path, path, value)
+	u.setError(err)
+	u.set = append(u.set, expr)
 	return u
 }
 
-func (u *Update) Remove(names ...string) *Update {
-	for _, n := range names {
-		n = u.subName(n)
+// Prepend inserts value to the beginning of the list specified by path.
+func (u *Update) Prepend(path string, value interface{}) *Update {
+	path, err := u.escape(path)
+	u.setError(err)
+	expr, err := u.subExpr("🝕 = list_append(?, 🝕)", path, value, path)
+	u.setError(err)
+	u.set = append(u.set, expr)
+	return u
+}
+
+// Add adds value to path.
+// Path can be a number or a set.
+// If path represents a set, value must be []int or []string.
+// Path must be a top-level attribute.
+func (u *Update) Add(path string, value interface{}) *Update {
+	path, err := u.escape(path)
+	u.setError(err)
+	vsub, err := u.subValue(value, "set")
+	u.setError(err)
+	u.add[path] = vsub
+	return u
+}
+
+// AddStrings adds the given values to the number set specified by path.
+func (u *Update) AddStrings(path string, value ...string) *Update {
+	return u.Add(path, value)
+}
+
+// AddInts adds the given values to the number set specified by path.
+func (u *Update) AddInts(path string, value ...int) *Update {
+	return u.Add(path, value)
+}
+
+// AddFloats adds the given values to the number set specified by path.
+func (u *Update) AddFloats(path string, value ...float64) *Update {
+	return u.Add(path, value)
+}
+
+func (u *Update) delete(path string, value interface{}) *Update {
+	path, err := u.escape(path)
+	vsub, err := u.subValue(value, "set")
+	u.setError(err)
+	u.del[path] = vsub
+	return u
+}
+
+// DeleteStrings deletes the given values from the string set specified by path.
+func (u *Update) DeleteStrings(path string, values ...string) *Update {
+	return u.delete(path, values)
+}
+
+// DeleteInts deletes the given values from the number set specified by path.
+func (u *Update) DeleteInts(path string, values ...int) *Update {
+	return u.delete(path, values)
+}
+
+// DeleteInts deletes the given values from the number set specified by path.
+func (u *Update) DeleteFloats(path string, values ...float64) *Update {
+	return u.delete(path, values)
+}
+
+// Remove removes the paths from this item, deleting the specified attributes.
+func (u *Update) Remove(paths ...string) *Update {
+	for _, n := range paths {
+		n, err := u.escape(n)
+		u.setError(err)
 		u.remove[n] = struct{}{}
 	}
 	return u
@@ -90,18 +165,20 @@ func (u *Update) Remove(names ...string) *Update {
 // Use the placeholder ? within the expression to substitute values, and use $ for names.
 // You need to use quoted or placeholder names when the name is a reserved word in DynamoDB.
 func (u *Update) If(expr string, args ...interface{}) *Update {
-	cond, err := u.subExpr(expr, args)
+	cond, err := u.subExpr(expr, args...)
 	u.setError(err)
 	u.condition = cond
 	return u
 }
 
+// Run executes this update.
 func (u *Update) Run() error {
 	u.returnType = "NONE"
 	_, err := u.run()
 	return err
 }
 
+// Value executes this update, encoding out with the new value.
 func (u *Update) Value(out interface{}) error {
 	u.returnType = "ALL_NEW"
 	output, err := u.run()
@@ -111,6 +188,7 @@ func (u *Update) Value(out interface{}) error {
 	return unmarshalItem(output.Attributes, out)
 }
 
+// OldValue executes this update, encoding out with the previous value.
 func (u *Update) OldValue(out interface{}) error {
 	u.returnType = "ALL_OLD"
 	output, err := u.run()
@@ -147,6 +225,7 @@ func (u *Update) updateInput() *dynamodb.UpdateItemInput {
 	if u.condition != "" {
 		input.ConditionExpression = &u.condition
 	}
+	fmt.Println("UPDATE:", input)
 	return input
 }
 
@@ -163,12 +242,8 @@ func (u *Update) key() map[string]*dynamodb.AttributeValue {
 func (u *Update) updateExpr() *string {
 	var expr []string
 
-	sets := make([]string, 0, len(u.set))
-	for k, v := range u.set {
-		sets = append(sets, fmt.Sprintf("%s = %s", k, v))
-	}
-	if len(sets) > 0 {
-		expr = append(expr, "SET", strings.Join(sets, ", "))
+	if len(u.set) > 0 {
+		expr = append(expr, "SET", strings.Join(u.set, ", "))
 	}
 
 	adds := make([]string, 0, len(u.add))

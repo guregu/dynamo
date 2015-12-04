@@ -4,6 +4,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
+// Query represents a request to delete an item.
+// See: http://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_DeleteItem.html
 type Delete struct {
 	table      Table
 	returnType string
@@ -20,15 +22,21 @@ type Delete struct {
 	err error
 }
 
-func (table Table) Delete(hashKey string, value interface{}) *Delete {
+// Get creates a new request to delete an item.
+// Key is the name of the hash key (a.k.a. partition key).
+// Value is the value of the hash key.
+func (table Table) Delete(name string, value interface{}) *Delete {
 	d := &Delete{
 		table:   table,
-		hashKey: hashKey,
+		hashKey: name,
 	}
 	d.hashValue, d.err = marshal(value, "")
 	return d
 }
 
+// Range specifies the range key (a.k.a. sort key) to delete.
+// Name is the name of the range key.
+// Value is the value of the range key.
 func (d *Delete) Range(name string, value interface{}) *Delete {
 	var err error
 	d.rangeKey = name
@@ -37,6 +45,10 @@ func (d *Delete) Range(name string, value interface{}) *Delete {
 	return d
 }
 
+// If specifies a conditional expression for this delete to succeed.
+// Use single quotes to specificy reserved names inline (like 'Count').
+// Use the placeholder ? within the expression to substitute values, and use $ for names.
+// You need to use quoted or placeholder names when the name is a reserved word in DynamoDB.
 func (d *Delete) If(expr string, args ...interface{}) *Delete {
 	expr, err := d.subExpr(expr, args...)
 	d.setError(err)
@@ -44,12 +56,15 @@ func (d *Delete) If(expr string, args ...interface{}) *Delete {
 	return d
 }
 
+// Run executes this delete request.
 func (d *Delete) Run() error {
 	d.returnType = "NONE"
 	_, err := d.run()
 	return err
 }
 
+// Run executes this delete request, unmarshaling the previous value to out.
+// Returns ErrNotFound is there was no previous value.
 func (d *Delete) OldValue(out interface{}) error {
 	d.returnType = "ALL_OLD"
 	output, err := d.run()

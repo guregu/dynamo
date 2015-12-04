@@ -4,6 +4,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
+// Query represents a request to create or replace an item.
+// See: http://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_PutItem.html
 type Put struct {
 	table      Table
 	returnType string
@@ -15,7 +17,7 @@ type Put struct {
 	err error
 }
 
-// Put creates a new item or replaces an existing one.
+// Put creates a new request to create or replace an item.
 func (table Table) Put(item interface{}) *Put {
 	encoded, err := marshalItem(item)
 	return &Put{
@@ -25,6 +27,10 @@ func (table Table) Put(item interface{}) *Put {
 	}
 }
 
+// If specifies a conditional expression for this put to succeed.
+// Use single quotes to specificy reserved names inline (like 'Count').
+// Use the placeholder ? within the expression to substitute values, and use $ for names.
+// You need to use quoted or placeholder names when the name is a reserved word in DynamoDB.
 func (p *Put) If(expr string, args ...interface{}) *Put {
 	expr, err := p.subExpr(expr, args)
 	p.setError(err)
@@ -32,12 +38,15 @@ func (p *Put) If(expr string, args ...interface{}) *Put {
 	return p
 }
 
+// Run executes this put.
 func (p *Put) Run() error {
 	p.returnType = "NONE"
 	_, err := p.run()
 	return err
 }
 
+// OldValue executes this put, unmarshaling the previous value into out.
+// Returns ErrNotFound is there was no previous value.
 func (p *Put) OldValue(out interface{}) error {
 	p.returnType = "ALL_OLD"
 	output, err := p.run()

@@ -39,11 +39,11 @@ type Query struct {
 // ErrNotFound is used when the requested item could not be found.
 var ErrNotFound = errors.New("dynamo: no record found")
 
-// Operators are an operation to try against the range key.
+// Operator is an operation to apply in key comparisons.
 type Operator *string
 
 var (
-	// These are OK in key comparisons
+	// The following operators are used in key comparisons.
 	Equal          Operator = Operator(aws.String("EQ"))
 	NotEqual                = Operator(aws.String("NE"))
 	Less                    = Operator(aws.String("LT"))
@@ -79,12 +79,12 @@ var (
 )
 
 // Get creates a new request to get an item.
-// Key is the name of the hash key (a.k.a. partition key).
+// Name is the name of the hash key (a.k.a. partition key).
 // Value is the value of the hash key.
-func (table Table) Get(key string, value interface{}) *Query {
+func (table Table) Get(name string, value interface{}) *Query {
 	q := &Query{
 		table:   table,
-		hashKey: key,
+		hashKey: name,
 	}
 	q.hashValue, q.err = marshal(value, "")
 	return q
@@ -92,9 +92,11 @@ func (table Table) Get(key string, value interface{}) *Query {
 
 // Range specifies the range key (a.k.a. sort key) or keys to get.
 // For single item requests using One, op must be Equal.
-func (q *Query) Range(key string, op Operator, values ...interface{}) *Query {
+// Name is the name of the range key.
+// Op specifies the operator to use when comparing values.
+func (q *Query) Range(name string, op Operator, values ...interface{}) *Query {
 	var err error
-	q.rangeKey = key
+	q.rangeKey = name
 	q.rangeOp = op
 	q.rangeValues, err = marshalSlice(values)
 	q.setError(err)

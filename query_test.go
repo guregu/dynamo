@@ -52,7 +52,7 @@ func TestGetAllCount(t *testing.T) {
 
 	// query specifically against the inserted item
 	var one widget
-	err = table.Get("UserID", 42).Range("Time", Equals, item.Time).Consistent(true).One(&one)
+	err = table.Get("UserID", 42).Range("Time", Equal, item.Time).Consistent(true).One(&one)
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}

@@ -11,6 +11,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
+// Marshaler is the interface implemented by objects that can marshal themselves into
+// an AttributeValue.
 type Marshaler interface {
 	MarshalDynamo() (*dynamodb.AttributeValue, error)
 }

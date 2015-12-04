@@ -1,4 +1,4 @@
-// Package exprs is the internal package for parsing DyanmoDB "expressions", including
+// Package exprs is the internal package for parsing DynamoDB "expressions", including
 // condition expressions and filter expressions.
 package exprs
 

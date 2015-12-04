@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
@@ -215,7 +214,7 @@ func (u *Update) run() (*dynamodb.UpdateItemOutput, error) {
 
 func (u *Update) updateInput() *dynamodb.UpdateItemInput {
 	input := &dynamodb.UpdateItemInput{
-		TableName:                 aws.String(u.table.Name),
+		TableName:                 &u.table.name,
 		Key:                       u.key(),
 		UpdateExpression:          u.updateExpr(),
 		ExpressionAttributeNames:  u.nameExpr,
@@ -225,7 +224,6 @@ func (u *Update) updateInput() *dynamodb.UpdateItemInput {
 	if u.condition != "" {
 		input.ConditionExpression = &u.condition
 	}
-	fmt.Println("UPDATE:", input)
 	return input
 }
 
@@ -270,7 +268,8 @@ func (u *Update) updateExpr() *string {
 		expr = append(expr, "REMOVE", strings.Join(rems, ", "))
 	}
 
-	return aws.String(strings.Join(expr, " "))
+	joined := strings.Join(expr, " ")
+	return &joined
 }
 
 func (u *Update) setError(err error) {

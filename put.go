@@ -65,7 +65,7 @@ func (p *Put) run() (output *dynamodb.PutItemOutput, err error) {
 
 func (p *Put) input() *dynamodb.PutItemInput {
 	input := &dynamodb.PutItemInput{
-		TableName:                 &p.table.Name,
+		TableName:                 &p.table.name,
 		Item:                      p.item,
 		ReturnValues:              &p.returnType,
 		ExpressionAttributeNames:  p.nameExpr,

@@ -79,7 +79,7 @@ func (d *Delete) run() (*dynamodb.DeleteItemOutput, error) {
 
 func (d *Delete) deleteInput() *dynamodb.DeleteItemInput {
 	input := &dynamodb.DeleteItemInput{
-		TableName:                 &d.table.Name,
+		TableName:                 &d.table.name,
 		Key:                       d.key(),
 		ReturnValues:              &d.returnType,
 		ExpressionAttributeNames:  d.nameExpr,

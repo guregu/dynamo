@@ -226,7 +226,7 @@ func (q *Query) Count() (int64, error) {
 
 func (q *Query) queryInput() *dynamodb.QueryInput {
 	req := &dynamodb.QueryInput{
-		TableName:                 &q.table.Name,
+		TableName:                 &q.table.name,
 		KeyConditions:             q.keyConditions(),
 		ExclusiveStartKey:         q.startKey,
 		ExpressionAttributeNames:  q.nameExpr,
@@ -271,7 +271,7 @@ func (q *Query) keyConditions() map[string]*dynamodb.Condition {
 
 func (q *Query) getItemInput() *dynamodb.GetItemInput {
 	req := &dynamodb.GetItemInput{
-		TableName: &q.table.Name,
+		TableName: &q.table.name,
 		Key:       q.keys(),
 		ExpressionAttributeNames: q.nameExpr,
 	}

@@ -68,7 +68,7 @@ func (s *Scan) All(out interface{}) error {
 func (s *Scan) scanInput() *dynamodb.ScanInput {
 	input := &dynamodb.ScanInput{
 		ExclusiveStartKey:         s.startKey,
-		TableName:                 &s.table.Name,
+		TableName:                 &s.table.name,
 		ExpressionAttributeNames:  s.nameExpr,
 		ExpressionAttributeValues: s.valueExpr,
 	}

@@ -71,6 +71,7 @@ func (s *subber) subExpr(expr string, args []interface{}) (string, error) {
 			if sub, err = s.subValue(args[idx]); err == nil {
 				_, err = buf.WriteString(sub)
 			}
+			idx++
 		}
 		if err != nil {
 			return "", err

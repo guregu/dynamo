@@ -20,3 +20,11 @@ func TestSubExpr(t *testing.T) {
 		t.Errorf("bad subbed expr: %v ≠ %v", subbed, expect)
 	}
 }
+
+func BenchmarkSubExpr(b *testing.B) {
+	const expr = "'User' = ? AND $ > ?"
+	s := subber{}
+	for i := 0; i < b.N; i++ {
+		s.subExpr(expr, []interface{}{613, "Time", "2015-12-04"})
+	}
+}

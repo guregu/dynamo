@@ -32,7 +32,7 @@ type Update struct {
 	err error
 }
 
-// Update constructs an operation to modify an existing item.
+// Update creates a new request to modify an existing item.
 func (table Table) Update(hashKey string, value interface{}) *Update {
 	u := &Update{
 		table:   table,

@@ -9,6 +9,10 @@ import (
 	// "github.com/davecgh/go-spew/spew"
 )
 
+// Query represents a request to get one or more items in a table.
+// Query uses the DynamoDB query for requests for multiple items, and GetItem for one.
+// See: http://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_Query.html
+// and http://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_GetItem.html
 type Query struct {
 	table    Table
 	startKey map[string]*dynamodb.AttributeValue
@@ -32,28 +36,35 @@ type Query struct {
 	err error
 }
 
+// ErrNotFound is used when the requested item could not be found.
 var ErrNotFound = errors.New("dynamo: no record found")
 
+// Operators are an operation to try against the range key.
 type Operator *string
 
 var (
 	// These are OK in key comparisons
-	Equals         Operator = Operator(aws.String("EQ"))
-	NotEquals               = Operator(aws.String("NE"))
-	LessOrEqual             = Operator(aws.String("LE"))
+	Equal          Operator = Operator(aws.String("EQ"))
+	NotEqual                = Operator(aws.String("NE"))
 	Less                    = Operator(aws.String("LT"))
-	GreaterOrEqual          = Operator(aws.String("GE"))
+	LessOrEqual             = Operator(aws.String("LE"))
 	Greater                 = Operator(aws.String("GT"))
+	GreaterOrEqual          = Operator(aws.String("GE"))
 	BeginsWith              = Operator(aws.String("BEGINS_WITH"))
 	Between                 = Operator(aws.String("BETWEEN"))
-	// These can't be used in key comparions
-	IsNull      Operator = Operator(aws.String("NULL"))
-	NotNull              = Operator(aws.String("NOT_NULL"))
-	Contains             = Operator(aws.String("CONTAINS"))
-	NotContains          = Operator(aws.String("NOT_CONTAINS"))
-	In                   = Operator(aws.String("IN"))
 )
 
+// These can't be used in key comparions, so disable them for now.
+// We will probably never need these.
+// var (
+// 	IsNull      Operator = Operator(aws.String("NULL"))
+// 	NotNull              = Operator(aws.String("NOT_NULL"))
+// 	Contains             = Operator(aws.String("CONTAINS"))
+// 	NotContains          = Operator(aws.String("NOT_CONTAINS"))
+// 	In                   = Operator(aws.String("IN"))
+// )
+
+// Order is used for specifying the order of results.
 type Order *bool
 
 var (
@@ -67,6 +78,9 @@ var (
 	selectSpecificAttributes = aws.String("SPECIFIC_ATTRIBUTES")
 )
 
+// Get creates a new request to get an item.
+// Key is the name of the hash key (a.k.a. partition key).
+// Value is the value of the hash key.
 func (table Table) Get(key string, value interface{}) *Query {
 	q := &Query{
 		table:   table,
@@ -76,6 +90,8 @@ func (table Table) Get(key string, value interface{}) *Query {
 	return q
 }
 
+// Range specifies the range key (a.k.a. sort key) or keys to get.
+// For single item requests using One, op must be Equal.
 func (q *Query) Range(key string, op Operator, values ...interface{}) *Query {
 	var err error
 	q.rangeKey = key
@@ -85,11 +101,13 @@ func (q *Query) Range(key string, op Operator, values ...interface{}) *Query {
 	return q
 }
 
+// Index specifies the name of the index that this query will operate on.
 func (q *Query) Index(name string) *Query {
 	q.index = name
 	return q
 }
 
+// Project limits the result attributes to the given paths.
 func (q *Query) Project(attribs ...string) *Query {
 	expr, err := q.subExpr(strings.Join(attribs, ", "), nil)
 	q.setError(err)
@@ -97,6 +115,10 @@ func (q *Query) Project(attribs ...string) *Query {
 	return q
 }
 
+// Filter takes an expression that all results will be evaluated against.
+// Use single quotes to specificy reserved names inline (like 'Count').
+// Use the placeholder ? within the expression to substitute values, and use $ for names.
+// You need to use quoted or placeholder names when the name is a reserved word in DynamoDB.
 func (q *Query) Filter(expr string, args ...interface{}) *Query {
 	expr, err := q.subExpr(expr, args...)
 	q.setError(err)
@@ -104,27 +126,37 @@ func (q *Query) Filter(expr string, args ...interface{}) *Query {
 	return q
 }
 
+// Consistent, if on is true, will make this query a strongly consistent read.
+// Queries are eventually consistent by default.
+// Strongly consistent queries are slower and more resource-heavy than eventually consistent queries.
 func (q *Query) Consistent(on bool) *Query {
 	q.consistent = on
 	return q
 }
 
+// Limit specifies the maximum amount of results to examine.
+// If a filter is not specified, the number of results will be limited.
+// If a filter is specified, the number of results to consider for filtering will be limited.
 func (q *Query) Limit(limit int64) *Query {
 	q.limit = limit
 	return q
 }
 
+// Order specifies the desired result order.
+// Requires a range key (a.k.a. partition key) to be specified.
 func (q *Query) Order(order Order) *Query {
 	q.order = order
 	return q
 }
 
+// One executes this query and retrieves a single result,
+// unmarshaling the result to out.
 func (q *Query) One(out interface{}) error {
 	if q.err != nil {
 		return q.err
 	}
 
-	if q.rangeOp != nil && q.rangeOp != Equals {
+	if q.rangeOp != nil && q.rangeOp != Equal {
 		// do a query and return the first result
 		return errors.New("not implemented: use All instead")
 	}
@@ -151,6 +183,7 @@ func (q *Query) One(out interface{}) error {
 	return unmarshalItem(res.Item, out)
 }
 
+// All executes this request and unmarshals all results to out, which must be a pointer to a slice.
 func (q *Query) All(out interface{}) error {
 	if q.err != nil {
 		return q.err
@@ -188,6 +221,7 @@ func (q *Query) All(out interface{}) error {
 	return nil
 }
 
+// Count executes this request, returning the number of results.
 func (q *Query) Count() (int64, error) {
 	if q.err != nil {
 		return 0, q.err
@@ -257,7 +291,7 @@ func (q *Query) keyConditions() map[string]*dynamodb.Condition {
 	conds := map[string]*dynamodb.Condition{
 		q.hashKey: &dynamodb.Condition{
 			AttributeValueList: []*dynamodb.AttributeValue{q.hashValue},
-			ComparisonOperator: Equals,
+			ComparisonOperator: Equal,
 		},
 	}
 	if q.rangeKey != "" && q.rangeOp != nil {

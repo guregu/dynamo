@@ -6,6 +6,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
+// Scan represents a request to scan all the data in a table.
+// See: http://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_Scan.html
 type Scan struct {
 	table    Table
 	startKey map[string]*dynamodb.AttributeValue
@@ -13,32 +15,39 @@ type Scan struct {
 
 	projection string
 	filter     string
-	limit      int64
-	segments   int // TODO
+	limit      int64 // TODO
+	segments   int   // TODO
 
 	subber
 
 	err error
 }
 
+// Scan creates a new request to scan this table.
 func (table Table) Scan() *Scan {
 	return &Scan{
 		table: table,
 	}
 }
 
+// Index specifies the name of the index that Scan will operate on.
 func (s *Scan) Index(name string) *Scan {
 	s.index = name
 	return s
 }
 
-func (s *Scan) Project(attribs ...string) *Scan {
-	expr, err := s.subExpr(strings.Join(attribs, ", "), nil)
+// Project limits the result attributes to the given paths.
+func (s *Scan) Project(paths ...string) *Scan {
+	expr, err := s.subExpr(strings.Join(paths, ", "), nil)
 	s.setError(err)
 	s.projection = expr
 	return s
 }
 
+// Filter takes an expression that all results will be evaluated against.
+// Use single quotes to specificy reserved names inline (like 'Count').
+// Use the placeholder ? within the expression to substitute values, and use $ for names.
+// You need to use quoted or placeholder names when the name is a reserved word in DynamoDB.
 func (s *Scan) Filter(expr string, args ...interface{}) *Scan {
 	expr, err := s.subExpr(expr, args...)
 	s.setError(err)
@@ -46,6 +55,7 @@ func (s *Scan) Filter(expr string, args ...interface{}) *Scan {
 	return s
 }
 
+// Iter returns a results iterator for this request.
 func (s *Scan) Iter() Iter {
 	return &scanIter{
 		scan:      s,
@@ -54,6 +64,7 @@ func (s *Scan) Iter() Iter {
 	}
 }
 
+// All executes this request and unmarshals all results to out, which must be a pointer to a slice.
 func (s *Scan) All(out interface{}) error {
 	itr := &scanIter{
 		scan:      s,
@@ -104,6 +115,8 @@ type scanIter struct {
 	unmarshal func(map[string]*dynamodb.AttributeValue, interface{}) error
 }
 
+// Next tries to unmarshal the next result into out.
+// Returns false when it is complete or if it runs into an error.
 func (itr *scanIter) Next(out interface{}) bool {
 	// stop if we have an error
 	if itr.err != nil {
@@ -148,6 +161,8 @@ func (itr *scanIter) Next(out interface{}) bool {
 	return itr.err == nil
 }
 
+// Err returns the error encountered, if any.
+// You should check this after Next is finished.
 func (itr *scanIter) Err() error {
 	return itr.err
 }

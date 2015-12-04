@@ -11,6 +11,7 @@ func (t Table) Name() string {
 	return t.name
 }
 
+// Table returns a Table handle specified by name.
 func (db *DB) Table(name string) Table {
 	return Table{
 		name: name,

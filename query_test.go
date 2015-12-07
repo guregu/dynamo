@@ -50,9 +50,18 @@ func TestGetAllCount(t *testing.T) {
 		t.Error("exact match of put item not found in get all")
 	}
 
-	// query specifically against the inserted item
+	// query specifically against the inserted item (using GetItem)
 	var one widget
 	err = table.Get("UserID", 42).Range("Time", Equal, item.Time).Consistent(true).One(&one)
+	if err != nil {
+		t.Error("unexpected error:", err)
+	}
+	if !reflect.DeepEqual(one, item) {
+		t.Errorf("bad result for get one. %v ≠ %v", one, item)
+	}
+
+	// query specifically against the inserted item (using Query)
+	err = table.Get("UserID", 42).Range("Time", Equal, item.Time).Filter("Msg = ?", item.Msg).Consistent(true).One(&one)
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}

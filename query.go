@@ -36,8 +36,10 @@ type Query struct {
 	err error
 }
 
-// ErrNotFound is used when the requested item could not be found.
-var ErrNotFound = errors.New("dynamo: no record found")
+var (
+	ErrNotFound = errors.New("dynamo: no item found")  // The requested item could not be found.
+	ErrTooMany  = errors.New("dynamo: too many items") // One item was requested, but the query returned multiple.
+)
 
 // Operator is an operation to apply in key comparisons.
 type Operator *string
@@ -158,31 +160,56 @@ func (q *Query) One(out interface{}) error {
 		return q.err
 	}
 
-	if q.rangeOp != nil && q.rangeOp != Equal {
-		// do a query and return the first result
-		return errors.New("not implemented: use All instead")
-	}
+	// Can we use the GetItem API?
+	if q.canGetItem() {
+		req := q.getItemInput()
 
-	// otherwise use GetItem
-	req := q.getItemInput()
-
-	var res *dynamodb.GetItemOutput
-	err := retry(func() error {
-		var err error
-		res, err = q.table.db.client.GetItem(req)
+		var res *dynamodb.GetItemOutput
+		err := retry(func() error {
+			var err error
+			res, err = q.table.db.client.GetItem(req)
+			if err != nil {
+				return err
+			}
+			if res.Item == nil {
+				return ErrNotFound
+			}
+			return nil
+		})
 		if err != nil {
 			return err
 		}
-		if res.Item == nil {
-			return ErrNotFound
+
+		return unmarshalItem(res.Item, out)
+	}
+
+	// If not, try a Query.
+	req := q.queryInput()
+
+	var res *dynamodb.QueryOutput
+	err := retry(func() error {
+		var err error
+		res, err = q.table.db.client.Query(req)
+		if err != nil {
+			return err
 		}
+
+		switch {
+		case len(res.Items) == 0:
+			return ErrNotFound
+		case len(res.Items) > 1:
+			return ErrTooMany
+		case res.LastEvaluatedKey != nil && q.limit != 0:
+			return ErrTooMany
+		}
+
 		return nil
 	})
 	if err != nil {
 		return err
 	}
 
-	return unmarshalItem(res.Item, out)
+	return unmarshalItem(res.Items[0], out)
 }
 
 // All executes this request and unmarshals all results to out, which must be a pointer to a slice.
@@ -260,6 +287,19 @@ func (q *Query) Count() (int64, error) {
 	return count, nil
 }
 
+// can we use the get item API?
+func (q *Query) canGetItem() bool {
+	switch {
+	case q.rangeOp != nil && q.rangeOp != Equal:
+		return false
+	case q.index != "":
+		return false
+	case q.filter != "":
+		return false
+	}
+	return true
+}
+
 func (q *Query) queryInput() *dynamodb.QueryInput {
 	req := &dynamodb.QueryInput{
 		TableName:                 &q.table.name,
@@ -328,6 +368,18 @@ func (q *Query) keys() map[string]*dynamodb.AttributeValue {
 		keys[q.rangeKey] = q.rangeValues[0]
 	}
 	return keys
+}
+
+func (q *Query) keysAndAttribs() *dynamodb.KeysAndAttributes {
+	kas := &dynamodb.KeysAndAttributes{
+		Keys: []map[string]*dynamodb.AttributeValue{q.keys()},
+		ExpressionAttributeNames: q.nameExpr,
+		ConsistentRead:           &q.consistent,
+	}
+	if q.projection != "" {
+		kas.ProjectionExpression = &q.projection
+	}
+	return kas
 }
 
 func (q *Query) setError(err error) {

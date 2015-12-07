@@ -12,7 +12,6 @@ dynamo is still under development, so the API may change!
 package dynamo
 
 import (
-	"os"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -29,7 +28,8 @@ type widget struct {
 	Msg       string   `dynamo:"Message"`
 	Count     int      `dynamo:",omitempty"`
 	Friends   []string `dynamo:",set"` // Sets 
-	SecretKey string   `dynamo:"-"` // Ignored
+	SecretKey string   `dynamo:"-"`    // Ignored
+	Children  []any    // Lists
 }
 
 func main() {

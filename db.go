@@ -20,8 +20,12 @@ func New(p client.ConfigProvider, cfgs ...*aws.Config) *DB {
 	return db
 }
 
-// Iter is an iterator for query results.
+// Iter is an iterator for request results.
 type Iter interface {
+	// Next tries to unmarshal the next result into out.
+	// Returns false when it is complete or if it runs into an error.
 	Next(out interface{}) bool
+	// Err returns the error encountered, if any.
+	// You should check this after Next is finished.
 	Err() error
 }

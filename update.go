@@ -159,7 +159,7 @@ func (u *Update) Remove(paths ...string) *Update {
 	return u
 }
 
-// If specifies a conditional expression for this update.
+// If specifies a conditional expression for this update to succeed.
 // Use single quotes to specificy reserved names inline (like 'Count').
 // Use the placeholder ? within the expression to substitute values, and use $ for names.
 // You need to use quoted or placeholder names when the name is a reserved word in DynamoDB.

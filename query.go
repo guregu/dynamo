@@ -48,14 +48,14 @@ type Operator *string
 
 // Operators used for comparing against the range key.
 var (
-	Equal          Operator = Operator(aws.String("EQ"))
-	NotEqual                = Operator(aws.String("NE"))
-	Less                    = Operator(aws.String("LT"))
-	LessOrEqual             = Operator(aws.String("LE"))
-	Greater                 = Operator(aws.String("GT"))
-	GreaterOrEqual          = Operator(aws.String("GE"))
-	BeginsWith              = Operator(aws.String("BEGINS_WITH"))
-	Between                 = Operator(aws.String("BETWEEN"))
+	Equal          = Operator(aws.String("EQ"))
+	NotEqual       = Operator(aws.String("NE"))
+	Less           = Operator(aws.String("LT"))
+	LessOrEqual    = Operator(aws.String("LE"))
+	Greater        = Operator(aws.String("GT"))
+	GreaterOrEqual = Operator(aws.String("GE"))
+	BeginsWith     = Operator(aws.String("BEGINS_WITH"))
+	Between        = Operator(aws.String("BETWEEN"))
 )
 
 // These can't be used in key comparions, so disable them for now.
@@ -73,8 +73,8 @@ type Order *bool
 
 // Orders for sorting results.
 var (
-	Ascending  Order = Order(aws.Bool(true))  // ScanIndexForward = true
-	Descending Order = Order(aws.Bool(false)) // ScanIndexForward = false
+	Ascending  = Order(aws.Bool(true))  // ScanIndexForward = true
+	Descending = Order(aws.Bool(false)) // ScanIndexForward = false
 )
 
 var (

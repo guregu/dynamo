@@ -46,8 +46,8 @@ var (
 // Operator is an operation to apply in key comparisons.
 type Operator *string
 
+// Operators used for comparing against the range key.
 var (
-	// The following operators are used in key comparisons.
 	Equal          Operator = Operator(aws.String("EQ"))
 	NotEqual                = Operator(aws.String("NE"))
 	Less                    = Operator(aws.String("LT"))
@@ -71,6 +71,7 @@ var (
 // Order is used for specifying the order of results.
 type Order *bool
 
+// Orders for sorting results.
 var (
 	Ascending  Order = Order(aws.Bool(true))  // ScanIndexForward = true
 	Descending Order = Order(aws.Bool(false)) // ScanIndexForward = false

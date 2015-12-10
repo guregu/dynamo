@@ -261,7 +261,7 @@ func (u *Update) updateExpr() *string {
 	}
 
 	rems := make([]string, 0, len(u.remove))
-	for k, _ := range u.remove {
+	for k := range u.remove {
 		rems = append(rems, k)
 	}
 	if len(rems) > 0 {

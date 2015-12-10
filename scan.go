@@ -56,7 +56,7 @@ func (s *Scan) Filter(expr string, args ...interface{}) *Scan {
 	return s
 }
 
-// Consistent, if on is true, will make this scan use a strongly consistent read.
+// Consistent will, if on is true, make this scan use a strongly consistent read.
 // Scans are eventually consistent by default.
 // Strongly consistent reads are more resource-heavy than eventually consistent reads.
 func (s *Scan) Consistent(on bool) *Scan {

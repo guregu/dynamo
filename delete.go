@@ -22,7 +22,7 @@ type Delete struct {
 	err error
 }
 
-// Get creates a new request to delete an item.
+// Delete creates a new request to delete an item.
 // Key is the name of the hash key (a.k.a. partition key).
 // Value is the value of the hash key.
 func (table Table) Delete(name string, value interface{}) *Delete {

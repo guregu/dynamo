@@ -9,8 +9,10 @@ import (
 // https://www.youtube.com/watch?v=HxaD_trXwRE
 // and the standard library (text/template/parse)
 
+// ItemType of a lexed item.
 type ItemType int
 
+// Types of lexed items.
 const (
 	ItemError ItemType = iota
 	ItemEOF
@@ -21,6 +23,7 @@ const (
 	ItemMagicLiteral
 )
 
+// Item is a lexed item.
 type Item struct {
 	Type ItemType
 	Pos  int

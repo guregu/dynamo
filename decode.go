@@ -10,7 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
-// Marshaler is the interface implemented by objects that can unmarshal
+// Unmarshaler is the interface implemented by objects that can unmarshal
 // an AttributeValue into themselves.
 type Unmarshaler interface {
 	UnmarshalDynamo(av *dynamodb.AttributeValue) error

@@ -68,7 +68,7 @@ func (u *Update) Set(path string, value interface{}) *Update {
 	return u
 }
 
-// Set changes path to the given value, if it does not already exist.
+// SetIfNotExists changes path to the given value, if it does not already exist.
 func (u *Update) SetIfNotExists(path string, value interface{}) *Update {
 	path, err := u.escape(path)
 	u.setError(err)
@@ -111,19 +111,19 @@ func (u *Update) Add(path string, value interface{}) *Update {
 	return u
 }
 
-// AddStrings adds the given values to the number set specified by path.
-func (u *Update) AddStrings(path string, value ...string) *Update {
-	return u.Add(path, value)
+// AddToStringSet adds the given values to the number set specified by path.
+func (u *Update) AddToStringSet(path string, values ...string) *Update {
+	return u.Add(path, values)
 }
 
-// AddInts adds the given values to the number set specified by path.
-func (u *Update) AddInts(path string, value ...int) *Update {
-	return u.Add(path, value)
+// AddToIntSet adds the given values to the number set specified by path.
+func (u *Update) AddToIntSet(path string, values ...int) *Update {
+	return u.Add(path, values)
 }
 
-// AddFloats adds the given values to the number set specified by path.
-func (u *Update) AddFloats(path string, value ...float64) *Update {
-	return u.Add(path, value)
+// AddToFloatSet adds the given values to the number set specified by path.
+func (u *Update) AddToFloatSet(path string, values ...float64) *Update {
+	return u.Add(path, values)
 }
 
 func (u *Update) delete(path string, value interface{}) *Update {
@@ -134,18 +134,18 @@ func (u *Update) delete(path string, value interface{}) *Update {
 	return u
 }
 
-// DeleteStrings deletes the given values from the string set specified by path.
-func (u *Update) DeleteStrings(path string, values ...string) *Update {
+// DeleteFromStringSet deletes the given values from the string set specified by path.
+func (u *Update) DeleteFromStringSet(path string, values ...string) *Update {
 	return u.delete(path, values)
 }
 
-// DeleteInts deletes the given values from the number set specified by path.
-func (u *Update) DeleteInts(path string, values ...int) *Update {
+// DeleteFromIntSet deletes the given values from the number set specified by path.
+func (u *Update) DeleteFromIntSet(path string, values ...int) *Update {
 	return u.delete(path, values)
 }
 
-// DeleteInts deletes the given values from the number set specified by path.
-func (u *Update) DeleteFloats(path string, values ...float64) *Update {
+// DeleteFromFloatSet deletes the given values from the number set specified by path.
+func (u *Update) DeleteFromFloatSet(path string, values ...float64) *Update {
 	return u.delete(path, values)
 }
 

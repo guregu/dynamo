@@ -4,7 +4,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
-// Query represents a request to delete an item.
+// Delete is a request to delete an item.
 // See: http://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_DeleteItem.html
 type Delete struct {
 	table      Table
@@ -63,7 +63,7 @@ func (d *Delete) Run() error {
 	return err
 }
 
-// Run executes this delete request, unmarshaling the previous value to out.
+// OldValue executes this delete request, unmarshaling the previous value to out.
 // Returns ErrNotFound is there was no previous value.
 func (d *Delete) OldValue(out interface{}) error {
 	d.returnType = "ALL_OLD"

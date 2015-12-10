@@ -9,7 +9,7 @@ import (
 	// "github.com/davecgh/go-spew/spew"
 )
 
-// Query represents a request to get one or more items in a table.
+// Query is a request to get one or more items in a table.
 // Query uses the DynamoDB query for requests for multiple items, and GetItem for one.
 // See: http://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_Query.html
 // and http://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_GetItem.html
@@ -37,8 +37,10 @@ type Query struct {
 }
 
 var (
-	ErrNotFound = errors.New("dynamo: no item found")  // The requested item could not be found.
-	ErrTooMany  = errors.New("dynamo: too many items") // One item was requested, but the query returned multiple.
+	// ErrNotFound is returned when no items could be found in Get or OldValue a and similar operations.
+	ErrNotFound = errors.New("dynamo: no item found")
+	// ErrTooMany is returned when one item was requested, but the query returned multiple items.
+	ErrTooMany = errors.New("dynamo: too many items")
 )
 
 // Operator is an operation to apply in key comparisons.
@@ -130,9 +132,9 @@ func (q *Query) Filter(expr string, args ...interface{}) *Query {
 	return q
 }
 
-// Consistent, if on is true, will make this query a strongly consistent read.
+// Consistent will, if on is true, make this query a strongly consistent read.
 // Queries are eventually consistent by default.
-// Strongly consistent queries are slower and more resource-heavy than eventually consistent queries.
+// Strongly consistent reads are more resource-heavy than eventually consistent reads.
 func (q *Query) Consistent(on bool) *Query {
 	q.consistent = on
 	return q

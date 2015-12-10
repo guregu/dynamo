@@ -4,7 +4,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
-// Query represents a request to create or replace an item.
+// Put is a request to create or replace an item.
 // See: http://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_PutItem.html
 type Put struct {
 	table      Table

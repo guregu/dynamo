@@ -7,6 +7,7 @@ import (
 	"sync"
 )
 
+// Expr is a "parsed" expression.
 type Expr struct {
 	Items []Item
 	err   error

@@ -6,7 +6,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
-// Scan represents a request to scan all the data in a table.
+// Scan is a request to scan all the data in a table.
 // See: http://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_Scan.html
 type Scan struct {
 	table    Table
@@ -15,6 +15,7 @@ type Scan struct {
 
 	projection string
 	filter     string
+	consistent bool
 	limit      int64 // TODO
 	segments   int   // TODO
 
@@ -55,6 +56,14 @@ func (s *Scan) Filter(expr string, args ...interface{}) *Scan {
 	return s
 }
 
+// Consistent, if on is true, will make this scan use a strongly consistent read.
+// Scans are eventually consistent by default.
+// Strongly consistent reads are more resource-heavy than eventually consistent reads.
+func (s *Scan) Consistent(on bool) *Scan {
+	s.consistent = on
+	return s
+}
+
 // Iter returns a results iterator for this request.
 func (s *Scan) Iter() Iter {
 	return &scanIter{
@@ -80,6 +89,7 @@ func (s *Scan) scanInput() *dynamodb.ScanInput {
 	input := &dynamodb.ScanInput{
 		ExclusiveStartKey:         s.startKey,
 		TableName:                 &s.table.name,
+		ConsistentRead:            &s.consistent,
 		ExpressionAttributeNames:  s.nameExpr,
 		ExpressionAttributeValues: s.valueExpr,
 	}

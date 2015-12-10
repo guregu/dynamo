@@ -59,7 +59,7 @@ func (u *Update) Range(name string, value interface{}) *Update {
 // Set changes path to the given value.
 // Paths that are reserved words are automatically escaped.
 // Use single quotes to escape complex values like 'User'.'Count'.
-func (u *Update) Set(path string, value interface{}, args ...interface{}) *Update {
+func (u *Update) Set(path string, value interface{}) *Update {
 	path, err := u.escape(path)
 	u.setError(err)
 	expr, err := u.subExpr("🝕 = ?", path, value)

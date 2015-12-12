@@ -1,7 +1,7 @@
 ## dynamo [![GoDoc](https://godoc.org/github.com/guregu/dynamo?status.svg)](https://godoc.org/github.com/guregu/dynamo) [![Circle CI](https://circleci.com/gh/guregu/dynamo.svg?style=svg)](https://circleci.com/gh/guregu/dynamo)
 `import "github.com/guregu/dynamo"` 
 
-dynamo is an expressive [DynamoDB](https://aws.amazon.com/dynamodb/) client for Go, with an API heavily inspired by [mgo](https://labix.org/mgo). dynamo uses the official [AWS SDK](https://github.com/aws/aws-sdk-go/) for sending requests.
+dynamo is an expressive [DynamoDB](https://aws.amazon.com/dynamodb/) client for Go, with an API heavily inspired by [mgo](https://labix.org/mgo). dynamo integrates with the official [AWS SDK](https://github.com/aws/aws-sdk-go/).
 
 dynamo is still under development, so the API may change!
 

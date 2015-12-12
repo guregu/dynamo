@@ -7,8 +7,8 @@ type Table struct {
 }
 
 // Name returns this table's name.
-func (t Table) Name() string {
-	return t.name
+func (table Table) Name() string {
+	return table.name
 }
 
 // Table returns a Table handle specified by name.

@@ -10,6 +10,7 @@ import (
 // TODO: chunk into 25-item requests
 
 // BatchWrite is a BatchWriteItem operation.
+// Note that currently batch writes are limited to 25 items.
 type BatchWrite struct {
 	batch Batch
 	ops   []*dynamodb.WriteRequest
@@ -18,6 +19,7 @@ type BatchWrite struct {
 
 // Write creates a new batch write request, to which
 // puts and deletes can be added.
+// Note that currently batch writes are limited to 25 items.
 func (b Batch) Write() *BatchWrite {
 	return &BatchWrite{
 		batch: b,

@@ -20,9 +20,9 @@ type Batch struct {
 
 // Batch creates a new batch with the given hash key name, and range key name if provided.
 // For purely Put batches, neither is necessary.
-func (t Table) Batch(hashAndRangeKeyName ...string) Batch {
+func (table Table) Batch(hashAndRangeKeyName ...string) Batch {
 	b := Batch{
-		table: t,
+		table: table,
 	}
 	switch len(hashAndRangeKeyName) {
 	case 0:
@@ -38,6 +38,7 @@ func (t Table) Batch(hashAndRangeKeyName ...string) Batch {
 }
 
 // BatchGet is a BatchGetItem operation.
+// Note that currently batch gets are limited to 100 items.
 type BatchGet struct {
 	batch      Batch
 	reqs       []*Query
@@ -50,6 +51,7 @@ type BatchGet struct {
 //	table.Batch("ID", "Month").
 //		Get([]dynamo.Keys{{1, "2015-10"}, {42, "2015-12"}, {42, "1992-02"}}...).
 //		All(&results)
+// Note that currently batch gets are limited to 100 items.
 func (b Batch) Get(keys ...Keyed) *BatchGet {
 	bg := &BatchGet{
 		batch: b,
@@ -163,9 +165,11 @@ func (itr *bgIter) Next(out interface{}) bool {
 		return false
 	}
 
+	tableName := itr.bg.batch.table.Name()
+
 	// can we use results we already have?
-	if itr.output != nil && itr.idx < len(itr.output.Responses[itr.bg.batch.table.Name()]) {
-		items := itr.output.Responses[itr.bg.batch.table.Name()]
+	if itr.output != nil && itr.idx < len(itr.output.Responses[tableName]) {
+		items := itr.output.Responses[tableName]
 		item := items[itr.idx]
 		itr.err = itr.unmarshal(item, out)
 		itr.idx++
@@ -177,7 +181,7 @@ func (itr *bgIter) Next(out interface{}) bool {
 		itr.input = itr.bg.input()
 	}
 
-	if itr.output != nil && itr.idx >= len(itr.output.Responses[itr.bg.batch.table.Name()]) {
+	if itr.output != nil && itr.idx >= len(itr.output.Responses[tableName]) {
 		// have we exhausted all results?
 		if len(itr.output.UnprocessedKeys) == 0 {
 			return false
@@ -196,7 +200,7 @@ func (itr *bgIter) Next(out interface{}) bool {
 		return err
 	})
 
-	items := itr.output.Responses[itr.bg.batch.table.Name()]
+	items := itr.output.Responses[tableName]
 	if itr.err != nil || len(items) == 0 {
 		if itr.idx == 0 {
 			itr.err = ErrNotFound

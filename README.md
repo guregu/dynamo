@@ -54,6 +54,30 @@ func main() {
 }
 ```
 
+### Expressions
+
+dynamo will help you write expressions used to filter results in queries and scans, and add conditions to puts and deletes. 
+
+Attribute names may be written as is if it is not a reserved word, or be escaped with single quotes (`''`). You may also use dollar signs (`$`) as placeholders for attribute names. DynamoDB has [very large amount of reserved words](http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ReservedWords.html) so it may be a good idea to just escape everything.
+
+Question marks (`?`) are used as placeholders for attribute values. DynamoDB doesn't have value literals, so you need to substitute everything.
+
+Please see the [DynamoDB reference on expressions](http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Expressions.SpecifyingConditions.html#ConditionExpressionReference) for more information.
+
+```go
+// Using single quotes to escape a reserved word, and a question mark as a value placeholder.
+// Finds all items whose date is greater than or equal to lastUpdate.
+table.Scan().Filter("'Date' >= ?", lastUpdate).All(&results)
+
+// Using dollar signs as a placeholder for attribute names. 
+// Deletes the item with an ID of 42 if its score is at or below the cutoff, and its name starts with G.
+table.Delete("ID", 42).If("Score <= ? AND begins_with($, ?)", cutoff, "Name", "G").Run()
+
+// Put a new item, only if it doesn't already exist.
+table.Put(item{ID: 42}).If("attribute_not_exists(ID)").Run()
+```
+
+
 ### Integration tests
 
 By default, tests are run in offline mode. Create a table called `TestDB`, with a Number Parition Key called `UserID` and a String Sort Key called `Time`. Change the table name with the environment variable `DYNAMO_TEST_TABLE`. You must specify `DYNAMO_TEST_REGION`, setting it to the AWS region where your test table is.

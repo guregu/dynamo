@@ -115,8 +115,8 @@ func (q *Query) Index(name string) *Query {
 }
 
 // Project limits the result attributes to the given paths.
-func (q *Query) Project(attribs ...string) *Query {
-	expr, err := q.subExpr(strings.Join(attribs, ", "), nil)
+func (q *Query) Project(paths ...string) *Query {
+	expr, err := q.subExpr(strings.Join(paths, ", "), nil)
 	q.setError(err)
 	q.projection = expr
 	return q
@@ -215,44 +215,6 @@ func (q *Query) One(out interface{}) error {
 	return unmarshalItem(res.Items[0], out)
 }
 
-// All executes this request and unmarshals all results to out, which must be a pointer to a slice.
-func (q *Query) All(out interface{}) error {
-	if q.err != nil {
-		return q.err
-	}
-
-	for {
-		req := q.queryInput()
-
-		var res *dynamodb.QueryOutput
-		err := retry(func() error {
-			var err error
-			res, err = q.table.db.client.Query(req)
-			if err != nil {
-				return err
-			}
-
-			for _, item := range res.Items {
-				if err := unmarshalAppend(item, out); err != nil {
-					return err
-				}
-			}
-			return nil
-		})
-		if err != nil {
-			return err
-		}
-
-		// do we need to check for more results?
-		q.startKey = res.LastEvaluatedKey
-		if res.LastEvaluatedKey == nil || q.limit > 0 {
-			break
-		}
-	}
-
-	return nil
-}
-
 // Count executes this request, returning the number of results.
 func (q *Query) Count() (int64, error) {
 	if q.err != nil {
@@ -288,6 +250,92 @@ func (q *Query) Count() (int64, error) {
 	}
 
 	return count, nil
+}
+
+// queryIter is the iterator for Query operations
+type queryIter struct {
+	query  *Query
+	input  *dynamodb.QueryInput
+	output *dynamodb.QueryOutput
+	err    error
+	idx    int
+
+	unmarshal func(map[string]*dynamodb.AttributeValue, interface{}) error
+}
+
+// Next tries to unmarshal the next result into out.
+// Returns false when it is complete or if it runs into an error.
+func (itr *queryIter) Next(out interface{}) bool {
+	// stop if we have an error
+	if itr.err != nil {
+		return false
+	}
+
+	// can we use results we already have?
+	if itr.output != nil && itr.idx < len(itr.output.Items) {
+		item := itr.output.Items[itr.idx]
+		itr.err = itr.unmarshal(item, out)
+		itr.idx++
+		return itr.err == nil
+	}
+
+	// new query
+	if itr.input == nil {
+		itr.input = itr.query.queryInput()
+	}
+	if itr.output != nil && itr.idx >= len(itr.output.Items) {
+		// have we exhausted all results?
+		if itr.output.LastEvaluatedKey == nil {
+			return false
+		}
+
+		// no, prepare next request and reset index
+		itr.input.ExclusiveStartKey = itr.output.LastEvaluatedKey
+		itr.idx = 0
+	}
+
+	itr.err = retry(func() error {
+		var err error
+		itr.output, err = itr.query.table.db.client.Query(itr.input)
+		return err
+	})
+
+	if itr.err != nil || len(itr.output.Items) == 0 {
+		return false
+	}
+
+	itr.err = itr.unmarshal(itr.output.Items[itr.idx], out)
+	itr.idx++
+	return itr.err == nil
+}
+
+// Err returns the error encountered, if any.
+// You should check this after Next is finished.
+func (itr *queryIter) Err() error {
+	return itr.err
+}
+
+// All executes this request and unmarshals all results to out, which must be a pointer to a slice.
+func (q *Query) All(out interface{}) error {
+	iter := &queryIter{
+		query:     q,
+		unmarshal: unmarshalAppend,
+		err:       q.err,
+	}
+	for iter.Next(out) {
+	}
+	return iter.Err()
+}
+
+// Iter returns a results iterator for this request.
+func (q *Query) Iter() Iter {
+	iter := &queryIter{
+		query:     q,
+		unmarshal: unmarshalItem,
+		err:       q.err,
+	}
+
+	return iter
 }
 
 // can we use the get item API?

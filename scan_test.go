@@ -25,7 +25,7 @@ func TestScan(t *testing.T) {
 
 	// now check if get all and count return the same amount of items
 	var result []widget
-	err = table.Scan().All(&result)
+	err = table.Scan().Filter("UserID = ?", 42).Consistent(true).All(&result)
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
@@ -35,7 +35,7 @@ func TestScan(t *testing.T) {
 		t.Error("unexpected error:", err)
 	}
 	if int(ct) != len(result) {
-		t.Error("count and scan don't match. count: %d, scan: %d", ct, len(result))
+		t.Errorf("count and scan don't match. count: %d, scan: %d", ct, len(result))
 	}
 
 	// search for our inserted item

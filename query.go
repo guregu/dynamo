@@ -260,7 +260,7 @@ type queryIter struct {
 	err    error
 	idx    int
 
-	unmarshal func(map[string]*dynamodb.AttributeValue, interface{}) error
+	unmarshal unmarshalFunc
 }
 
 // Next tries to unmarshal the next result into out.

@@ -16,6 +16,9 @@ type Unmarshaler interface {
 	UnmarshalDynamo(av *dynamodb.AttributeValue) error
 }
 
+// used in iterators for unmarshaling one item
+type unmarshalFunc func(map[string]*dynamodb.AttributeValue, interface{}) error
+
 // unmarshals one value
 func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 	// first try interface unmarshal stuff

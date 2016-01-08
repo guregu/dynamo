@@ -10,7 +10,6 @@ import (
 // TODO: chunk into 25-item requests
 
 // BatchWrite is a BatchWriteItem operation.
-// Note that currently batch writes are limited to 25 items.
 type BatchWrite struct {
 	batch Batch
 	ops   []*dynamodb.WriteRequest
@@ -19,7 +18,6 @@ type BatchWrite struct {
 
 // Write creates a new batch write request, to which
 // puts and deletes can be added.
-// Note that currently batch writes are limited to 25 items.
 func (b Batch) Write() *BatchWrite {
 	return &BatchWrite{
 		batch: b,
@@ -59,12 +57,24 @@ func (bw *BatchWrite) Run() error {
 	if bw.err != nil {
 		return bw.err
 	}
-
 	boff := backoff.NewExponentialBackOff()
 	boff.MaxElapsedTime = 0
-	for {
+
+	loopSize := len(bw.ops) / 25
+
+	i := 0
+
+	for i < loopSize+1 {
 		var res *dynamodb.BatchWriteItemOutput
-		req := bw.input()
+		start := i * 25
+		end := start + 25
+
+		if i == loopSize {
+			end = len(bw.ops)
+		}
+
+		req := bw.input(start, end)
+
 		err := retry(func() error {
 			var err error
 			res, err = bw.batch.table.db.client.BatchWriteItem(req)
@@ -74,21 +84,17 @@ func (bw *BatchWrite) Run() error {
 			return err
 		}
 
-		if res.UnprocessedItems == nil || len(res.UnprocessedItems) == 0 {
-			break
-		}
-		bw.ops = res.UnprocessedItems[bw.batch.table.Name()]
-		// need to sleep when re-requesting, per spec
 		time.Sleep(boff.NextBackOff())
+		i++
 	}
 
 	return nil
 }
 
-func (bw *BatchWrite) input() *dynamodb.BatchWriteItemInput {
+func (bw *BatchWrite) input(start int, end int) *dynamodb.BatchWriteItemInput {
 	return &dynamodb.BatchWriteItemInput{
 		RequestItems: map[string][]*dynamodb.WriteRequest{
-			bw.batch.table.Name(): bw.ops,
+			bw.batch.table.Name(): bw.ops[start:end],
 		},
 	}
 }

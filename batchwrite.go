@@ -12,7 +12,6 @@ import (
 const maxWriteOps = 25
 
 // BatchWrite is a BatchWriteItem operation.
-// Note that currently batch writes are limited to 25 items.
 type BatchWrite struct {
 	batch Batch
 	ops   []*dynamodb.WriteRequest
@@ -21,7 +20,6 @@ type BatchWrite struct {
 
 // Write creates a new batch write request, to which
 // puts and deletes can be added.
-// Note that currently batch writes are limited to 25 items.
 func (b Batch) Write() *BatchWrite {
 	return &BatchWrite{
 		batch: b,
@@ -57,6 +55,9 @@ func (bw *BatchWrite) Delete(keys ...Keyed) *BatchWrite {
 }
 
 // Run executes this batch.
+// For batches with more than 25 operations, an error could indicate that
+// some records have been written and some have not. Consult the wrote
+// return amount to figure out which operations have succeeded.
 func (bw *BatchWrite) Run() (wrote int, err error) {
 	if bw.err != nil {
 		return 0, bw.err

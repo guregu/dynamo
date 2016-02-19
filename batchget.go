@@ -39,7 +39,6 @@ func (table Table) Batch(hashAndRangeKeyName ...string) Batch {
 }
 
 // BatchGet is a BatchGetItem operation.
-// Note that currently batch gets are limited to 100 items.
 type BatchGet struct {
 	batch      Batch
 	reqs       []*Query
@@ -52,7 +51,6 @@ type BatchGet struct {
 //	table.Batch("ID", "Month").
 //		Get([]dynamo.Keys{{1, "2015-10"}, {42, "2015-12"}, {42, "1992-02"}}...).
 //		All(&results)
-// Note that currently batch gets are limited to 100 items.
 func (b Batch) Get(keys ...Keyed) *BatchGet {
 	bg := &BatchGet{
 		batch: b,

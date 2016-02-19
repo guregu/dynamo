@@ -1,13 +1,15 @@
 package dynamo
 
 import (
+	"math"
 	"time"
 
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/cenkalti/backoff"
 )
 
-// TODO: chunk into 25-item requests
+// DynamoDB API limit, 25 operations per request
+const maxWriteOps = 25
 
 // BatchWrite is a BatchWriteItem operation.
 // Note that currently batch writes are limited to 25 items.
@@ -55,40 +57,51 @@ func (bw *BatchWrite) Delete(keys ...Keyed) *BatchWrite {
 }
 
 // Run executes this batch.
-func (bw *BatchWrite) Run() error {
+func (bw *BatchWrite) Run() (wrote int, err error) {
 	if bw.err != nil {
-		return bw.err
+		return 0, bw.err
 	}
+
+	// TODO: this could be made to be more efficient,
+	// by combining unprocessed items with the next request.
 
 	boff := backoff.NewExponentialBackOff()
 	boff.MaxElapsedTime = 0
-	for {
-		var res *dynamodb.BatchWriteItemOutput
-		req := bw.input()
-		err := retry(func() error {
-			var err error
-			res, err = bw.batch.table.db.client.BatchWriteItem(req)
-			return err
-		})
-		if err != nil {
-			return err
+	batches := int(math.Ceil(float64(len(bw.ops)) / maxWriteOps))
+	for i := 0; i < batches; i++ {
+		start, end := i*maxWriteOps, (i+1)*maxWriteOps
+		if end > len(bw.ops) {
+			end = len(bw.ops)
 		}
-
-		if res.UnprocessedItems == nil || len(res.UnprocessedItems) == 0 {
-			break
+		ops := bw.ops[start:end]
+		for {
+			var res *dynamodb.BatchWriteItemOutput
+			req := bw.input(ops)
+			err := retry(func() error {
+				var err error
+				res, err = bw.batch.table.db.client.BatchWriteItem(req)
+				return err
+			})
+			if err != nil {
+				return wrote, err
+			}
+			wrote += len(ops) - len(res.UnprocessedItems)
+			if len(res.UnprocessedItems) == 0 {
+				break
+			}
+			ops = res.UnprocessedItems[bw.batch.table.Name()]
+			// need to sleep when re-requesting, per spec
+			time.Sleep(boff.NextBackOff())
 		}
-		bw.ops = res.UnprocessedItems[bw.batch.table.Name()]
-		// need to sleep when re-requesting, per spec
-		time.Sleep(boff.NextBackOff())
 	}
 
-	return nil
+	return wrote, nil
 }
 
-func (bw *BatchWrite) input() *dynamodb.BatchWriteItemInput {
+func (bw *BatchWrite) input(ops []*dynamodb.WriteRequest) *dynamodb.BatchWriteItemInput {
 	return &dynamodb.BatchWriteItemInput{
 		RequestItems: map[string][]*dynamodb.WriteRequest{
-			bw.batch.table.Name(): bw.ops,
+			bw.batch.table.Name(): ops,
 		},
 	}
 }

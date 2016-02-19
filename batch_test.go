@@ -5,51 +5,64 @@ import (
 	"time"
 )
 
+const batchSize = 51
+
 func TestBatchGetWrite(t *testing.T) {
 	if testDB == nil {
 		t.Skip(offlineSkipMsg)
 	}
 	table := testDB.Table(testTable)
 
-	// first, add an item to delete later
-	item := widget{
-		UserID: 42,
-		Time:   time.Now().UTC(),
-		Msg:    "hello",
+	items := make([]interface{}, batchSize)
+	widgets := make(map[int]widget)
+	keys := make([]Keyed, batchSize)
+	for i := 0; i < batchSize; i++ {
+		now := time.Now().UTC()
+		w := widget{
+			UserID: i,
+			Time:   now,
+			Msg:    "batch test",
+		}
+		widgets[i] = w
+		items[i] = w
+		keys[i] = Keys{i, now}
 	}
-	// add another item
-	item2 := widget{
-		UserID: 613,
-		Time:   time.Now().UTC(),
-		Msg:    "hello",
+
+	wrote, err := table.Batch().Write().Put(items...).Run()
+	if wrote != batchSize {
+		t.Error("unexpected wrote:", wrote, "≠", batchSize)
 	}
-	err := table.Batch().Write().Put(item, item2).Run()
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
 
-	// get both
+	// get all
 	var results []widget
 	err = table.Batch("UserID", "Time").
-		Get(Keys{item.UserID, item.Time}, Keys{item2.UserID, item2.Time}).
+		Get(keys...).
 		Consistent(true).
 		All(&results)
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
 
-	if len(results) != 2 {
-		t.Error("expected 2 results, got", len(results))
+	if len(results) != batchSize {
+		t.Error("expected", batchSize, "results, got", len(results))
 	}
+
 	for _, result := range results {
-		if result.UserID != item.UserID && result.UserID != item2.UserID {
-			t.Error("unexpected result", result)
+		other := widgets[result.UserID]
+		if result.UserID != other.UserID && !result.Time.Equal(other.Time) {
+			t.Error("unexpected result", result, "≠", other)
 		}
 	}
 
 	// delete both
-	err = table.Batch("UserID", "Time").Write().
-		Delete(Keys{item.UserID, item.Time}, Keys{item2.UserID, item2.Time}).Run()
+	wrote, err = table.Batch("UserID", "Time").Write().
+		Delete(keys...).Run()
+	if wrote != batchSize {
+		t.Error("unexpected wrote:", wrote, "≠", batchSize)
+	}
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
@@ -57,7 +70,7 @@ func TestBatchGetWrite(t *testing.T) {
 	// get both again
 	results = nil
 	err = table.Batch("UserID", "Time").
-		Get(Keys{item.UserID, item.Time}, Keys{item2.UserID, item2.Time}).
+		Get(keys...).
 		Consistent(true).
 		All(&results)
 	if err != ErrNotFound {

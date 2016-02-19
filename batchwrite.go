@@ -85,11 +85,13 @@ func (bw *BatchWrite) Run() (wrote int, err error) {
 			if err != nil {
 				return wrote, err
 			}
-			wrote += len(ops) - len(res.UnprocessedItems)
-			if len(res.UnprocessedItems) == 0 {
+
+			unprocessed := res.UnprocessedItems[bw.batch.table.Name()]
+			wrote += len(ops) - len(unprocessed)
+			if len(unprocessed) == 0 {
 				break
 			}
-			ops = res.UnprocessedItems[bw.batch.table.Name()]
+			ops = unprocessed
 			// need to sleep when re-requesting, per spec
 			time.Sleep(boff.NextBackOff())
 		}

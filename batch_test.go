@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-const batchSize = 51
+const batchSize = 101
 
 func TestBatchGetWrite(t *testing.T) {
 	if testDB == nil {

@@ -8,7 +8,8 @@ import (
 	"github.com/cenkalti/backoff"
 )
 
-// TODO: chunk into 100 item requests
+// DynamoDB API limit, 100 operations per request
+const maxGetOps = 100
 
 // Batch stores the names of the hash key and range key
 // for creating new batches.
@@ -99,20 +100,28 @@ func (bg *BatchGet) Iter() Iter {
 	return newBGIter(bg, unmarshalItem, bg.err)
 }
 
-func (bg *BatchGet) input() *dynamodb.BatchGetItemInput {
+func (bg *BatchGet) input(start int) *dynamodb.BatchGetItemInput {
+	if start >= len(bg.reqs) {
+		return nil // done
+	}
+	end := start + maxGetOps
+	if end > len(bg.reqs) {
+		end = len(bg.reqs)
+	}
+
 	in := &dynamodb.BatchGetItemInput{
 		RequestItems: make(map[string]*dynamodb.KeysAndAttributes, 1),
 	}
 
 	if bg.projection != "" {
-		for _, get := range bg.reqs {
+		for _, get := range bg.reqs[start:end] {
 			get.Project(get.projection)
 			bg.setError(get.err)
 		}
 	}
 
 	var kas *dynamodb.KeysAndAttributes
-	for _, get := range bg.reqs {
+	for _, get := range bg.reqs[start:end] {
 		if kas == nil {
 			kas = get.keysAndAttribs()
 			continue
@@ -142,6 +151,7 @@ type bgIter struct {
 	output    *dynamodb.BatchGetItemOutput
 	err       error
 	idx       int
+	total     int
 	backoff   *backoff.ExponentialBackOff
 	unmarshal unmarshalFunc
 }
@@ -173,18 +183,27 @@ func (itr *bgIter) Next(out interface{}) bool {
 		item := items[itr.idx]
 		itr.err = itr.unmarshal(item, out)
 		itr.idx++
+		itr.total++
 		return itr.err == nil
 	}
 
 	// new bg
 	if itr.input == nil {
-		itr.input = itr.bg.input()
+		itr.input = itr.bg.input(itr.total)
 	}
 
 	if itr.output != nil && itr.idx >= len(itr.output.Responses[tableName]) {
 		// have we exhausted all results?
 		if len(itr.output.UnprocessedKeys) == 0 {
-			return false
+			// next inner batch of 100 items
+			if itr.input = itr.bg.input(itr.total); itr.input == nil {
+				// we're done, no more input
+				return false
+			} else {
+				// more batches to run!
+				itr.idx = 0
+				goto request
+			}
 		}
 
 		// no, prepare next request and reset index
@@ -194,6 +213,7 @@ func (itr *bgIter) Next(out interface{}) bool {
 		time.Sleep(itr.backoff.NextBackOff())
 	}
 
+request:
 	itr.err = retry(func() error {
 		var err error
 		itr.output, err = itr.bg.batch.table.db.client.BatchGetItem(itr.input)
@@ -202,13 +222,14 @@ func (itr *bgIter) Next(out interface{}) bool {
 
 	items := itr.output.Responses[tableName]
 	if itr.err != nil || len(items) == 0 {
-		if itr.idx == 0 {
+		if itr.total == 0 {
 			itr.err = ErrNotFound
 		}
 		return false
 	}
 	itr.err = itr.unmarshal(items[itr.idx], out)
 	itr.idx++
+	itr.total++
 	return itr.err == nil
 }
 

@@ -7,13 +7,13 @@ import (
 	"github.com/cenkalti/backoff"
 )
 
-const retryTimeout = 1 * time.Minute // TODO: make this configurable
+var RetryTimeout = 1 * time.Minute
 
 func retry(f func() error) error {
 	var err error
 	var next time.Duration
 	b := backoff.NewExponentialBackOff()
-	b.MaxElapsedTime = retryTimeout
+	b.MaxElapsedTime = RetryTimeout
 
 	for {
 		if err = f(); err == nil {

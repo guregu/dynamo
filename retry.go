@@ -7,6 +7,10 @@ import (
 	"github.com/cenkalti/backoff"
 )
 
+// RetryTimeout defines the maximum amount of time that requests will
+// attempt to automatically retry for. In other words, this is the maximum
+// amount of time that dynamo operations will block.
+// Higher values are better when using tables with lower throughput.
 var RetryTimeout = 1 * time.Minute
 
 func retry(f func() error) error {

@@ -82,7 +82,7 @@ func (ct *CreateTable) Stream(view StreamView) *CreateTable {
 	return ct
 }
 
-func (ct *CreateTable) Project(index string, projection IndexProjection, includeAttribs ...string) {
+func (ct *CreateTable) Project(index string, projection IndexProjection, includeAttribs ...string) *CreateTable {
 	projectionStr := string(projection)
 	proj := &dynamodb.Projection{
 		ProjectionType: &projectionStr,
@@ -94,11 +94,14 @@ func (ct *CreateTable) Project(index string, projection IndexProjection, include
 	}
 	if idx, global := ct.globalIndices[index]; global {
 		idx.Projection = proj
+		ct.globalIndices[index] = idx
 	} else if localIdx, ok := ct.localIndices[index]; ok {
 		localIdx.Projection = proj
+		ct.localIndices[index] = localIdx
 	} else {
 		ct.setError(fmt.Errorf("dynamo: no such index: %s", index))
 	}
+	return ct
 }
 
 func (ct *CreateTable) Run() error {
@@ -107,10 +110,12 @@ func (ct *CreateTable) Run() error {
 	}
 
 	input := ct.input()
-	return retry(func() error {
-		_, err := ct.db.client.CreateTable(input)
-		return err
-	})
+	fmt.Printf("RUN %#v\n", input)
+	// return retry(func() error {
+	// 	_, err := ct.db.client.CreateTable(input)
+	// 	return err
+	// })
+	return nil
 }
 
 func (ct *CreateTable) from(rv reflect.Value) error {

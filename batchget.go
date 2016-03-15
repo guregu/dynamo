@@ -193,25 +193,20 @@ func (itr *bgIter) Next(out interface{}) bool {
 	if itr.output != nil && itr.idx >= len(itr.output.Responses[tableName]) {
 		// have we exhausted all results?
 		if len(itr.output.UnprocessedKeys) == 0 {
-			// next inner batch of 100 items
+			// yes, try to get next inner batch of 100 items
 			if itr.input = itr.bg.input(itr.total); itr.input == nil {
 				// we're done, no more input
 				return false
-			} else {
-				// more batches to run!
-				itr.idx = 0
-				goto request
 			}
+		} else {
+			// no, prepare a new request with the remaining keys
+			itr.input.RequestItems = itr.output.UnprocessedKeys
+			// we need to sleep here a bit as per the official docs
+			time.Sleep(itr.backoff.NextBackOff())
 		}
-
-		// no, prepare next request and reset index
-		itr.input.RequestItems = itr.output.UnprocessedKeys
 		itr.idx = 0
-		// we need to sleep here a bit as per the official docs
-		time.Sleep(itr.backoff.NextBackOff())
 	}
 
-request:
 	itr.err = retry(func() error {
 		var err error
 		itr.output, err = itr.bg.batch.table.db.client.BatchGetItem(itr.input)

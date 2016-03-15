@@ -149,7 +149,7 @@ func marshalReflect(rv reflect.Value, special string) (*dynamodb.AttributeValue,
 			return nil, err
 		}
 		return &dynamodb.AttributeValue{M: avs}, nil
-	case reflect.Slice:
+	case reflect.Slice, reflect.Array:
 		if rv.Len() == 0 {
 			return nil, nil
 		}

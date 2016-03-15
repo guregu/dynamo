@@ -10,10 +10,10 @@ import (
 )
 
 type UserAction struct {
-	UserID string    `dynamo:"ID,hash" index:"Seq-ID-index,range"`
+	UserID string    `dynamo:"ID,hash"`
 	Time   time.Time `dynamo:",range"`
-	Seq    int64     `localIndex:"ID-Seq-index,range" index:"Seq-ID-index,hash"`
-	UUID   string    `index:"UUID-index,hash"`
+	Seq    int64     `localIndex:"ID-Seq-index,range"`
+	UUID   string
 	embeddedWithKeys
 }
 
@@ -30,7 +30,7 @@ func TestCreateTable(t *testing.T) {
 	input := testDB.CreateTable("UserActions", UserAction{}).
 		Project("Seq-ID-index", IncludeProjection, "UUID").
 		Provision(4, 2).
-		ProvisionIndex("Seq-ID-index", 1, 2).
+		ProvisionIndex("Embedded-index", 1, 2).
 		input()
 
 	expected := &dynamodb.CreateTableInput{
@@ -48,45 +48,11 @@ func TestCreateTable(t *testing.T) {
 				AttributeType: aws.String("N"),
 			},
 			{
-				AttributeName: aws.String("UUID"),
-				AttributeType: aws.String("S"),
-			},
-			{
 				AttributeName: aws.String("Embedded"),
 				AttributeType: aws.String("S"),
 			},
 		},
 		GlobalSecondaryIndexes: []*dynamodb.GlobalSecondaryIndex{{
-			IndexName: aws.String("Seq-ID-index"),
-			KeySchema: []*dynamodb.KeySchemaElement{{
-				AttributeName: aws.String("Seq"),
-				KeyType:       aws.String("HASH"),
-			}, {
-				AttributeName: aws.String("ID"),
-				KeyType:       aws.String("RANGE"),
-			}},
-			Projection: &dynamodb.Projection{
-				ProjectionType:   aws.String("INCLUDE"),
-				NonKeyAttributes: []*string{aws.String("UUID")},
-			},
-			ProvisionedThroughput: &dynamodb.ProvisionedThroughput{
-				ReadCapacityUnits:  aws.Int64(1),
-				WriteCapacityUnits: aws.Int64(2),
-			},
-		}, {
-			IndexName: aws.String("UUID-index"),
-			KeySchema: []*dynamodb.KeySchemaElement{{
-				AttributeName: aws.String("UUID"),
-				KeyType:       aws.String("HASH"),
-			}},
-			Projection: &dynamodb.Projection{
-				ProjectionType: aws.String("ALL"),
-			},
-			ProvisionedThroughput: &dynamodb.ProvisionedThroughput{
-				ReadCapacityUnits:  aws.Int64(1),
-				WriteCapacityUnits: aws.Int64(1),
-			},
-		}, {
 			IndexName: aws.String("Embedded-index"),
 			KeySchema: []*dynamodb.KeySchemaElement{{
 				AttributeName: aws.String("Embedded"),
@@ -97,7 +63,7 @@ func TestCreateTable(t *testing.T) {
 			},
 			ProvisionedThroughput: &dynamodb.ProvisionedThroughput{
 				ReadCapacityUnits:  aws.Int64(1),
-				WriteCapacityUnits: aws.Int64(1),
+				WriteCapacityUnits: aws.Int64(2),
 			},
 		}},
 		KeySchema: []*dynamodb.KeySchemaElement{{

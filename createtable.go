@@ -13,27 +13,30 @@ import (
 type StreamView string
 
 var (
-	// KeysOnly: Only the key attributes of the modified item are written to the stream.
+	// KeysOnlyView: Only the key attributes of the modified item are written to the stream.
 	KeysOnlyView StreamView = dynamodb.StreamViewTypeKeysOnly
-	// NewImage: The entire item, as it appears after it was modified, is written to the stream.
+	// NewImageView: The entire item, as it appears after it was modified, is written to the stream.
 	NewImageView StreamView = dynamodb.StreamViewTypeNewImage
-	// OldImage: The entire item, as it appeared before it was modified, is written to the stream.
+	// OldImageView: The entire item, as it appeared before it was modified, is written to the stream.
 	OldImageView StreamView = dynamodb.StreamViewTypeOldImage
-	// NewAndOldImages: Both the new and the old item images of the item are written to the stream.
+	// NewAndOldImagesView: Both the new and the old item images of the item are written to the stream.
 	NewAndOldImagesView StreamView = dynamodb.StreamViewTypeNewAndOldImages
 )
 
+// IndexProjection determines which attributes are mirrored into indices.
 type IndexProjection string
 
 var (
-	// KeysOnly: Only the key attributes of the modified item are written to the stream.
+	// KeysOnlyProjection: Only the key attributes of the modified item are written to the stream.
 	KeysOnlyProjection IndexProjection = dynamodb.ProjectionTypeKeysOnly
-	// All of the table attributes are projected into the index.
+	// AllProjection: of the table attributes are projected into the index.
 	AllProjection IndexProjection = dynamodb.ProjectionTypeAll
 	// IncludeProjection: Only the specified table attributes are projected into the index.
 	IncludeProjection IndexProjection = dynamodb.ProjectionTypeInclude
 )
 
+// CreateTable is a request to create a new table.
+// See: http://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_CreateTable.html
 type CreateTable struct {
 	db            *DB
 	tableName     string
@@ -47,6 +50,20 @@ type CreateTable struct {
 	err           error
 }
 
+// CreateTable begins a new operation to create a table with the given name.
+// The second parameter must be a struct with appropriate hash and range key struct tags
+// for the primary key and all indices.
+//
+// An example of a from struct follows:
+// 	type UserAction struct {
+// 		UserID string    `dynamo:"ID,hash" index:"Seq-ID-index,range"`
+// 		Time   time.Time `dynamo:",range"`
+// 		Seq    int64     `localIndex:"ID-Seq-index,range" index:"Seq-ID-index,hash"`
+// 		UUID   string    `index:"UUID-index,hash"`
+// 	}
+// This creates a table with the primary hash key ID and range key Time.
+// It creates two global secondary indices called UUID-index and Seq-ID-index,
+// and a local secondary index called ID-Seq-index.
 func (db *DB) CreateTable(name string, from interface{}) *CreateTable {
 	ct := &CreateTable{
 		db:            db,
@@ -62,11 +79,15 @@ func (db *DB) CreateTable(name string, from interface{}) *CreateTable {
 	return ct
 }
 
+// Provision specifies the provisioned read and write capacity for this table.
+// If Provision isn't called, the table will be created with 1 unit each.
 func (ct *CreateTable) Provision(readUnits, writeUnits int64) *CreateTable {
 	ct.readUnits, ct.writeUnits = readUnits, writeUnits
 	return ct
 }
 
+// ProvisionIndex specifies the provisioned read and write capacity for the given
+// global secondary index. Local secondary indices share their capacity with the table.
 func (ct *CreateTable) ProvisionIndex(index string, readUnits, writeUnits int64) *CreateTable {
 	idx := ct.globalIndices[index]
 	idx.ProvisionedThroughput = &dynamodb.ProvisionedThroughput{
@@ -77,11 +98,15 @@ func (ct *CreateTable) ProvisionIndex(index string, readUnits, writeUnits int64)
 	return ct
 }
 
+// Stream enables DynamoDB Streams for this table which the specified type of view.
+// Streams are disabled by default.
 func (ct *CreateTable) Stream(view StreamView) *CreateTable {
 	ct.streamView = view
 	return ct
 }
 
+// Project specifies the projection type for the given table.
+// When using IncludeProjection, you must specify the additional attributes to include via includeAttribs.
 func (ct *CreateTable) Project(index string, projection IndexProjection, includeAttribs ...string) *CreateTable {
 	projectionStr := string(projection)
 	proj := &dynamodb.Projection{
@@ -104,17 +129,17 @@ func (ct *CreateTable) Project(index string, projection IndexProjection, include
 	return ct
 }
 
+// Run creates this table or returns and error.
 func (ct *CreateTable) Run() error {
 	if ct.err != nil {
 		return ct.err
 	}
 
 	input := ct.input()
-	fmt.Printf("RUN %#v\n", input)
-	// return retry(func() error {
-	// 	_, err := ct.db.client.CreateTable(input)
-	// 	return err
-	// })
+	return retry(func() error {
+		_, err := ct.db.client.CreateTable(input)
+		return err
+	})
 	return nil
 }
 

@@ -28,7 +28,7 @@ func TestCreateTable(t *testing.T) {
 	// }
 
 	input := testDB.CreateTable("UserActions", UserAction{}).
-		Project("Seq-ID-index", IncludeProjection, "UUID").
+		Project("ID-Seq-index", IncludeProjection, "UUID").
 		Provision(4, 2).
 		ProvisionIndex("Embedded-index", 1, 2).
 		input()
@@ -83,7 +83,8 @@ func TestCreateTable(t *testing.T) {
 				KeyType:       aws.String("RANGE"),
 			}},
 			Projection: &dynamodb.Projection{
-				ProjectionType: aws.String("ALL"),
+				ProjectionType:   aws.String("INCLUDE"),
+				NonKeyAttributes: []*string{aws.String("UUID")},
 			},
 		}},
 		ProvisionedThroughput: &dynamodb.ProvisionedThroughput{
@@ -96,4 +97,8 @@ func TestCreateTable(t *testing.T) {
 	if !reflect.DeepEqual(input, expected) {
 		t.Error("unexpected input", input)
 	}
+}
+
+func TestDeleteTable(t *testing.T) {
+	testDB.Table("UserActions").DeleteTable().Run()
 }

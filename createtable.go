@@ -13,13 +13,13 @@ import (
 type StreamView string
 
 var (
-	// KeysOnlyView: Only the key attributes of the modified item are written to the stream.
+	// Only the key attributes of the modified item are written to the stream.
 	KeysOnlyView StreamView = dynamodb.StreamViewTypeKeysOnly
-	// NewImageView: The entire item, as it appears after it was modified, is written to the stream.
+	// The entire item, as it appears after it was modified, is written to the stream.
 	NewImageView StreamView = dynamodb.StreamViewTypeNewImage
-	// OldImageView: The entire item, as it appeared before it was modified, is written to the stream.
+	// The entire item, as it appeared before it was modified, is written to the stream.
 	OldImageView StreamView = dynamodb.StreamViewTypeOldImage
-	// NewAndOldImagesView: Both the new and the old item images of the item are written to the stream.
+	// Both the new and the old item images of the item are written to the stream.
 	NewAndOldImagesView StreamView = dynamodb.StreamViewTypeNewAndOldImages
 )
 
@@ -27,11 +27,11 @@ var (
 type IndexProjection string
 
 var (
-	// KeysOnlyProjection: Only the key attributes of the modified item are written to the stream.
+	// Only the key attributes of the modified item are written to the stream.
 	KeysOnlyProjection IndexProjection = dynamodb.ProjectionTypeKeysOnly
-	// AllProjection: of the table attributes are projected into the index.
+	// All of the table attributes are projected into the index.
 	AllProjection IndexProjection = dynamodb.ProjectionTypeAll
-	// IncludeProjection: Only the specified table attributes are projected into the index.
+	// Only the specified table attributes are projected into the index.
 	IncludeProjection IndexProjection = dynamodb.ProjectionTypeInclude
 )
 
@@ -293,27 +293,32 @@ func (ct *CreateTable) setError(err error) {
 }
 
 func typeOf(rv reflect.Value) string {
-	switch x := rv.Interface().(type) {
-	case Marshaler:
-		if av, err := x.MarshalDynamo(); err == nil {
-			if iface, err := av2iface(av); err == nil {
-				return typeOf(reflect.ValueOf(iface))
+	if rv.CanInterface() {
+		switch x := rv.Interface().(type) {
+		case Marshaler:
+			if av, err := x.MarshalDynamo(); err == nil {
+				if iface, err := av2iface(av); err == nil {
+					return typeOf(reflect.ValueOf(iface))
+				}
 			}
+		case encoding.TextMarshaler:
+			return "S"
 		}
-	case encoding.TextMarshaler:
-		return "S"
 	}
 
-	switch rv.Kind() {
+	typ := rv.Type()
+check:
+	switch typ.Kind() {
 	case reflect.Ptr:
-		return typeOf(rv.Elem())
+		typ = typ.Elem()
+		goto check
 	case reflect.String:
 		return "S"
 	case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16,
 		reflect.Int8, reflect.Float64, reflect.Float32:
 		return "N"
 	case reflect.Slice, reflect.Array:
-		if rv.Type().Elem().Kind() == reflect.Int8 {
+		if typ.Elem().Kind() == reflect.Uint8 {
 			return "B"
 		}
 	}

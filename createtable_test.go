@@ -18,7 +18,7 @@ type UserAction struct {
 }
 
 type embeddedWithKeys struct {
-	Embedded string `index:"Embedded-index,hash"`
+	Embedded **[]byte `index:"Embedded-index,hash"`
 }
 
 func TestCreateTable(t *testing.T) {
@@ -49,7 +49,7 @@ func TestCreateTable(t *testing.T) {
 			},
 			{
 				AttributeName: aws.String("Embedded"),
-				AttributeType: aws.String("S"),
+				AttributeType: aws.String("B"),
 			},
 		},
 		GlobalSecondaryIndexes: []*dynamodb.GlobalSecondaryIndex{{

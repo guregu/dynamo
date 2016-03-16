@@ -98,7 +98,3 @@ func TestCreateTable(t *testing.T) {
 		t.Error("unexpected input", input)
 	}
 }
-
-func TestDeleteTable(t *testing.T) {
-	testDB.Table("UserActions").DeleteTable().Run()
-}

@@ -23,7 +23,7 @@ func marshalItem(v interface{}) (map[string]*dynamodb.AttributeValue, error) {
 	case reflect.Ptr:
 		return marshalItem(rv.Elem().Interface())
 	case reflect.Struct:
-		return marshalStruct(rv.Interface())
+		return marshalStruct(rv)
 	case reflect.Map:
 		return marshalMap(rv.Interface())
 	}
@@ -42,19 +42,21 @@ func marshalMap(v interface{}) (map[string]*dynamodb.AttributeValue, error) {
 	return av.M, nil
 }
 
-func marshalStruct(v interface{}) (map[string]*dynamodb.AttributeValue, error) {
+func marshalStruct(rv reflect.Value) (map[string]*dynamodb.AttributeValue, error) {
 	item := make(map[string]*dynamodb.AttributeValue)
 	var err error
-	rv := reflect.ValueOf(v)
 
 	for i := 0; i < rv.Type().NumField(); i++ {
 		field := rv.Type().Field(i)
 		fv := rv.Field(i)
 
 		name, special, omitempty := fieldInfo(field)
+		anonStruct := fv.Type().Kind() == reflect.Struct && field.Anonymous
 		switch {
 		case !fv.CanInterface():
-			continue
+			if !anonStruct {
+				continue
+			}
 		case name == "-":
 			continue
 		case omitempty:
@@ -64,8 +66,8 @@ func marshalStruct(v interface{}) (map[string]*dynamodb.AttributeValue, error) {
 		}
 
 		// embed anonymous structs
-		if fv.Type().Kind() == reflect.Struct && field.Anonymous {
-			avs, err := marshalStruct(fv.Interface())
+		if anonStruct {
+			avs, err := marshalStruct(fv)
 			if err != nil {
 				return nil, err
 			}
@@ -144,7 +146,7 @@ func marshalReflect(rv reflect.Value, special string) (*dynamodb.AttributeValue,
 		}
 		return &dynamodb.AttributeValue{M: avs}, nil
 	case reflect.Struct:
-		avs, err := marshalStruct(rv.Interface())
+		avs, err := marshalStruct(rv)
 		if err != nil {
 			return nil, err
 		}

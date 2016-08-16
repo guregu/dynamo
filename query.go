@@ -271,6 +271,11 @@ func (itr *queryIter) Next(out interface{}) bool {
 		return false
 	}
 
+	// stop if exceed limit
+	if itr.output != nil && itr.input.Limit != nil && int(*itr.input.Limit) == itr.idx {
+		return false
+	}
+
 	// can we use results we already have?
 	if itr.output != nil && itr.idx < len(itr.output.Items) {
 		item := itr.output.Items[itr.idx]

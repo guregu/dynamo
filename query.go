@@ -26,7 +26,7 @@ type Query struct {
 	rangeOp     Operator
 
 	projection string
-	filter     string
+	filters    []string
 	consistent bool
 	limit      int64
 	order      Order
@@ -126,10 +126,11 @@ func (q *Query) Project(paths ...string) *Query {
 // Use single quotes to specificy reserved names inline (like 'Count').
 // Use the placeholder ? within the expression to substitute values, and use $ for names.
 // You need to use quoted or placeholder names when the name is a reserved word in DynamoDB.
+// Multiple calls to Filter will be combined with AND.
 func (q *Query) Filter(expr string, args ...interface{}) *Query {
 	expr, err := q.subExpr(expr, args...)
 	q.setError(err)
-	q.filter = expr
+	q.filters = append(q.filters, expr)
 	return q
 }
 
@@ -350,7 +351,7 @@ func (q *Query) canGetItem() bool {
 		return false
 	case q.index != "":
 		return false
-	case q.filter != "":
+	case len(q.filters) > 0:
 		return false
 	}
 	return true
@@ -373,8 +374,9 @@ func (q *Query) queryInput() *dynamodb.QueryInput {
 	if q.projection != "" {
 		req.ProjectionExpression = &q.projection
 	}
-	if q.filter != "" {
-		req.FilterExpression = &q.filter
+	if len(q.filters) > 0 {
+		filter := strings.Join(q.filters, " AND ")
+		req.FilterExpression = &filter
 	}
 	if q.index != "" {
 		req.IndexName = &q.index

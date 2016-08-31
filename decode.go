@@ -16,6 +16,17 @@ type Unmarshaler interface {
 	UnmarshalDynamo(av *dynamodb.AttributeValue) error
 }
 
+// Unmarshal decodes a DynamoDB item into out, which must be a pointer.
+func UnmarshalItem(item map[string]*dynamodb.AttributeValue, out interface{}) error {
+	return unmarshalItem(item, out)
+}
+
+// Unmarshal decodes a DynamoDB value into out, which must be a pointer.
+func Unmarshal(av *dynamodb.AttributeValue, out interface{}) error {
+	rv := reflect.ValueOf(out)
+	return unmarshalReflect(av, rv)
+}
+
 // used in iterators for unmarshaling one item
 type unmarshalFunc func(map[string]*dynamodb.AttributeValue, interface{}) error
 

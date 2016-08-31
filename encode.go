@@ -17,6 +17,11 @@ type Marshaler interface {
 	MarshalDynamo() (*dynamodb.AttributeValue, error)
 }
 
+// MarshalItem converts the given struct into a DynamoDB item.
+func MarshalItem(v interface{}) (map[string]*dynamodb.AttributeValue, error) {
+	return marshalItem(v)
+}
+
 func marshalItem(v interface{}) (map[string]*dynamodb.AttributeValue, error) {
 	rv := reflect.ValueOf(v)
 	switch rv.Type().Kind() {
@@ -86,6 +91,11 @@ func marshalStruct(rv reflect.Value) (map[string]*dynamodb.AttributeValue, error
 		}
 	}
 	return item, err
+}
+
+// Marshal converts the given value into a DynamoDB attribute value.
+func Marshal(v interface{}) (*dynamodb.AttributeValue, error) {
+	return marshal(v, "")
 }
 
 func marshal(v interface{}, special string) (*dynamodb.AttributeValue, error) {

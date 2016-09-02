@@ -25,11 +25,12 @@ type Query struct {
 	rangeValues []*dynamodb.AttributeValue
 	rangeOp     Operator
 
-	projection string
-	filters    []string
-	consistent bool
-	limit      int64
-	order      Order
+	projection  string
+	filters     []string
+	consistent  bool
+	limit       int64
+	searchLimit int64
+	order       Order
 
 	subber
 
@@ -142,11 +143,17 @@ func (q *Query) Consistent(on bool) *Query {
 	return q
 }
 
-// Limit specifies the maximum amount of results to examine.
-// If a filter is not specified, the number of results will be limited.
-// If a filter is specified, the number of results to consider for filtering will be limited.
+// Limit specifies the maximum amount of results to return.
 func (q *Query) Limit(limit int64) *Query {
 	q.limit = limit
+	return q
+}
+
+// SearchLimit specifies the maximum amount of results to examine.
+// If a filter is not specified, the number of results will be limited.
+// If a filter is specified, the number of results to consider for filtering will be limited.
+func (q *Query) SearchLimit(limit int64) *Query {
+	q.searchLimit = limit
 	return q
 }
 
@@ -203,7 +210,7 @@ func (q *Query) One(out interface{}) error {
 			return ErrNotFound
 		case len(res.Items) > 1:
 			return ErrTooMany
-		case res.LastEvaluatedKey != nil && q.limit != 0:
+		case res.LastEvaluatedKey != nil && q.searchLimit != 0:
 			return ErrTooMany
 		}
 
@@ -245,7 +252,7 @@ func (q *Query) Count() (int64, error) {
 		}
 
 		q.startKey = res.LastEvaluatedKey
-		if res.LastEvaluatedKey == nil || q.limit > 0 {
+		if res.LastEvaluatedKey == nil || q.searchLimit > 0 {
 			break
 		}
 	}
@@ -260,6 +267,7 @@ type queryIter struct {
 	output *dynamodb.QueryOutput
 	err    error
 	idx    int
+	n      int64
 
 	unmarshal unmarshalFunc
 }
@@ -273,7 +281,7 @@ func (itr *queryIter) Next(out interface{}) bool {
 	}
 
 	// stop if exceed limit
-	if itr.output != nil && itr.input.Limit != nil && int(*itr.input.Limit) == itr.idx {
+	if itr.query.limit > 0 && itr.n == itr.query.limit {
 		return false
 	}
 
@@ -282,6 +290,7 @@ func (itr *queryIter) Next(out interface{}) bool {
 		item := itr.output.Items[itr.idx]
 		itr.err = itr.unmarshal(item, out)
 		itr.idx++
+		itr.n++
 		return itr.err == nil
 	}
 
@@ -312,6 +321,7 @@ func (itr *queryIter) Next(out interface{}) bool {
 
 	itr.err = itr.unmarshal(itr.output.Items[itr.idx], out)
 	itr.idx++
+	itr.n++
 	return itr.err == nil
 }
 
@@ -369,7 +379,12 @@ func (q *Query) queryInput() *dynamodb.QueryInput {
 		req.ConsistentRead = &q.consistent
 	}
 	if q.limit > 0 {
-		req.Limit = &q.limit
+		if len(q.filters) == 0 {
+			req.Limit = &q.limit
+		}
+	}
+	if q.searchLimit > 0 {
+		req.Limit = &q.searchLimit
 	}
 	if q.projection != "" {
 		req.ProjectionExpression = &q.projection

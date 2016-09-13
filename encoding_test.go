@@ -155,10 +155,12 @@ var itemEncodingTests = []struct {
 			EmptyPtr   *int
 			EmptyIface interface{}
 		}{
-			OK: "OK",
+			OK:     "OK",
+			EmptyL: []int{},
 		},
 		out: map[string]*dynamodb.AttributeValue{
-			"OK": &dynamodb.AttributeValue{S: aws.String("OK")},
+			"OK":     &dynamodb.AttributeValue{S: aws.String("OK")},
+			"EmptyL": &dynamodb.AttributeValue{L: []*dynamodb.AttributeValue{}},
 		},
 	},
 

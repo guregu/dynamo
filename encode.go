@@ -162,19 +162,25 @@ func marshalReflect(rv reflect.Value, special string) (*dynamodb.AttributeValue,
 		}
 		return &dynamodb.AttributeValue{M: avs}, nil
 	case reflect.Slice, reflect.Array:
-		if rv.Len() == 0 {
-			return nil, nil
-		}
-
 		// special case: byte slice is B
 		if rv.Type().Elem().Kind() == reflect.Uint8 {
+			// binary values can't be empty
+			if rv.Len() == 0 {
+				return nil, nil
+			}
 			return &dynamodb.AttributeValue{B: rv.Bytes()}, nil
 		}
 
+		// sets
 		if special == "set" {
+			// sets can't be empty
+			if rv.Len() == 0 {
+				return nil, nil
+			}
 			return marshalSet(rv)
 		}
 
+		// lists CAN be empty
 		avs := make([]*dynamodb.AttributeValue, 0, rv.Len())
 		for i := 0; i < rv.Len(); i++ {
 			innerVal := rv.Index(i)

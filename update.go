@@ -128,6 +128,7 @@ func (u *Update) AddFloatsToSet(path string, values ...float64) *Update {
 
 func (u *Update) delete(path string, value interface{}) *Update {
 	path, err := u.escape(path)
+	u.setError(err)
 	vsub, err := u.subValue(value, "set")
 	u.setError(err)
 	u.del[path] = vsub

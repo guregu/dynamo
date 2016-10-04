@@ -128,6 +128,8 @@ func marshalReflect(rv reflect.Value, special string) (*dynamodb.AttributeValue,
 		return &dynamodb.AttributeValue{BOOL: aws.Bool(rv.Bool())}, nil
 	case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
 		return &dynamodb.AttributeValue{N: aws.String(strconv.FormatInt(rv.Int(), 10))}, nil
+	case reflect.Uint, reflect.Uint64, reflect.Uint32, reflect.Uint16, reflect.Uint8:
+		return &dynamodb.AttributeValue{N: aws.String(strconv.FormatUint(rv.Uint(), 10))}, nil
 	case reflect.Float32, reflect.Float64:
 		return &dynamodb.AttributeValue{N: aws.String(strconv.FormatFloat(rv.Float(), 'f', -1, 64))}, nil
 	case reflect.String:
@@ -219,6 +221,12 @@ func marshalSet(rv reflect.Value) (*dynamodb.AttributeValue, error) {
 		ns := make([]*string, 0, rv.Len())
 		for i := 0; i < rv.Len(); i++ {
 			ns = append(ns, aws.String(strconv.FormatInt(rv.Index(i).Int(), 10)))
+		}
+		return &dynamodb.AttributeValue{NS: ns}, nil
+	case reflect.Uint, reflect.Uint64, reflect.Uint32, reflect.Uint16, reflect.Uint8:
+		ns := make([]*string, 0, rv.Len())
+		for i := 0; i < rv.Len(); i++ {
+			ns = append(ns, aws.String(strconv.FormatUint(rv.Index(i).Uint(), 10)))
 		}
 		return &dynamodb.AttributeValue{NS: ns}, nil
 	case reflect.Float32, reflect.Float64:

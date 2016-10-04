@@ -9,14 +9,17 @@ import (
 
 func TestUnmarshalAppend(t *testing.T) {
 	var results []struct {
-		User int `dynamo:"UserID"`
-		Page int
+		User  int `dynamo:"UserID"`
+		Page  int
+		Limit uint
 	}
 	id := "12345"
 	page := "5"
+	limit := "20"
 	item := map[string]*dynamodb.AttributeValue{
 		"UserID": &dynamodb.AttributeValue{N: &id},
 		"Page":   &dynamodb.AttributeValue{N: &page},
+		"Limit":   &dynamodb.AttributeValue{N: &limit},
 	}
 
 	for range [15]struct{}{} {
@@ -27,7 +30,7 @@ func TestUnmarshalAppend(t *testing.T) {
 	}
 
 	for _, h := range results {
-		if h.User != 12345 || h.Page != 5 {
+		if h.User != 12345 || h.Page != 5 || h.Limit != 20 {
 			t.Error("invalid hit", h)
 		}
 	}

@@ -28,6 +28,11 @@ var encodingTests = []struct {
 		out:  &dynamodb.AttributeValue{N: aws.String("123")},
 	},
 	{
+		name: "uints",
+		in:   uint(123),
+		out:  &dynamodb.AttributeValue{N: aws.String("123")},
+	},
+	{
 		name: "floats",
 		in:   1.2,
 		out:  &dynamodb.AttributeValue{N: aws.String("1.2")},
@@ -185,12 +190,14 @@ var itemEncodingTests = []struct {
 			BS  [][]byte        `dynamo:",set"`
 			NS1 []int           `dynamo:",set"`
 			NS2 []float64       `dynamo:",set"`
+			NS3 []uint          `dynamo:",set"`
 		}{
 			SS1: []string{"A", "B"},
 			SS2: []textMarshaler{textMarshaler(true), textMarshaler(false)},
 			BS:  [][]byte{[]byte{'A'}, []byte{'B'}},
 			NS1: []int{1, 2},
 			NS2: []float64{1, 2},
+			NS3: []uint{1, 2},
 		},
 		out: map[string]*dynamodb.AttributeValue{
 			"SS1": &dynamodb.AttributeValue{SS: []*string{aws.String("A"), aws.String("B")}},
@@ -198,6 +205,7 @@ var itemEncodingTests = []struct {
 			"BS":  &dynamodb.AttributeValue{BS: [][]byte{[]byte{'A'}, []byte{'B'}}},
 			"NS1": &dynamodb.AttributeValue{NS: []*string{aws.String("1"), aws.String("2")}},
 			"NS2": &dynamodb.AttributeValue{NS: []*string{aws.String("1"), aws.String("2")}},
+			"NS3": &dynamodb.AttributeValue{NS: []*string{aws.String("1"), aws.String("2")}},
 		},
 	},
 	{

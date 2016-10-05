@@ -75,6 +75,16 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 		}
 		rv.SetInt(n)
 		return nil
+	case reflect.Uint, reflect.Uint64, reflect.Uint32, reflect.Uint16, reflect.Uint8:
+		if av.N == nil {
+			return errors.New("dynamo: unmarshal uint: expected N to be non-nil")
+		}
+		n, err := strconv.ParseUint(*av.N, 10, 64)
+		if err != nil {
+			return err
+		}
+		rv.SetUint(n)
+		return nil
 	case reflect.Float64, reflect.Float32:
 		if av.N == nil {
 			return errors.New("dynamo: unmarshal int: expected N to be non-nil")

@@ -2,7 +2,7 @@ package dynamo
 
 import (
 	"bytes"
-	"encoding/base64"
+	"encoding/base32"
 	"fmt"
 	"strings"
 
@@ -86,7 +86,7 @@ func (s *subber) subExpr(expr string, args ...interface{}) (string, error) {
 // encodeName consistently encodes a name.
 // The consistency is important.
 func encodeName(name string) string {
-	name = base64.StdEncoding.EncodeToString([]byte(name))
+	name = base32.StdEncoding.EncodeToString([]byte(name))
 	return strings.TrimRight(name, "=")
 }
 

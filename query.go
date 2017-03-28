@@ -167,6 +167,10 @@ func (q *Query) Order(order Order) *Query {
 // One executes this query and retrieves a single result,
 // unmarshaling the result to out.
 func (q *Query) One(out interface{}) error {
+	return q.OneWithContext(aws.BackgroundContext(), out)
+}
+
+func (q *Query) OneWithContext(ctx aws.Context, out interface{}) error {
 	if q.err != nil {
 		return q.err
 	}
@@ -178,7 +182,7 @@ func (q *Query) One(out interface{}) error {
 		var res *dynamodb.GetItemOutput
 		err := retry(func() error {
 			var err error
-			res, err = q.table.db.client.GetItem(req)
+			res, err = q.table.db.client.GetItemWithContext(ctx, req)
 			if err != nil {
 				return err
 			}
@@ -200,7 +204,7 @@ func (q *Query) One(out interface{}) error {
 	var res *dynamodb.QueryOutput
 	err := retry(func() error {
 		var err error
-		res, err = q.table.db.client.Query(req)
+		res, err = q.table.db.client.QueryWithContext(ctx, req)
 		if err != nil {
 			return err
 		}

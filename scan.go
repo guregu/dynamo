@@ -3,6 +3,7 @@ package dynamo
 import (
 	"strings"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
@@ -128,6 +129,10 @@ type scanIter struct {
 // Next tries to unmarshal the next result into out.
 // Returns false when it is complete or if it runs into an error.
 func (itr *scanIter) Next(out interface{}) bool {
+	return itr.NextWithContext(aws.BackgroundContext(), out)
+}
+
+func (itr *scanIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 	// stop if we have an error
 	if itr.err != nil {
 		return false
@@ -158,7 +163,7 @@ func (itr *scanIter) Next(out interface{}) bool {
 
 	itr.err = retry(func() error {
 		var err error
-		itr.output, err = itr.scan.table.db.client.Scan(itr.input)
+		itr.output, err = itr.scan.table.db.client.ScanWithContext(ctx, itr.input)
 		return err
 	})
 

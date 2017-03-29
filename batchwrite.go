@@ -4,6 +4,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/cenkalti/backoff"
 )
@@ -59,6 +60,10 @@ func (bw *BatchWrite) Delete(keys ...Keyed) *BatchWrite {
 // some records have been written and some have not. Consult the wrote
 // return amount to figure out which operations have succeeded.
 func (bw *BatchWrite) Run() (wrote int, err error) {
+	return bw.RunWithContext(aws.BackgroundContext())
+}
+
+func (bw *BatchWrite) RunWithContext(ctx aws.Context) (wrote int, err error) {
 	if bw.err != nil {
 		return 0, bw.err
 	}
@@ -80,7 +85,7 @@ func (bw *BatchWrite) Run() (wrote int, err error) {
 			req := bw.input(ops)
 			err := retry(func() error {
 				var err error
-				res, err = bw.batch.table.db.client.BatchWriteItem(req)
+				res, err = bw.batch.table.db.client.BatchWriteItemWithContext(ctx, req)
 				return err
 			})
 			if err != nil {

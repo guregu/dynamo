@@ -1,6 +1,7 @@
 package dynamo
 
 import (
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
@@ -58,16 +59,24 @@ func (d *Delete) If(expr string, args ...interface{}) *Delete {
 
 // Run executes this delete request.
 func (d *Delete) Run() error {
+	return d.RunWithContext(aws.BackgroundContext())
+}
+
+func (d *Delete) RunWithContext(ctx aws.Context) error {
 	d.returnType = "NONE"
-	_, err := d.run()
+	_, err := d.run(ctx)
 	return err
 }
 
 // OldValue executes this delete request, unmarshaling the previous value to out.
 // Returns ErrNotFound is there was no previous value.
 func (d *Delete) OldValue(out interface{}) error {
+	return d.OldValueWithContext(aws.BackgroundContext(), out)
+}
+
+func (d *Delete) OldValueWithContext(ctx aws.Context, out interface{}) error {
 	d.returnType = "ALL_OLD"
-	output, err := d.run()
+	output, err := d.run(ctx)
 	switch {
 	case err != nil:
 		return err
@@ -77,7 +86,7 @@ func (d *Delete) OldValue(out interface{}) error {
 	return unmarshalItem(output.Attributes, out)
 }
 
-func (d *Delete) run() (*dynamodb.DeleteItemOutput, error) {
+func (d *Delete) run(ctx aws.Context) (*dynamodb.DeleteItemOutput, error) {
 	if d.err != nil {
 		return nil, d.err
 	}
@@ -86,7 +95,7 @@ func (d *Delete) run() (*dynamodb.DeleteItemOutput, error) {
 	var output *dynamodb.DeleteItemOutput
 	err := retry(func() error {
 		var err error
-		output, err = d.table.db.client.DeleteItem(input)
+		output, err = d.table.db.client.DeleteItemWithContext(ctx, input)
 		return err
 	})
 	return output, err

@@ -37,12 +37,14 @@ func (table Table) DeleteTable() *DeleteTable {
 
 // Run executes this request and deletes the table.
 func (dt *DeleteTable) Run() error {
-	return dt.RunWithContext(aws.BackgroundContext())
+	ctx, cancel := defaultContext()
+	defer cancel()
+	return dt.RunWithContext(ctx)
 }
 
 func (dt *DeleteTable) RunWithContext(ctx aws.Context) error {
 	input := dt.input()
-	return retry(func() error {
+	return retry(ctx, func() error {
 		_, err := dt.table.db.client.DeleteTableWithContext(ctx, input)
 		return err
 	})

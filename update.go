@@ -174,7 +174,9 @@ func (u *Update) If(expr string, args ...interface{}) *Update {
 
 // Run executes this update.
 func (u *Update) Run() error {
-	return u.RunWithContext(aws.BackgroundContext())
+	ctx, cancel := defaultContext()
+	defer cancel()
+	return u.RunWithContext(ctx)
 }
 
 func (u *Update) RunWithContext(ctx aws.Context) error {
@@ -185,7 +187,9 @@ func (u *Update) RunWithContext(ctx aws.Context) error {
 
 // Value executes this update, encoding out with the new value.
 func (u *Update) Value(out interface{}) error {
-	return u.ValueWithContext(aws.BackgroundContext(), out)
+	ctx, cancel := defaultContext()
+	defer cancel()
+	return u.ValueWithContext(ctx, out)
 }
 
 func (u *Update) ValueWithContext(ctx aws.Context, out interface{}) error {
@@ -199,7 +203,9 @@ func (u *Update) ValueWithContext(ctx aws.Context, out interface{}) error {
 
 // OldValue executes this update, encoding out with the previous value.
 func (u *Update) OldValue(out interface{}) error {
-	return u.OldValueWithContext(aws.BackgroundContext(), out)
+	ctx, cancel := defaultContext()
+	defer cancel()
+	return u.OldValueWithContext(ctx, out)
 }
 func (u *Update) OldValueWithContext(ctx aws.Context, out interface{}) error {
 	u.returnType = "ALL_OLD"
@@ -217,7 +223,7 @@ func (u *Update) run(ctx aws.Context) (*dynamodb.UpdateItemOutput, error) {
 
 	input := u.updateInput()
 	var output *dynamodb.UpdateItemOutput
-	err := retry(func() error {
+	err := retry(ctx, func() error {
 		var err error
 		output, err = u.table.db.client.UpdateItemWithContext(ctx, input)
 		return err

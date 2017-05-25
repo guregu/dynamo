@@ -132,7 +132,9 @@ func (ct *CreateTable) Project(index string, projection IndexProjection, include
 
 // Run creates this table or returns and error.
 func (ct *CreateTable) Run() error {
-	return ct.RunWithContext(aws.BackgroundContext())
+	ctx, cancel := defaultContext()
+	defer cancel()
+	return ct.RunWithContext(ctx)
 }
 
 func (ct *CreateTable) RunWithContext(ctx aws.Context) error {
@@ -141,7 +143,7 @@ func (ct *CreateTable) RunWithContext(ctx aws.Context) error {
 	}
 
 	input := ct.input()
-	return retry(func() error {
+	return retry(ctx, func() error {
 		_, err := ct.db.client.CreateTableWithContext(ctx, input)
 		return err
 	})

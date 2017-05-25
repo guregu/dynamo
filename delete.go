@@ -59,7 +59,9 @@ func (d *Delete) If(expr string, args ...interface{}) *Delete {
 
 // Run executes this delete request.
 func (d *Delete) Run() error {
-	return d.RunWithContext(aws.BackgroundContext())
+	ctx, cancel := defaultContext()
+	defer cancel()
+	return d.RunWithContext(ctx)
 }
 
 func (d *Delete) RunWithContext(ctx aws.Context) error {
@@ -71,7 +73,9 @@ func (d *Delete) RunWithContext(ctx aws.Context) error {
 // OldValue executes this delete request, unmarshaling the previous value to out.
 // Returns ErrNotFound is there was no previous value.
 func (d *Delete) OldValue(out interface{}) error {
-	return d.OldValueWithContext(aws.BackgroundContext(), out)
+	ctx, cancel := defaultContext()
+	defer cancel()
+	return d.OldValueWithContext(ctx, out)
 }
 
 func (d *Delete) OldValueWithContext(ctx aws.Context, out interface{}) error {
@@ -93,7 +97,7 @@ func (d *Delete) run(ctx aws.Context) (*dynamodb.DeleteItemOutput, error) {
 
 	input := d.deleteInput()
 	var output *dynamodb.DeleteItemOutput
-	err := retry(func() error {
+	err := retry(ctx, func() error {
 		var err error
 		output, err = d.table.db.client.DeleteItemWithContext(ctx, input)
 		return err

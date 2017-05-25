@@ -3,8 +3,10 @@ package dynamo
 import (
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/cenkalti/backoff"
+	"golang.org/x/net/context"
 )
 
 // RetryTimeout defines the maximum amount of time that requests will
@@ -13,12 +15,17 @@ import (
 // Higher values are better when using tables with lower throughput.
 var RetryTimeout = 1 * time.Minute
 
-func retry(f func() error) error {
+func defaultContext() (aws.Context, context.CancelFunc) {
+	if RetryTimeout == 0 {
+		return aws.BackgroundContext(), (func() {})
+	}
+	return context.WithDeadline(aws.BackgroundContext(), time.Now().Add(RetryTimeout))
+}
+
+func retry(ctx aws.Context, f func() error) error {
 	var err error
 	var next time.Duration
-	b := backoff.NewExponentialBackOff()
-	b.MaxElapsedTime = RetryTimeout
-
+	b := backoff.WithContext(backoff.NewExponentialBackOff(), ctx)
 	for {
 		if err = f(); err == nil {
 			return nil
@@ -32,7 +39,9 @@ func retry(f func() error) error {
 			return err
 		}
 
-		time.Sleep(next)
+		if err = aws.SleepWithContext(ctx, next); err != nil {
+			return err
+		}
 	}
 }
 

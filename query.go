@@ -167,6 +167,12 @@ func (q *Query) Order(order Order) *Query {
 // One executes this query and retrieves a single result,
 // unmarshaling the result to out.
 func (q *Query) One(out interface{}) error {
+	ctx, cancel := defaultContext()
+	defer cancel()
+	return q.OneWithContext(ctx, out)
+}
+
+func (q *Query) OneWithContext(ctx aws.Context, out interface{}) error {
 	if q.err != nil {
 		return q.err
 	}
@@ -176,9 +182,9 @@ func (q *Query) One(out interface{}) error {
 		req := q.getItemInput()
 
 		var res *dynamodb.GetItemOutput
-		err := retry(func() error {
+		err := retry(ctx, func() error {
 			var err error
-			res, err = q.table.db.client.GetItem(req)
+			res, err = q.table.db.client.GetItemWithContext(ctx, req)
 			if err != nil {
 				return err
 			}
@@ -198,9 +204,9 @@ func (q *Query) One(out interface{}) error {
 	req := q.queryInput()
 
 	var res *dynamodb.QueryOutput
-	err := retry(func() error {
+	err := retry(ctx, func() error {
 		var err error
-		res, err = q.table.db.client.Query(req)
+		res, err = q.table.db.client.QueryWithContext(ctx, req)
 		if err != nil {
 			return err
 		}
@@ -225,6 +231,12 @@ func (q *Query) One(out interface{}) error {
 
 // Count executes this request, returning the number of results.
 func (q *Query) Count() (int64, error) {
+	ctx, cancel := defaultContext()
+	defer cancel()
+	return q.CountWithContext(ctx)
+}
+
+func (q *Query) CountWithContext(ctx aws.Context) (int64, error) {
 	if q.err != nil {
 		return 0, q.err
 	}
@@ -235,9 +247,9 @@ func (q *Query) Count() (int64, error) {
 		req := q.queryInput()
 		req.Select = selectCount
 
-		err := retry(func() error {
+		err := retry(ctx, func() error {
 			var err error
-			res, err = q.table.db.client.Query(req)
+			res, err = q.table.db.client.QueryWithContext(ctx, req)
 			if err != nil {
 				return err
 			}
@@ -275,6 +287,12 @@ type queryIter struct {
 // Next tries to unmarshal the next result into out.
 // Returns false when it is complete or if it runs into an error.
 func (itr *queryIter) Next(out interface{}) bool {
+	ctx, cancel := defaultContext()
+	defer cancel()
+	return itr.NextWithContext(ctx, out)
+}
+
+func (itr *queryIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 	// stop if we have an error
 	if itr.err != nil {
 		return false
@@ -309,9 +327,9 @@ func (itr *queryIter) Next(out interface{}) bool {
 		itr.idx = 0
 	}
 
-	itr.err = retry(func() error {
+	itr.err = retry(ctx, func() error {
 		var err error
-		itr.output, err = itr.query.table.db.client.Query(itr.input)
+		itr.output, err = itr.query.table.db.client.QueryWithContext(ctx, itr.input)
 		return err
 	})
 

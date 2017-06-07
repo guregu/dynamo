@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
@@ -173,15 +174,27 @@ func (u *Update) If(expr string, args ...interface{}) *Update {
 
 // Run executes this update.
 func (u *Update) Run() error {
+	ctx, cancel := defaultContext()
+	defer cancel()
+	return u.RunWithContext(ctx)
+}
+
+func (u *Update) RunWithContext(ctx aws.Context) error {
 	u.returnType = "NONE"
-	_, err := u.run()
+	_, err := u.run(ctx)
 	return err
 }
 
 // Value executes this update, encoding out with the new value.
 func (u *Update) Value(out interface{}) error {
+	ctx, cancel := defaultContext()
+	defer cancel()
+	return u.ValueWithContext(ctx, out)
+}
+
+func (u *Update) ValueWithContext(ctx aws.Context, out interface{}) error {
 	u.returnType = "ALL_NEW"
-	output, err := u.run()
+	output, err := u.run(ctx)
 	if err != nil {
 		return err
 	}
@@ -190,24 +203,29 @@ func (u *Update) Value(out interface{}) error {
 
 // OldValue executes this update, encoding out with the previous value.
 func (u *Update) OldValue(out interface{}) error {
+	ctx, cancel := defaultContext()
+	defer cancel()
+	return u.OldValueWithContext(ctx, out)
+}
+func (u *Update) OldValueWithContext(ctx aws.Context, out interface{}) error {
 	u.returnType = "ALL_OLD"
-	output, err := u.run()
+	output, err := u.run(ctx)
 	if err != nil {
 		return err
 	}
 	return unmarshalItem(output.Attributes, out)
 }
 
-func (u *Update) run() (*dynamodb.UpdateItemOutput, error) {
+func (u *Update) run(ctx aws.Context) (*dynamodb.UpdateItemOutput, error) {
 	if u.err != nil {
 		return nil, u.err
 	}
 
 	input := u.updateInput()
 	var output *dynamodb.UpdateItemOutput
-	err := retry(func() error {
+	err := retry(ctx, func() error {
 		var err error
-		output, err = u.table.db.client.UpdateItem(input)
+		output, err = u.table.db.client.UpdateItemWithContext(ctx, input)
 		return err
 	})
 	return output, err

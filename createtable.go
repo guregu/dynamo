@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
@@ -131,13 +132,19 @@ func (ct *CreateTable) Project(index string, projection IndexProjection, include
 
 // Run creates this table or returns and error.
 func (ct *CreateTable) Run() error {
+	ctx, cancel := defaultContext()
+	defer cancel()
+	return ct.RunWithContext(ctx)
+}
+
+func (ct *CreateTable) RunWithContext(ctx aws.Context) error {
 	if ct.err != nil {
 		return ct.err
 	}
 
 	input := ct.input()
-	return retry(func() error {
-		_, err := ct.db.client.CreateTable(input)
+	return retry(ctx, func() error {
+		_, err := ct.db.client.CreateTableWithContext(ctx, input)
 		return err
 	})
 	return nil

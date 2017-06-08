@@ -131,6 +131,27 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 		return nil
 	case reflect.Slice:
 		return unmarshalSlice(av, rv)
+	case reflect.Array:
+		arr := reflect.New(rv.Type()).Elem()
+		elemtype := arr.Type().Elem()
+		switch {
+		case av.B != nil:
+			for i, b := range av.B {
+				arr.Index(i).Set(reflect.ValueOf(b))
+			}
+			rv.Set(arr)
+			return nil
+		case av.L != nil:
+			for i, innerAV := range av.L {
+				innerRV := reflect.New(elemtype).Elem()
+				if err := unmarshalReflect(innerAV, innerRV); err != nil {
+					return err
+				}
+				arr.Index(i).Set(innerRV)
+			}
+			rv.Set(arr)
+			return nil
+		}
 	case reflect.Interface:
 		// interface{}
 		if rv.NumMethod() == 0 {

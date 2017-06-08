@@ -75,6 +75,20 @@ var encodingTests = []struct {
 		}},
 	},
 	{
+		name: "array",
+		in:   [3]int{1, 2, 3},
+		out: &dynamodb.AttributeValue{L: []*dynamodb.AttributeValue{
+			{N: aws.String("1")},
+			{N: aws.String("2")},
+			{N: aws.String("3")},
+		}},
+	},
+	{
+		name: "byte array",
+		in:   [4]byte{'a', 'b', 'c', 'd'},
+		out:  &dynamodb.AttributeValue{B: []byte{'a', 'b', 'c', 'd'}},
+	},
+	{
 		name: "dynamo.Marshaler",
 		in:   customMarshaler(1),
 		out:  &dynamodb.AttributeValue{BOOL: aws.Bool(true)},

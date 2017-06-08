@@ -170,7 +170,16 @@ func marshalReflect(rv reflect.Value, special string) (*dynamodb.AttributeValue,
 			if rv.Len() == 0 {
 				return nil, nil
 			}
-			return &dynamodb.AttributeValue{B: rv.Bytes()}, nil
+			var data []byte
+			if rv.Kind() == reflect.Array {
+				data = make([]byte, rv.Len())
+				for i := 0; i < rv.Len(); i++ {
+					data[i] = rv.Index(i).Interface().(byte)
+				}
+			} else {
+				data = rv.Bytes()
+			}
+			return &dynamodb.AttributeValue{B: data}, nil
 		}
 
 		// sets

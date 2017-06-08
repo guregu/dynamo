@@ -100,6 +100,8 @@ func Marshal(v interface{}) (*dynamodb.AttributeValue, error) {
 
 func marshal(v interface{}, special string) (*dynamodb.AttributeValue, error) {
 	switch x := v.(type) {
+	case *dynamodb.AttributeValue:
+		return x, nil
 	case Marshaler:
 		return x.MarshalDynamo()
 	case encoding.TextMarshaler:

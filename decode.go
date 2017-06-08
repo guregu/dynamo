@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 )
 
 // Unmarshaler is the interface implemented by objects that can unmarshal
@@ -47,6 +48,8 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 			return nil
 		case Unmarshaler:
 			return x.UnmarshalDynamo(av)
+		case dynamodbattribute.Unmarshaler:
+			return x.UnmarshalDynamoDBAttributeValue(av)
 		case encoding.TextUnmarshaler:
 			if av.S != nil {
 				return x.UnmarshalText([]byte(*av.S))

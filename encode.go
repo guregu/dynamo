@@ -9,6 +9,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 )
 
 // Marshaler is the interface implemented by objects that can marshal themselves into
@@ -100,8 +101,13 @@ func Marshal(v interface{}) (*dynamodb.AttributeValue, error) {
 
 func marshal(v interface{}, special string) (*dynamodb.AttributeValue, error) {
 	switch x := v.(type) {
+	case *dynamodb.AttributeValue:
+		return x, nil
 	case Marshaler:
 		return x.MarshalDynamo()
+	case dynamodbattribute.Marshaler:
+		av := &dynamodb.AttributeValue{}
+		return av, x.MarshalDynamoDBAttributeValue(av)
 	case encoding.TextMarshaler:
 		text, err := x.MarshalText()
 		if err != nil {

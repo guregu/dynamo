@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 )
 
 // Unmarshaler is the interface implemented by objects that can unmarshal
@@ -41,12 +42,17 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 			iface = rv.Interface()
 		}
 
-		if u, ok := iface.(Unmarshaler); ok {
-			return u.UnmarshalDynamo(av)
-		}
-		if u, ok := iface.(encoding.TextUnmarshaler); ok {
+		switch x := iface.(type) {
+		case *dynamodb.AttributeValue:
+			*x = *av
+			return nil
+		case Unmarshaler:
+			return x.UnmarshalDynamo(av)
+		case dynamodbattribute.Unmarshaler:
+			return x.UnmarshalDynamoDBAttributeValue(av)
+		case encoding.TextUnmarshaler:
 			if av.S != nil {
-				return u.UnmarshalText([]byte(*av.S))
+				return x.UnmarshalText([]byte(*av.S))
 			}
 		}
 	}
@@ -257,6 +263,11 @@ func fieldsInStruct(rv reflect.Value) map[string]reflect.Value {
 
 // unmarshals a struct
 func unmarshalItem(item map[string]*dynamodb.AttributeValue, out interface{}) error {
+	if out, ok := out.(*map[string]*dynamodb.AttributeValue); ok {
+		*out = item
+		return nil
+	}
+
 	rv := reflect.ValueOf(out)
 	if rv.Kind() != reflect.Ptr {
 		return fmt.Errorf("dynamo: unmarshal: not a pointer: %T", out)

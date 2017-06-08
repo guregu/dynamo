@@ -3,8 +3,7 @@
 
 dynamo is an expressive [DynamoDB](https://aws.amazon.com/dynamodb/) client for Go, with an API heavily inspired by [mgo](https://labix.org/mgo). dynamo integrates with the official [AWS SDK](https://github.com/aws/aws-sdk-go/).
 
-dynamo is still under development, so the API may change!
-
+dynamo is still under development, so the API may change rarely. However, breaking changes will be avoided and the API can be considered relatively stable.
 
 ### Example
 
@@ -77,6 +76,37 @@ table.Delete("ID", 42).If("Score <= ? AND begins_with($, ?)", cutoff, "Name", "G
 table.Put(item{ID: 42}).If("attribute_not_exists(ID)").Run()
 ```
 
+### Encoding support
+
+dynamo automatically handles the following interfaces:
+
+* [`dynamo.Marshaler`](https://godoc.org/github.com/guregu/dynamo#Marshaler) and [`dynamo.Unmarshaler`](https://godoc.org/github.com/guregu/dynamo#Unmarshaler) 
+* [`dynamodbattribute.Marshaler`](https://godoc.org/github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute#Marshaler) and [`dynamodbattribute.Unmarshaler`](https://godoc.org/github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute#Unmarshaler)
+* [`encoding.TextMarshaler`](https://godoc.org/encoding#TextMarshaler) and [`encoding.TextUnmarshaler`](https://godoc.org/encoding#TextUnmarshaler)
+
+This allows you to define custom encodings and provides built-in support for types such as `time.Time`. 
+
+### Compatibility with the official AWS library
+
+dynamo has been in development before the official AWS libraries were stable. We use a different encoder and decoder than the [dynamodbattribute](https://godoc.org/github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute) package. dynamo uses the `dynamo` struct tag instead of the `dynamodbav` struct tag, and we also prefer to automatically omit invalid values such as empty strings, whereas the dynamodbattribute package substitutes null values for them. Items that satisfy the [`dynamodbattribute.(Un)marshaler`](https://godoc.org/github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute#Marshaler) interfaces are compatibile with both libraries.
+
+In order to use dynamodbattribute's encoding facilities, you must wrap objects passed to dynamo with [`dynamo.AWSEncoding`](https://godoc.org/github.com/guregu/dynamo#AWSEncoding). Here is a quick example: 
+
+```go
+// Notice the use of the dynamodbav struct tag
+type book struct {
+	ID    int    `dynamodbav:"id"`
+	Title string `dynamodbav:"title"`
+}
+// Putting an item
+err := db.Table("Books").Put(dynamo.AWSEncoding(book{
+	ID:    42,
+	Title: "Principia Discordia",
+})).Run()
+// When getting an item you MUST pass a pointer to AWSEncoding!
+var someBook book
+err := db.Table("Books").Get("ID", 555).One(dynamo.AWSEncoding(&someBook))
+```
 
 ### Integration tests
 

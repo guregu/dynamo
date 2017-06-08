@@ -21,7 +21,7 @@ type awsTestWidget struct {
 func TestAWSEncoding(t *testing.T) {
 	w := awsTestWidget{
 		UserID:    555,
-		Time:      time.Now(),
+		Time:      time.Now().UTC(),
 		Msg:       "hello",
 		Count:     0,
 		Friends:   []string{"a", "b"},

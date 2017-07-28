@@ -18,6 +18,9 @@ func TestUpdate(t *testing.T) {
 		Time:   time.Now().UTC(),
 		Msg:    "hello",
 		Count:  0,
+		Meta: map[string]string{
+			"foo": "bar",
+		},
 	}
 	err := table.Put(item).Run()
 	if err != nil {
@@ -29,6 +32,7 @@ func TestUpdate(t *testing.T) {
 	err = table.Update("UserID", item.UserID).
 		Range("Time", item.Time).
 		Set("Msg", "changed").
+		SetExpr("Meta.$ = ?", "foo", "baz").
 		Add("Count", 1).
 		Add("Test", []string{"A", "B"}).
 		Value(&result)
@@ -37,6 +41,9 @@ func TestUpdate(t *testing.T) {
 		Time:   item.Time,
 		Msg:    "changed",
 		Count:  1,
+		Meta: map[string]string{
+			"foo": "baz",
+		},
 	}
 	if err != nil {
 		t.Error("unexpected error:", err)

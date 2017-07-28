@@ -31,6 +31,7 @@ type widget struct {
 	Time   time.Time // RK
 	Msg    string
 	Count  int
+	Meta   map[string]string
 }
 
 func isConditionalCheckErr(err error) bool {

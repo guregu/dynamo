@@ -63,7 +63,7 @@ func (u *Update) Range(name string, value interface{}) *Update {
 func (u *Update) Set(path string, value interface{}) *Update {
 	path, err := u.escape(path)
 	u.setError(err)
-	expr, err := u.subExpr("🝕 = ?", path, value)
+	expr, err := u.subExpr("?? = ?", path, value)
 	u.setError(err)
 	u.set = append(u.set, expr)
 	return u
@@ -73,7 +73,15 @@ func (u *Update) Set(path string, value interface{}) *Update {
 func (u *Update) SetIfNotExists(path string, value interface{}) *Update {
 	path, err := u.escape(path)
 	u.setError(err)
-	expr, err := u.subExpr("🝕 = if_not_exists(🝕, ?)", path, path, value)
+	expr, err := u.subExpr("?? = if_not_exists(??, ?)", path, path, value)
+	u.setError(err)
+	u.set = append(u.set, expr)
+	return u
+}
+
+// SetExpr specifies an expression for SET
+func (u *Update) SetExpr(expr string, args ...interface{}) *Update {
+	expr, err := u.subExpr(expr, args...)
 	u.setError(err)
 	u.set = append(u.set, expr)
 	return u
@@ -83,7 +91,7 @@ func (u *Update) SetIfNotExists(path string, value interface{}) *Update {
 func (u *Update) Append(path string, value interface{}) *Update {
 	path, err := u.escape(path)
 	u.setError(err)
-	expr, err := u.subExpr("🝕 = list_append(🝕, ?)", path, path, value)
+	expr, err := u.subExpr("?? = list_append(??, ?)", path, path, value)
 	u.setError(err)
 	u.set = append(u.set, expr)
 	return u
@@ -93,7 +101,7 @@ func (u *Update) Append(path string, value interface{}) *Update {
 func (u *Update) Prepend(path string, value interface{}) *Update {
 	path, err := u.escape(path)
 	u.setError(err)
-	expr, err := u.subExpr("🝕 = list_append(?, 🝕)", path, value, path)
+	expr, err := u.subExpr("?? = list_append(?, ??)", path, value, path)
 	u.setError(err)
 	u.set = append(u.set, expr)
 	return u

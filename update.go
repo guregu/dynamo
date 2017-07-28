@@ -79,6 +79,14 @@ func (u *Update) SetIfNotExists(path string, value interface{}) *Update {
 	return u
 }
 
+// SetExpr specifies an expression for SET
+func (u *Update) SetExpr(expr string, args ...interface{}) *Update {
+	expr, err := u.subExpr(expr, args...)
+	u.setError(err)
+	u.set = append(u.set, expr)
+	return u
+}
+
 // Append appends value  to the end of the list specified by path.
 func (u *Update) Append(path string, value interface{}) *Update {
 	path, err := u.escape(path)

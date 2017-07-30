@@ -117,8 +117,15 @@ func (q *Query) Index(name string) *Query {
 
 // Project limits the result attributes to the given paths.
 func (q *Query) Project(paths ...string) *Query {
-	expr, err := q.subExpr(strings.Join(paths, ", "), nil)
-	q.setError(err)
+	var expr string
+	for i, p := range paths {
+		if i != 0 {
+			expr += ", "
+		}
+		name, err := q.escape(p)
+		q.setError(err)
+		expr += name
+	}
 	q.projection = expr
 	return q
 }

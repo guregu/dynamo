@@ -42,14 +42,13 @@ func main() {
 	// get the same item 
 	var result widget
 	err = table.Get("UserID", w.UserID).
-				Range("Time", dynamo.Equal, w.Time).
-				Filter("'Count' = ? AND $ = ?", w.Count, "Message", w.Msg). // placeholders in expressions
-				One(&result)
+			Range("Time", dynamo.Equal, w.Time).
+			Filter("'Count' = ? AND $ = ?", w.Count, "Message", w.Msg). // placeholders in expressions
+			One(&result)
 	
 	// get all items
 	var results []widget
 	err = table.Scan().All(&results)
-	// ...
 }
 ```
 

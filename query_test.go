@@ -61,6 +61,7 @@ func TestGetAllCount(t *testing.T) {
 	}
 
 	// query specifically against the inserted item (using Query)
+	one = widget{}
 	err = table.Get("UserID", 42).Range("Time", Equal, item.Time).Filter("Msg = ?", item.Msg).Consistent(true).One(&one)
 	if err != nil {
 		t.Error("unexpected error:", err)
@@ -70,6 +71,7 @@ func TestGetAllCount(t *testing.T) {
 	}
 
 	// GetItem + Project
+	one = widget{}
 	projected := widget{
 		UserID: item.UserID,
 		Time:   item.Time,

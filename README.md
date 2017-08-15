@@ -51,16 +51,20 @@ func main() {
 	err = table.Scan().All(&results)
 
 	// describe table
-	tableDescription, err1 := table.DescribeTable().Run()
+	dtd, err1 := table.DescribeTable().Run()
 	if err1 != nil {
 		...
 	}
-	fmt.Println(tableDescription)
+	fmt.Println(dtd)
 
 	// update table througput
 	rcu := int64(1)
 	wcu := int64(1)
-	err = table.UpdateTable().UpdateThroughput(rcu, wcu)
+	utd, err2 := table.UpdateTable().UpdateThroughput(rcu, wcu)
+	if err2 != nil {
+		...
+	}
+	fmt.Println(utd)
 }
 ```
 

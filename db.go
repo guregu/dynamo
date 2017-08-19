@@ -5,11 +5,12 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
 )
 
 // DB is a DynamoDB client.
 type DB struct {
-	client *dynamodb.DynamoDB
+	client dynamodbiface.DynamoDBAPI
 }
 
 // New creates a new client with the given configuration.

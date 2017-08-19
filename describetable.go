@@ -15,9 +15,11 @@ type Description struct {
 	Created time.Time
 
 	// Attribute name of the hash key (a.k.a. partition key).
-	HashKey string
+	HashKey     string
+	HashKeyType KeyType
 	// Attribute name of the range key (a.k.a. sort key) or blank if nonexistant.
-	RangeKey string
+	RangeKey     string
+	RangeKeyType KeyType
 
 	// Provisioned throughput for this table.
 	Throughput Throughput
@@ -57,17 +59,22 @@ type Throughput struct {
 }
 
 type Index struct {
-	Name   string
-	ARN    string
-	Status Status
+	Name        string
+	ARN         string
+	Status      Status
+	Backfilling bool // only for GSI
+
 	// Local is true when this index is a local secondary index, otherwise it is a global secondary index.
 	Local bool
 
-	Backfilling bool // only for GSI
+	// Attribute name of the hash key (a.k.a. partition key).
+	HashKey     string
+	HashKeyType KeyType
+	// Attribute name of the range key (a.k.a. sort key) or blank if nonexistant.
+	RangeKey     string
+	RangeKeyType KeyType
 
-	HashKey  string
-	RangeKey string
-
+	// The provisioned throughput for this index.
 	Throughput Throughput
 
 	Items int64
@@ -94,6 +101,8 @@ func newDescription(table *dynamodb.TableDescription) Description {
 	}
 
 	desc.HashKey, desc.RangeKey = schemaKeys(table.KeySchema)
+	desc.HashKeyType = lookupADType(table.AttributeDefinitions, desc.HashKey)
+	desc.RangeKeyType = lookupADType(table.AttributeDefinitions, desc.RangeKey)
 
 	if table.ProvisionedThroughput != nil {
 		desc.Throughput = newThroughput(table.ProvisionedThroughput)
@@ -118,6 +127,8 @@ func newDescription(table *dynamodb.TableDescription) Description {
 			idx.Backfilling = *index.Backfilling
 		}
 		idx.HashKey, idx.RangeKey = schemaKeys(index.KeySchema)
+		idx.HashKeyType = lookupADType(table.AttributeDefinitions, idx.HashKey)
+		idx.RangeKeyType = lookupADType(table.AttributeDefinitions, idx.RangeKey)
 		if index.ItemCount != nil {
 			idx.Items = *index.ItemCount
 		}
@@ -141,6 +152,8 @@ func newDescription(table *dynamodb.TableDescription) Description {
 			ProjectionType: IndexProjection(*index.Projection.ProjectionType),
 		}
 		idx.HashKey, idx.RangeKey = schemaKeys(index.KeySchema)
+		idx.HashKeyType = lookupADType(table.AttributeDefinitions, idx.HashKey)
+		idx.RangeKeyType = lookupADType(table.AttributeDefinitions, idx.RangeKey)
 		if index.ItemCount != nil {
 			idx.Items = *index.ItemCount
 		}
@@ -179,6 +192,7 @@ type DescribeTable struct {
 	table Table
 }
 
+// Describe begins a new request to describe this table.
 func (table Table) Describe() *DescribeTable {
 	return &DescribeTable{table: table}
 }
@@ -240,4 +254,16 @@ func schemaKeys(schema []*dynamodb.KeySchemaElement) (hashKey, rangeKey string) 
 		}
 	}
 	return
+}
+
+func lookupADType(ads []*dynamodb.AttributeDefinition, name string) KeyType {
+	if name == "" {
+		return ""
+	}
+	for _, ad := range ads {
+		if *ad.AttributeName == name {
+			return KeyType(*ad.AttributeType)
+		}
+	}
+	return ""
 }

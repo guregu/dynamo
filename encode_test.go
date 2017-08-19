@@ -1,6 +1,8 @@
 package dynamo
 
 import (
+	"github.com/kr/pretty"
+	// "log"
 	"reflect"
 	"testing"
 )
@@ -26,6 +28,7 @@ func TestMarshalItem(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(item, tc.out) {
+			t.Log(pretty.Sprint(pretty.Diff(item, tc.out)))
 			t.Errorf("%s: bad result: %#v ≠ %#v", tc.name, item, tc.out)
 		}
 	}

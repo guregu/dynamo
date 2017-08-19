@@ -147,7 +147,6 @@ func (ct *CreateTable) RunWithContext(ctx aws.Context) error {
 		_, err := ct.db.client.CreateTableWithContext(ctx, input)
 		return err
 	})
-	return nil
 }
 
 func (ct *CreateTable) from(rv reflect.Value) error {

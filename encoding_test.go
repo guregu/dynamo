@@ -223,9 +223,9 @@ var itemEncodingTests = []struct {
 	{
 		name: "sets",
 		in: struct {
-			SS1 []string        `dynamo:",set"`
-			SS2 []textMarshaler `dynamo:",set"`
-			SS3 map[string]struct{}
+			SS1 []string             `dynamo:",set"`
+			SS2 []textMarshaler      `dynamo:",set"`
+			SS3 map[string]struct{}  `dynamo:",set"`
 			SS4 map[string]bool      `dynamo:",set"`
 			BS1 [][]byte             `dynamo:",set"`
 			BS2 map[[1]byte]struct{} `dynamo:",set"`

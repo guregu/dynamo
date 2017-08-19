@@ -145,7 +145,7 @@ func marshalReflect(rv reflect.Value, special string) (*dynamodb.AttributeValue,
 		}
 		return &dynamodb.AttributeValue{S: aws.String(s)}, nil
 	case reflect.Map:
-		if special == "set" || rv.Type().Elem() == emptyStructType {
+		if special == "set" {
 			// sets can't be empty
 			if rv.Len() == 0 {
 				return nil, nil

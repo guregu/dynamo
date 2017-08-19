@@ -69,6 +69,21 @@ func (u *Update) Set(path string, value interface{}) *Update {
 	return u
 }
 
+// SetSet changes a set at the given path to the given value.
+// SetSet marshals value to a string set, number set, or binary set.
+// Paths that are reserved words are automatically escaped.
+// Use single quotes to escape complex values like 'User'.'Count'.
+func (u *Update) SetSet(path string, value interface{}) *Update {
+	v, err := marshal(value, "set")
+	u.setError(err)
+	path, err = u.escape(path)
+	u.setError(err)
+	expr, err := u.subExpr("🝕 = ?", path, v)
+	u.setError(err)
+	u.set = append(u.set, expr)
+	return u
+}
+
 // SetIfNotExists changes path to the given value, if it does not already exist.
 func (u *Update) SetIfNotExists(path string, value interface{}) *Update {
 	path, err := u.escape(path)
@@ -79,7 +94,10 @@ func (u *Update) SetIfNotExists(path string, value interface{}) *Update {
 	return u
 }
 
-// SetExpr specifies an expression for SET
+// SetExpr performs a custom set expression, substituting the args into expr as in filter expressions.
+// See: http://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_UpdateItem.html#DDB-UpdateItem-request-UpdateExpression
+//	SetExpr("MyMap.$.$ = ?", key1, key2, val)
+//	SetExpr("'Counter' = 'Counter' + ?", 1)
 func (u *Update) SetExpr(expr string, args ...interface{}) *Update {
 	expr, err := u.subExpr(expr, args...)
 	u.setError(err)
@@ -109,7 +127,8 @@ func (u *Update) Prepend(path string, value interface{}) *Update {
 
 // Add adds value to path.
 // Path can be a number or a set.
-// If path represents a set, value must be []int or []string.
+// If path represents a number, value is atomically added to the number.
+// If path represents a set, value must be a slice, a map[*]struct{}, or map[*]bool.
 // Path must be a top-level attribute.
 func (u *Update) Add(path string, value interface{}) *Update {
 	path, err := u.escape(path)

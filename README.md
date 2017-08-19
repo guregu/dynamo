@@ -23,13 +23,15 @@ import (
 type widget struct {
 	UserID int       // Hash key, a.k.a. partition key
 	Time   time.Time // Range key, a.k.a. sort key
-	
-	Msg       string   `dynamo:"Message"`
-	Count     int      `dynamo:",omitempty"`
-	Friends   []string `dynamo:",set"` // Sets 
-	SecretKey string   `dynamo:"-"`    // Ignored
-	Children  []any    // Lists
+
+	Msg       string              `dynamo:"Message"`
+	Count     int                 `dynamo:",omitempty"`
+	Friends   []string            `dynamo:",set"` // Sets
+	Set       map[string]struct{} `dynamo:",set"` // Map sets, too!
+	SecretKey string              `dynamo:"-"`    // Ignored
+	Children  []any               // Lists
 }
+
 
 func main() {
 	db := dynamo.New(session.New(), &aws.Config{Region: aws.String("us-west-2")})
@@ -42,9 +44,9 @@ func main() {
 	// get the same item 
 	var result widget
 	err = table.Get("UserID", w.UserID).
-			Range("Time", dynamo.Equal, w.Time).
-			Filter("'Count' = ? AND $ = ?", w.Count, "Message", w.Msg). // placeholders in expressions
-			One(&result)
+		Range("Time", dynamo.Equal, w.Time).
+		Filter("'Count' = ? AND $ = ?", w.Count, "Message", w.Msg). // placeholders in expressions
+		One(&result)
 	
 	// get all items
 	var results []widget

@@ -116,24 +116,64 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 		}
 		return nil
 	case reflect.Map:
-		if av.M == nil {
-			return errors.New("dynamo: unmarshal map: expected M to be non-nil")
-		}
-
 		if rv.IsNil() {
 			// TODO: maybe always remake this?
 			// I think the JSON library doesn't...
 			rv.Set(reflect.MakeMap(rv.Type()))
 		}
 
-		// TODO: this is probably slow
-		for k, v := range av.M {
-			innerRV := reflect.New(rv.Type().Elem())
-			if err := unmarshalReflect(v, innerRV.Elem()); err != nil {
-				return err
+		var truthy reflect.Value
+		switch {
+		case rv.Type().Elem().Kind() == reflect.Bool:
+			truthy = reflect.ValueOf(true)
+		case rv.Type().Elem() == emptyStructType:
+			truthy = reflect.ValueOf(struct{}{})
+		default:
+			if av.M == nil {
+				return fmt.Errorf("dynamo: unmarshal map set: value type must be struct{} or bool, got %v", rv.Type())
 			}
-			rv.SetMapIndex(reflect.ValueOf(k), innerRV.Elem())
 		}
+
+		switch {
+		case av.M != nil:
+			// TODO: this is probably slow
+			for k, v := range av.M {
+				innerRV := reflect.New(rv.Type().Elem())
+				if err := unmarshalReflect(v, innerRV.Elem()); err != nil {
+					return err
+				}
+				rv.SetMapIndex(reflect.ValueOf(k), innerRV.Elem())
+			}
+			return nil
+		case av.SS != nil:
+			for _, s := range av.SS {
+				rv.SetMapIndex(reflect.ValueOf(*s), truthy)
+			}
+			return nil
+		case av.NS != nil:
+			for _, n := range av.NS {
+				key := reflect.New(rv.Type().Key()).Elem()
+				if err := unmarshalReflect(&dynamodb.AttributeValue{N: n}, key); err != nil {
+					return nil
+				}
+				rv.SetMapIndex(key, truthy)
+			}
+			return nil
+		case av.BS != nil:
+			for _, bb := range av.BS {
+				key := reflect.New(rv.Type().Key()).Elem()
+				for i, b := range bb {
+					key.Index(i).Set(reflect.ValueOf(b))
+				}
+				rv.SetMapIndex(key, truthy)
+			}
+			return nil
+		}
+
+		if av.M == nil {
+			return errors.New("dynamo: unmarshal map: expected M to be non-nil")
+		}
+
 		return nil
 	case reflect.Slice:
 		return unmarshalSlice(av, rv)

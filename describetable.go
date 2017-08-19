@@ -78,6 +78,101 @@ type Index struct {
 	ProjectionAttribs []string
 }
 
+func newDescription(table *dynamodb.TableDescription) Description {
+	desc := Description{
+		Name: *table.TableName,
+	}
+
+	if table.TableArn != nil {
+		desc.ARN = *table.TableArn
+	}
+	if table.TableStatus != nil {
+		desc.Status = Status(*table.TableStatus)
+	}
+	if table.CreationDateTime != nil {
+		desc.Created = *table.CreationDateTime
+	}
+
+	desc.HashKey, desc.RangeKey = schemaKeys(table.KeySchema)
+
+	if table.ProvisionedThroughput != nil {
+		desc.Throughput = newThroughput(table.ProvisionedThroughput)
+	}
+
+	if table.ItemCount != nil {
+		desc.Items = *table.ItemCount
+	}
+	if table.TableSizeBytes != nil {
+		desc.Size = *table.TableSizeBytes
+	}
+
+	for _, index := range table.GlobalSecondaryIndexes {
+		idx := Index{
+			Name:           *index.IndexName,
+			ARN:            *index.IndexArn,
+			Status:         Status(*index.IndexStatus),
+			Throughput:     newThroughput(index.ProvisionedThroughput),
+			ProjectionType: IndexProjection(*index.Projection.ProjectionType),
+		}
+		if index.Backfilling != nil {
+			idx.Backfilling = *index.Backfilling
+		}
+		idx.HashKey, idx.RangeKey = schemaKeys(index.KeySchema)
+		if index.ItemCount != nil {
+			idx.Items = *index.ItemCount
+		}
+		if index.IndexSizeBytes != nil {
+			idx.Size = *index.IndexSizeBytes
+		}
+		var attribs []string
+		for _, nka := range index.Projection.NonKeyAttributes {
+			attribs = append(attribs, *nka)
+		}
+		idx.ProjectionAttribs = attribs
+		desc.GSI = append(desc.GSI, idx)
+	}
+	for _, index := range table.LocalSecondaryIndexes {
+		idx := Index{
+			Name:           *index.IndexName,
+			ARN:            *index.IndexArn,
+			Status:         ActiveStatus, // local secondary index is always active (technically, it has no status)
+			Local:          true,
+			Throughput:     desc.Throughput, // has the same throughput as the table
+			ProjectionType: IndexProjection(*index.Projection.ProjectionType),
+		}
+		idx.HashKey, idx.RangeKey = schemaKeys(index.KeySchema)
+		if index.ItemCount != nil {
+			idx.Items = *index.ItemCount
+		}
+		if index.IndexSizeBytes != nil {
+			idx.Size = *index.IndexSizeBytes
+		}
+		var attribs []string
+		for _, nka := range index.Projection.NonKeyAttributes {
+			attribs = append(attribs, *nka)
+		}
+		idx.ProjectionAttribs = attribs
+		desc.LSI = append(desc.LSI, idx)
+	}
+
+	if table.StreamSpecification != nil {
+		if table.StreamSpecification.StreamEnabled != nil {
+			desc.StreamEnabled = *table.StreamSpecification.StreamEnabled
+		}
+		if table.StreamSpecification.StreamViewType != nil {
+			desc.StreamView = StreamView(*table.StreamSpecification.StreamViewType)
+		}
+	}
+	if table.LatestStreamArn != nil {
+		desc.LatestStreamARN = *table.LatestStreamArn
+	}
+	if table.LatestStreamLabel != nil {
+		desc.LatestStreamLabel = *table.LatestStreamLabel
+	}
+
+	return desc
+}
+
 // DescribeTable is a request for information about a table and its indexes.
 // See: http://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_DescribeTable.html
 type DescribeTable struct {
@@ -108,98 +203,7 @@ func (dt *DescribeTable) RunWithContext(ctx aws.Context) (Description, error) {
 		return Description{}, err
 	}
 
-	desc := Description{
-		Name: *result.Table.TableName,
-	}
-
-	if result.Table.TableArn != nil {
-		desc.ARN = *result.Table.TableArn
-	}
-	if result.Table.TableStatus != nil {
-		desc.Status = Status(*result.Table.TableStatus)
-	}
-	if result.Table.CreationDateTime != nil {
-		desc.Created = *result.Table.CreationDateTime
-	}
-
-	desc.HashKey, desc.RangeKey = schemaKeys(result.Table.KeySchema)
-
-	if result.Table.ProvisionedThroughput != nil {
-		desc.Throughput = newThroughput(result.Table.ProvisionedThroughput)
-	}
-
-	if result.Table.ItemCount != nil {
-		desc.Items = *result.Table.ItemCount
-	}
-	if result.Table.TableSizeBytes != nil {
-		desc.Size = *result.Table.TableSizeBytes
-	}
-
-	for _, index := range result.Table.GlobalSecondaryIndexes {
-		idx := Index{
-			Name:           *index.IndexName,
-			ARN:            *index.IndexArn,
-			Status:         Status(*index.IndexStatus),
-			Throughput:     newThroughput(index.ProvisionedThroughput),
-			ProjectionType: IndexProjection(*index.Projection.ProjectionType),
-		}
-		if index.Backfilling != nil {
-			idx.Backfilling = *index.Backfilling
-		}
-		idx.HashKey, idx.RangeKey = schemaKeys(index.KeySchema)
-		if index.ItemCount != nil {
-			idx.Items = *index.ItemCount
-		}
-		if index.IndexSizeBytes != nil {
-			idx.Size = *index.IndexSizeBytes
-		}
-		var attribs []string
-		for _, nka := range index.Projection.NonKeyAttributes {
-			attribs = append(attribs, *nka)
-		}
-		idx.ProjectionAttribs = attribs
-		desc.GSI = append(desc.GSI, idx)
-	}
-	for _, index := range result.Table.LocalSecondaryIndexes {
-		idx := Index{
-			Name:           *index.IndexName,
-			ARN:            *index.IndexArn,
-			Status:         ActiveStatus, // local secondary index is always active (technically, it has no status)
-			Local:          true,
-			Throughput:     desc.Throughput, // has the same throughput as the table
-			ProjectionType: IndexProjection(*index.Projection.ProjectionType),
-		}
-		idx.HashKey, idx.RangeKey = schemaKeys(index.KeySchema)
-		if index.ItemCount != nil {
-			idx.Items = *index.ItemCount
-		}
-		if index.IndexSizeBytes != nil {
-			idx.Size = *index.IndexSizeBytes
-		}
-		var attribs []string
-		for _, nka := range index.Projection.NonKeyAttributes {
-			attribs = append(attribs, *nka)
-		}
-		idx.ProjectionAttribs = attribs
-		desc.LSI = append(desc.LSI, idx)
-	}
-
-	if result.Table.StreamSpecification != nil {
-		if result.Table.StreamSpecification.StreamEnabled != nil {
-			desc.StreamEnabled = *result.Table.StreamSpecification.StreamEnabled
-		}
-		if result.Table.StreamSpecification.StreamViewType != nil {
-			desc.StreamView = StreamView(*result.Table.StreamSpecification.StreamViewType)
-		}
-	}
-	if result.Table.LatestStreamArn != nil {
-		desc.LatestStreamARN = *result.Table.LatestStreamArn
-	}
-	if result.Table.LatestStreamLabel != nil {
-		desc.LatestStreamLabel = *result.Table.LatestStreamLabel
-	}
-
-	return desc, nil
+	return newDescription(result.Table), nil
 }
 
 func (dt *DescribeTable) input() *dynamodb.DescribeTableInput {

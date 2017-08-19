@@ -145,6 +145,14 @@ func marshalReflect(rv reflect.Value, special string) (*dynamodb.AttributeValue,
 		}
 		return &dynamodb.AttributeValue{S: aws.String(s)}, nil
 	case reflect.Map:
+		if special == "set" {
+			// sets can't be empty
+			if rv.Len() == 0 {
+				return nil, nil
+			}
+			return marshalSet(rv)
+		}
+
 		if rv.Type().Key().Kind() != reflect.String {
 			return nil, fmt.Errorf("dynamo marshal: map key must be string: %T", rv.Interface())
 		}
@@ -231,43 +239,104 @@ func marshalSet(rv reflect.Value) (*dynamodb.AttributeValue, error) {
 		return &dynamodb.AttributeValue{SS: ss}, nil
 	}
 
-	switch rv.Type().Elem().Kind() {
-	case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
-		ns := make([]*string, 0, rv.Len())
-		for i := 0; i < rv.Len(); i++ {
-			ns = append(ns, aws.String(strconv.FormatInt(rv.Index(i).Int(), 10)))
-		}
-		return &dynamodb.AttributeValue{NS: ns}, nil
-	case reflect.Uint, reflect.Uint64, reflect.Uint32, reflect.Uint16, reflect.Uint8:
-		ns := make([]*string, 0, rv.Len())
-		for i := 0; i < rv.Len(); i++ {
-			ns = append(ns, aws.String(strconv.FormatUint(rv.Index(i).Uint(), 10)))
-		}
-		return &dynamodb.AttributeValue{NS: ns}, nil
-	case reflect.Float32, reflect.Float64:
-		ns := make([]*string, 0, rv.Len())
-		for i := 0; i < rv.Len(); i++ {
-			ns = append(ns, aws.String(strconv.FormatFloat(rv.Index(i).Float(), 'f', -1, 64)))
-		}
-		return &dynamodb.AttributeValue{NS: ns}, nil
-	case reflect.String:
-		ss := make([]*string, 0, rv.Len())
-		for i := 0; i < rv.Len(); i++ {
-			ss = append(ss, aws.String(rv.Index(i).String()))
-		}
-		return &dynamodb.AttributeValue{SS: ss}, nil
+	switch rv.Type().Kind() {
 	case reflect.Slice:
-		if rv.Type().Elem().Elem().Kind() == reflect.Uint8 {
-			bs := make([][]byte, 0, rv.Len())
+		switch rv.Type().Elem().Kind() {
+		case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
+			ns := make([]*string, 0, rv.Len())
 			for i := 0; i < rv.Len(); i++ {
-				bs = append(bs, rv.Index(i).Bytes())
+				ns = append(ns, aws.String(strconv.FormatInt(rv.Index(i).Int(), 10)))
 			}
-			return &dynamodb.AttributeValue{BS: bs}, nil
+			return &dynamodb.AttributeValue{NS: ns}, nil
+		case reflect.Uint, reflect.Uint64, reflect.Uint32, reflect.Uint16, reflect.Uint8:
+			ns := make([]*string, 0, rv.Len())
+			for i := 0; i < rv.Len(); i++ {
+				ns = append(ns, aws.String(strconv.FormatUint(rv.Index(i).Uint(), 10)))
+			}
+			return &dynamodb.AttributeValue{NS: ns}, nil
+		case reflect.Float32, reflect.Float64:
+			ns := make([]*string, 0, rv.Len())
+			for i := 0; i < rv.Len(); i++ {
+				ns = append(ns, aws.String(strconv.FormatFloat(rv.Index(i).Float(), 'f', -1, 64)))
+			}
+			return &dynamodb.AttributeValue{NS: ns}, nil
+		case reflect.String:
+			ss := make([]*string, 0, rv.Len())
+			for i := 0; i < rv.Len(); i++ {
+				ss = append(ss, aws.String(rv.Index(i).String()))
+			}
+			return &dynamodb.AttributeValue{SS: ss}, nil
+		case reflect.Slice:
+			if rv.Type().Elem().Elem().Kind() == reflect.Uint8 {
+				bs := make([][]byte, 0, rv.Len())
+				for i := 0; i < rv.Len(); i++ {
+					bs = append(bs, rv.Index(i).Bytes())
+				}
+				return &dynamodb.AttributeValue{BS: bs}, nil
+			}
+		}
+	case reflect.Map:
+		useBool := rv.Type().Elem().Kind() == reflect.Bool
+		if !useBool && rv.Type().Elem() != emptyStructType {
+			return nil, fmt.Errorf("dynamo: cannot marshal type %v into a set", rv.Type())
+		}
+
+		switch rv.Type().Key().Kind() {
+		case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
+			ns := make([]*string, 0, rv.Len())
+			for _, k := range rv.MapKeys() {
+				if !useBool || rv.MapIndex(k).Bool() {
+					ns = append(ns, aws.String(strconv.FormatInt(k.Int(), 10)))
+				}
+			}
+			return &dynamodb.AttributeValue{NS: ns}, nil
+		case reflect.Uint, reflect.Uint64, reflect.Uint32, reflect.Uint16, reflect.Uint8:
+			ns := make([]*string, 0, rv.Len())
+			for _, k := range rv.MapKeys() {
+				if !useBool || rv.MapIndex(k).Bool() {
+					ns = append(ns, aws.String(strconv.FormatUint(k.Uint(), 10)))
+				}
+			}
+			return &dynamodb.AttributeValue{NS: ns}, nil
+		case reflect.Float32, reflect.Float64:
+			ns := make([]*string, 0, rv.Len())
+			for _, k := range rv.MapKeys() {
+				if !useBool || rv.MapIndex(k).Bool() {
+					ns = append(ns, aws.String(strconv.FormatFloat(k.Float(), 'f', -1, 64)))
+				}
+			}
+			return &dynamodb.AttributeValue{NS: ns}, nil
+		case reflect.String:
+			ss := make([]*string, 0, rv.Len())
+			for _, k := range rv.MapKeys() {
+				if !useBool || rv.MapIndex(k).Bool() {
+					ss = append(ss, aws.String(k.String()))
+				}
+			}
+			return &dynamodb.AttributeValue{SS: ss}, nil
+		case reflect.Array:
+			if rv.Type().Key().Elem().Kind() == reflect.Uint8 {
+				bs := make([][]byte, 0, rv.Len())
+				for _, k := range rv.MapKeys() {
+					if useBool && !rv.MapIndex(k).Bool() {
+						continue
+					}
+					// TODO: is there a better way to turn [n]byte into []byte with reflection?
+					key := make([]byte, k.Len())
+					for i := 0; i < k.Len(); i++ {
+						key[i] = (byte)(k.Index(i).Uint())
+					}
+					bs = append(bs, key)
+				}
+				return &dynamodb.AttributeValue{BS: bs}, nil
+			}
 		}
 	}
 
 	return nil, fmt.Errorf("dynamo marshal: unknown type for sets %s", rv.Type().String())
 }
+
+var emptyStructType = reflect.TypeOf(struct{}{})
 
 func marshalSlice(values []interface{}) ([]*dynamodb.AttributeValue, error) {
 	avs := make([]*dynamodb.AttributeValue, 0, len(values))

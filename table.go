@@ -3,7 +3,20 @@ package dynamo
 import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/jinzhu/copier"
+)
+
+// Status is an enumeration of table and index statuses.
+type Status string
+
+const (
+	// The table or index is ready for use.
+	ActiveStatus Status = "ACTIVE"
+	// The table or index is being created.
+	CreatingStatus = "CREATING"
+	// The table or index is being updated.
+	UpdatingStatus = "UPDATING"
+	// The table or index is being deleted.
+	DeletingStatus = "DELETING"
 )
 
 // Table is a DynamoDB table.
@@ -43,6 +56,7 @@ func (dt *DeleteTable) Run() error {
 	return dt.RunWithContext(ctx)
 }
 
+// RunWithContext executes this request and deletes the table.
 func (dt *DeleteTable) RunWithContext(ctx aws.Context) error {
 	input := dt.input()
 	return retry(ctx, func() error {
@@ -54,42 +68,6 @@ func (dt *DeleteTable) RunWithContext(ctx aws.Context) error {
 func (dt *DeleteTable) input() *dynamodb.DeleteTableInput {
 	name := dt.table.Name()
 	return &dynamodb.DeleteTableInput{
-		TableName: &name,
-	}
-}
-
-type DescribeTable struct {
-	table Table
-}
-
-type DescribeTableDescription struct {
-	dynamodb.DescribeTableOutput
-}
-
-func (table Table) DescribeTable() *DescribeTable {
-	return &DescribeTable{table: table}
-}
-
-// Run executes this request and describe the table.
-func (dt *DescribeTable) Run() (DescribeTableDescription, error) {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return dt.RunWithContext(ctx)
-}
-
-func (dt *DescribeTable) RunWithContext(ctx aws.Context) (DescribeTableDescription, error) {
-	input := dt.input()
-	result, err := dt.table.db.client.DescribeTableWithContext(ctx, input)
-
-	var tableDescription = DescribeTableDescription{}
-	copier.Copy(&tableDescription, &result)
-
-	return tableDescription, err
-}
-
-func (dt *DescribeTable) input() *dynamodb.DescribeTableInput {
-	name := dt.table.Name()
-	return &dynamodb.DescribeTableInput{
 		TableName: &name,
 	}
 }
@@ -122,7 +100,7 @@ func (dt *UpdateTable) RunWithContext(ctx aws.Context, r int64, w int64) (Update
 	result, err := dt.table.db.client.UpdateTableWithContext(ctx, input)
 
 	var tableDescription = UpdateTableDescription{}
-	copier.Copy(&tableDescription, &result)
+	// copier.Copy(&tableDescription, &result)
 
 	return tableDescription, err
 }

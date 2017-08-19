@@ -25,6 +25,9 @@ func _TestUpdateTable(t *testing.T) {
 			Write: 1,
 		},
 	}).Run()
+
+	// desc, err := table.UpdateTable().DeleteIndex("test123").Run()
+
 	// spew.Dump(desc, err)
 	// desc, err := table.UpdateTable().Provision(2, 1).Run()
 	if err != nil {

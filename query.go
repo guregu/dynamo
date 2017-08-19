@@ -47,7 +47,7 @@ var (
 // Operator is an operation to apply in key comparisons.
 type Operator *string
 
-// Operators used for comparing against the range key.
+// Operators used for comparing against the range key in queries.
 var (
 	Equal          = Operator(aws.String("EQ"))
 	NotEqual       = Operator(aws.String("NE"))

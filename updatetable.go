@@ -21,8 +21,6 @@ type UpdateTable struct {
 	deleteIdx []string
 	ads       []*dynamodb.AttributeDefinition
 
-	subber
-
 	err error
 }
 

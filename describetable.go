@@ -117,11 +117,14 @@ func newDescription(table *dynamodb.TableDescription) Description {
 
 	for _, index := range table.GlobalSecondaryIndexes {
 		idx := Index{
-			Name:           *index.IndexName,
-			ARN:            *index.IndexArn,
-			Status:         Status(*index.IndexStatus),
-			Throughput:     newThroughput(index.ProvisionedThroughput),
-			ProjectionType: IndexProjection(*index.Projection.ProjectionType),
+			Name:       *index.IndexName,
+			ARN:        *index.IndexArn,
+			Status:     Status(*index.IndexStatus),
+			Throughput: newThroughput(index.ProvisionedThroughput),
+		}
+		if index.Projection != nil && index.Projection.ProjectionType != nil {
+			idx.ProjectionType = IndexProjection(*index.Projection.ProjectionType)
+			idx.ProjectionAttribs = aws.StringValueSlice(index.Projection.NonKeyAttributes)
 		}
 		if index.Backfilling != nil {
 			idx.Backfilling = *index.Backfilling
@@ -135,21 +138,19 @@ func newDescription(table *dynamodb.TableDescription) Description {
 		if index.IndexSizeBytes != nil {
 			idx.Size = *index.IndexSizeBytes
 		}
-		var attribs []string
-		for _, nka := range index.Projection.NonKeyAttributes {
-			attribs = append(attribs, *nka)
-		}
-		idx.ProjectionAttribs = attribs
 		desc.GSI = append(desc.GSI, idx)
 	}
 	for _, index := range table.LocalSecondaryIndexes {
 		idx := Index{
-			Name:           *index.IndexName,
-			ARN:            *index.IndexArn,
-			Status:         ActiveStatus, // local secondary index is always active (technically, it has no status)
-			Local:          true,
-			Throughput:     desc.Throughput, // has the same throughput as the table
-			ProjectionType: IndexProjection(*index.Projection.ProjectionType),
+			Name:       *index.IndexName,
+			ARN:        *index.IndexArn,
+			Status:     ActiveStatus, // local secondary index is always active (technically, it has no status)
+			Local:      true,
+			Throughput: desc.Throughput, // has the same throughput as the table
+		}
+		if index.Projection != nil && index.Projection.ProjectionType != nil {
+			idx.ProjectionType = IndexProjection(*index.Projection.ProjectionType)
+			idx.ProjectionAttribs = aws.StringValueSlice(index.Projection.NonKeyAttributes)
 		}
 		idx.HashKey, idx.RangeKey = schemaKeys(index.KeySchema)
 		idx.HashKeyType = lookupADType(table.AttributeDefinitions, idx.HashKey)
@@ -160,11 +161,6 @@ func newDescription(table *dynamodb.TableDescription) Description {
 		if index.IndexSizeBytes != nil {
 			idx.Size = *index.IndexSizeBytes
 		}
-		var attribs []string
-		for _, nka := range index.Projection.NonKeyAttributes {
-			attribs = append(attribs, *nka)
-		}
-		idx.ProjectionAttribs = attribs
 		desc.LSI = append(desc.LSI, idx)
 	}
 
@@ -228,6 +224,10 @@ func (dt *DescribeTable) input() *dynamodb.DescribeTableInput {
 }
 
 func newThroughput(td *dynamodb.ProvisionedThroughputDescription) Throughput {
+	if td == nil {
+		return Throughput{}
+	}
+
 	thru := Throughput{
 		Read:  *td.ReadCapacityUnits,
 		Write: *td.WriteCapacityUnits,

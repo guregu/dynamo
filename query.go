@@ -30,7 +30,7 @@ type Query struct {
 	consistent  bool
 	limit       int64
 	searchLimit int64
-	order       Order
+	order       *Order
 
 	subber
 
@@ -45,37 +45,27 @@ var (
 )
 
 // Operator is an operation to apply in key comparisons.
-type Operator *string
+type Operator string
 
 // Operators used for comparing against the range key in queries.
-var (
-	Equal          = Operator(aws.String("EQ"))
-	NotEqual       = Operator(aws.String("NE"))
-	Less           = Operator(aws.String("LT"))
-	LessOrEqual    = Operator(aws.String("LE"))
-	Greater        = Operator(aws.String("GT"))
-	GreaterOrEqual = Operator(aws.String("GE"))
-	BeginsWith     = Operator(aws.String("BEGINS_WITH"))
-	Between        = Operator(aws.String("BETWEEN"))
+const (
+	Equal          Operator = "EQ"
+	NotEqual                = "NE"
+	Less                    = "LT"
+	LessOrEqual             = "LE"
+	Greater                 = "GT"
+	GreaterOrEqual          = "GE"
+	BeginsWith              = "BEGINS_WITH"
+	Between                 = "BETWEEN"
 )
 
-// These can't be used in key comparions, so disable them for now.
-// We will probably never need these.
-// var (
-// 	IsNull      Operator = Operator(aws.String("NULL"))
-// 	NotNull              = Operator(aws.String("NOT_NULL"))
-// 	Contains             = Operator(aws.String("CONTAINS"))
-// 	NotContains          = Operator(aws.String("NOT_CONTAINS"))
-// 	In                   = Operator(aws.String("IN"))
-// )
-
 // Order is used for specifying the order of results.
-type Order *bool
+type Order bool
 
 // Orders for sorting results.
-var (
-	Ascending  = Order(aws.Bool(true))  // ScanIndexForward = true
-	Descending = Order(aws.Bool(false)) // ScanIndexForward = false
+const (
+	Ascending  Order = true  // ScanIndexForward = true
+	Descending       = false // ScanIndexForward = false
 )
 
 var (
@@ -167,7 +157,7 @@ func (q *Query) SearchLimit(limit int64) *Query {
 // Order specifies the desired result order.
 // Requires a range key (a.k.a. partition key) to be specified.
 func (q *Query) Order(order Order) *Query {
-	q.order = order
+	q.order = &order
 	return q
 }
 
@@ -382,7 +372,7 @@ func (q *Query) Iter() Iter {
 // can we use the get item API?
 func (q *Query) canGetItem() bool {
 	switch {
-	case q.rangeOp != nil && q.rangeOp != Equal:
+	case q.rangeOp != "" && q.rangeOp != Equal:
 		return false
 	case q.index != "":
 		return false
@@ -422,7 +412,7 @@ func (q *Query) queryInput() *dynamodb.QueryInput {
 		req.IndexName = &q.index
 	}
 	if q.order != nil {
-		req.ScanIndexForward = q.order
+		req.ScanIndexForward = (*bool)(q.order)
 	}
 	return req
 }
@@ -431,13 +421,13 @@ func (q *Query) keyConditions() map[string]*dynamodb.Condition {
 	conds := map[string]*dynamodb.Condition{
 		q.hashKey: &dynamodb.Condition{
 			AttributeValueList: []*dynamodb.AttributeValue{q.hashValue},
-			ComparisonOperator: Equal,
+			ComparisonOperator: aws.String(string(Equal)),
 		},
 	}
-	if q.rangeKey != "" && q.rangeOp != nil {
+	if q.rangeKey != "" && q.rangeOp != "" {
 		conds[q.rangeKey] = &dynamodb.Condition{
 			AttributeValueList: q.rangeValues,
-			ComparisonOperator: q.rangeOp,
+			ComparisonOperator: aws.String(string(q.rangeOp)),
 		}
 	}
 	return conds

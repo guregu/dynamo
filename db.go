@@ -53,7 +53,6 @@ func (lt *ListTables) AllWithContext(ctx aws.Context) ([]string, error) {
 
 type ltIter struct {
 	lt     *ListTables
-	next   string
 	result *dynamodb.ListTablesOutput
 	idx    int
 	err    error

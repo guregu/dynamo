@@ -2,6 +2,7 @@ package dynamo
 
 import (
 	"os"
+	"testing"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -39,4 +40,28 @@ func isConditionalCheckErr(err error) bool {
 		return ae.Code() == "ConditionalCheckFailedException"
 	}
 	return false
+}
+
+func TestListTables(t *testing.T) {
+	if testDB == nil {
+		t.Skip(offlineSkipMsg)
+	}
+
+	tables, err := testDB.ListTables().All()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	found := false
+	for _, t := range tables {
+		if t == testTable {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Error("couldn't find testTable", testTable, "in:", tables)
+	}
 }

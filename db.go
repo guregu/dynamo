@@ -109,8 +109,8 @@ func (itr *ltIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 		return false
 	}
 
-	itr.idx = 0
-	*out.(*string) = *itr.result.TableNames[itr.idx]
+	*out.(*string) = *itr.result.TableNames[0]
+	itr.idx = 1
 	return true
 }
 

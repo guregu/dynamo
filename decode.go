@@ -319,6 +319,7 @@ func unmarshalItem(item map[string]*dynamodb.AttributeValue, out interface{}) er
 		return unmarshalItem(item, rv.Elem().Interface())
 	case reflect.Struct:
 		var err error
+		rv.Elem().Set(reflect.Zero(rv.Type().Elem()))
 		fields := fieldsInStruct(rv.Elem())
 		for name, fv := range fields {
 			if av, ok := item[name]; ok {

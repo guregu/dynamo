@@ -71,11 +71,17 @@ func (u *Update) Set(path string, value interface{}) *Update {
 
 // SetSet changes a set at the given path to the given value.
 // SetSet marshals value to a string set, number set, or binary set.
+// If value is of zero length or nil, path will be removed instead.
 // Paths that are reserved words are automatically escaped.
 // Use single quotes to escape complex values like 'User'.'Count'.
 func (u *Update) SetSet(path string, value interface{}) *Update {
 	v, err := marshal(value, "set")
+	if v == nil && err == nil {
+		// empty set
+		return u.Remove(path)
+	}
 	u.setError(err)
+
 	path, err = u.escape(path)
 	u.setError(err)
 	expr, err := u.subExpr("🝕 = ?", path, v)

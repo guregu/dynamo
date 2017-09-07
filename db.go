@@ -7,17 +7,18 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
 )
 
 // DB is a DynamoDB client.
 type DB struct {
-	Client *dynamodb.DynamoDB
+	Client dynamodbiface.DynamoDBAPI
 }
 
 // New creates a new client with the given configuration.
 func New(p client.ConfigProvider, cfgs ...*aws.Config) *DB {
 	db := &DB{
-		dynamodb.New(p, cfgs...),
+		Client: dynamodb.New(p, cfgs...),
 	}
 	return db
 }

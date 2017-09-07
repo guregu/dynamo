@@ -165,7 +165,7 @@ func (itr *scanIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 
 	itr.err = retry(ctx, func() error {
 		var err error
-		itr.output, err = itr.scan.table.db.client.ScanWithContext(ctx, itr.input)
+		itr.output, err = itr.scan.table.db.Client.ScanWithContext(ctx, itr.input)
 		return err
 	})
 

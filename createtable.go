@@ -144,7 +144,7 @@ func (ct *CreateTable) RunWithContext(ctx aws.Context) error {
 
 	input := ct.input()
 	return retry(ctx, func() error {
-		_, err := ct.db.client.CreateTableWithContext(ctx, input)
+		_, err := ct.db.Client.CreateTableWithContext(ctx, input)
 		return err
 	})
 }

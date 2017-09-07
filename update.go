@@ -258,7 +258,7 @@ func (u *Update) run(ctx aws.Context) (*dynamodb.UpdateItemOutput, error) {
 	var output *dynamodb.UpdateItemOutput
 	err := retry(ctx, func() error {
 		var err error
-		output, err = u.table.db.client.UpdateItemWithContext(ctx, input)
+		output, err = u.table.db.Client.UpdateItemWithContext(ctx, input)
 		return err
 	})
 	return output, err

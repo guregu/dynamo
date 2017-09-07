@@ -7,17 +7,18 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
 )
 
 // DB is a DynamoDB client.
 type DB struct {
-	client *dynamodb.DynamoDB
+	Client dynamodbiface.DynamoDBAPI
 }
 
 // New creates a new client with the given configuration.
 func New(p client.ConfigProvider, cfgs ...*aws.Config) *DB {
 	db := &DB{
-		dynamodb.New(p, cfgs...),
+		Client: dynamodb.New(p, cfgs...),
 	}
 	return db
 }
@@ -94,7 +95,7 @@ func (itr *ltIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 	}
 
 	itr.err = retry(ctx, func() error {
-		res, err := itr.lt.db.client.ListTables(itr.input())
+		res, err := itr.lt.db.Client.ListTables(itr.input())
 		if err != nil {
 			return err
 		}

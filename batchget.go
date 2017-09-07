@@ -219,7 +219,7 @@ func (itr *bgIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 
 	itr.err = retry(ctx, func() error {
 		var err error
-		itr.output, err = itr.bg.batch.table.db.client.BatchGetItemWithContext(ctx, itr.input)
+		itr.output, err = itr.bg.batch.table.db.Client.BatchGetItemWithContext(ctx, itr.input)
 		return err
 	})
 

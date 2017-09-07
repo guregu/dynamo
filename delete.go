@@ -99,7 +99,7 @@ func (d *Delete) run(ctx aws.Context) (*dynamodb.DeleteItemOutput, error) {
 	var output *dynamodb.DeleteItemOutput
 	err := retry(ctx, func() error {
 		var err error
-		output, err = d.table.db.client.DeleteItemWithContext(ctx, input)
+		output, err = d.table.db.Client.DeleteItemWithContext(ctx, input)
 		return err
 	})
 	return output, err

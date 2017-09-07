@@ -60,7 +60,7 @@ func (dt *DeleteTable) Run() error {
 func (dt *DeleteTable) RunWithContext(ctx aws.Context) error {
 	input := dt.input()
 	return retry(ctx, func() error {
-		_, err := dt.table.db.client.DeleteTableWithContext(ctx, input)
+		_, err := dt.table.db.Client.DeleteTableWithContext(ctx, input)
 		return err
 	})
 }

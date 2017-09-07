@@ -206,7 +206,7 @@ func (dt *DescribeTable) RunWithContext(ctx aws.Context) (Description, error) {
 	var result *dynamodb.DescribeTableOutput
 	err := retry(ctx, func() error {
 		var err error
-		result, err = dt.table.db.client.DescribeTableWithContext(ctx, input)
+		result, err = dt.table.db.Client.DescribeTableWithContext(ctx, input)
 		return err
 	})
 	if err != nil {

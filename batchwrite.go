@@ -85,7 +85,7 @@ func (bw *BatchWrite) RunWithContext(ctx aws.Context) (wrote int, err error) {
 			req := bw.input(ops)
 			err := retry(ctx, func() error {
 				var err error
-				res, err = bw.batch.table.db.client.BatchWriteItemWithContext(ctx, req)
+				res, err = bw.batch.table.db.Client.BatchWriteItemWithContext(ctx, req)
 				return err
 			})
 			if err != nil {

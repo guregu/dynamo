@@ -181,7 +181,7 @@ func (q *Query) OneWithContext(ctx aws.Context, out interface{}) error {
 		var res *dynamodb.GetItemOutput
 		err := retry(ctx, func() error {
 			var err error
-			res, err = q.table.db.client.GetItemWithContext(ctx, req)
+			res, err = q.table.db.Client.GetItemWithContext(ctx, req)
 			if err != nil {
 				return err
 			}
@@ -203,7 +203,7 @@ func (q *Query) OneWithContext(ctx aws.Context, out interface{}) error {
 	var res *dynamodb.QueryOutput
 	err := retry(ctx, func() error {
 		var err error
-		res, err = q.table.db.client.QueryWithContext(ctx, req)
+		res, err = q.table.db.Client.QueryWithContext(ctx, req)
 		if err != nil {
 			return err
 		}
@@ -246,7 +246,7 @@ func (q *Query) CountWithContext(ctx aws.Context) (int64, error) {
 
 		err := retry(ctx, func() error {
 			var err error
-			res, err = q.table.db.client.QueryWithContext(ctx, req)
+			res, err = q.table.db.Client.QueryWithContext(ctx, req)
 			if err != nil {
 				return err
 			}
@@ -326,7 +326,7 @@ func (itr *queryIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 
 	itr.err = retry(ctx, func() error {
 		var err error
-		itr.output, err = itr.query.table.db.client.QueryWithContext(ctx, itr.input)
+		itr.output, err = itr.query.table.db.Client.QueryWithContext(ctx, itr.input)
 		return err
 	})
 

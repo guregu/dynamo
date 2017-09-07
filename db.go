@@ -11,7 +11,7 @@ import (
 
 // DB is a DynamoDB client.
 type DB struct {
-	client *dynamodb.DynamoDB
+	Client *dynamodb.DynamoDB
 }
 
 // New creates a new client with the given configuration.
@@ -94,7 +94,7 @@ func (itr *ltIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 	}
 
 	itr.err = retry(ctx, func() error {
-		res, err := itr.lt.db.client.ListTables(itr.input())
+		res, err := itr.lt.db.Client.ListTables(itr.input())
 		if err != nil {
 			return err
 		}

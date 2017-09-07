@@ -110,7 +110,7 @@ func (ut *UpdateTable) RunWithContext(ctx aws.Context) (Description, error) {
 	var result *dynamodb.UpdateTableOutput
 	err := retry(ctx, func() error {
 		var err error
-		result, err = ut.table.db.client.UpdateTableWithContext(ctx, input)
+		result, err = ut.table.db.Client.UpdateTableWithContext(ctx, input)
 		return err
 	})
 	if err != nil {

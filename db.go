@@ -29,7 +29,7 @@ func NewFromIface(client dynamodbiface.DynamoDBAPI) *DB {
 }
 
 // Client returns this DB's internal client used to make API requests.
-func (db DB) Client() dynamodbiface.DynamoDBAPI {
+func (db *DB) Client() dynamodbiface.DynamoDBAPI {
 	return db.client
 }
 

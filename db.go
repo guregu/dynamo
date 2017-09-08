@@ -7,11 +7,12 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
 )
 
 // DB is a DynamoDB client.
 type DB struct {
-	client *dynamodb.DynamoDB
+	client dynamodbiface.DynamoDBAPI
 }
 
 // New creates a new client with the given configuration.
@@ -20,6 +21,16 @@ func New(p client.ConfigProvider, cfgs ...*aws.Config) *DB {
 		dynamodb.New(p, cfgs...),
 	}
 	return db
+}
+
+// NewFromIface creates a new client with the given interface.
+func NewFromIface(client dynamodbiface.DynamoDBAPI) *DB {
+	return &DB{client}
+}
+
+// Client returns this DB's internal client used to make API requests.
+func (db DB) Client() dynamodbiface.DynamoDBAPI {
+	return db.client
 }
 
 // ListTables is a request to list tables.

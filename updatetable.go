@@ -205,12 +205,7 @@ func createIndexAction(index Index) *dynamodb.CreateGlobalSecondaryIndexAction {
 		},
 	}
 	if index.ProjectionType == IncludeProjection {
-		names := make([]*string, 0, len(index.ProjectionAttribs))
-		for _, n := range index.ProjectionAttribs {
-			n := n
-			names = append(names, &n)
-		}
-		add.Projection.NonKeyAttributes = names
+		add.Projection.NonKeyAttributes = aws.StringSlice(index.ProjectionAttribs)
 	}
 	return add
 }

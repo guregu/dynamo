@@ -4,6 +4,7 @@ import (
 	"encoding"
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -130,6 +131,58 @@ func (ct *CreateTable) Project(index string, projection IndexProjection, include
 	return ct
 }
 
+// Index specifies an index to add to this table.
+func (ct *CreateTable) Index(index Index) *CreateTable {
+	ct.add(index.HashKey, string(index.HashKeyType))
+	ks := []*dynamodb.KeySchemaElement{
+		&dynamodb.KeySchemaElement{
+			AttributeName: &index.HashKey,
+			KeyType:       aws.String(string(index.HashKeyType)),
+		},
+	}
+	if index.RangeKey != "" {
+		ct.add(index.RangeKey, string(index.RangeKeyType))
+		ks = append(ks, &dynamodb.KeySchemaElement{
+			AttributeName: &index.RangeKey,
+			KeyType:       aws.String(string(index.RangeKeyType)),
+		})
+	}
+
+	var proj *dynamodb.Projection
+	if index.ProjectionType != "" {
+		proj = &dynamodb.Projection{
+			ProjectionType: aws.String((string)(index.ProjectionType)),
+		}
+		if index.ProjectionType == IncludeProjection {
+			proj.NonKeyAttributes = aws.StringSlice(index.ProjectionAttribs)
+		}
+	}
+
+	if index.Local {
+		idx := ct.localIndices[index.Name]
+		idx.KeySchema = ks
+		if proj != nil {
+			idx.Projection = proj
+		}
+		ct.localIndices[index.Name] = idx
+		return ct
+	}
+
+	idx := ct.globalIndices[index.Name]
+	idx.KeySchema = ks
+	if index.Throughput.Read != 0 || index.Throughput.Write != 0 {
+		idx.ProvisionedThroughput = &dynamodb.ProvisionedThroughput{
+			ReadCapacityUnits:  &index.Throughput.Read,
+			WriteCapacityUnits: &index.Throughput.Write,
+		}
+	}
+	if proj != nil {
+		idx.Projection = proj
+	}
+	ct.globalIndices[index.Name] = idx
+	return ct
+}
+
 // Run creates this table or returns and error.
 func (ct *CreateTable) Run() error {
 	ctx, cancel := defaultContext()
@@ -185,29 +238,33 @@ func (ct *CreateTable) from(rv reflect.Value) error {
 		}
 
 		// global secondary index
-		if index := field.Tag.Get("index"); index != "" {
-			ct.add(name, typeOf(fv))
-			keyType := keyTypeFromTag(index)
-			indexName := index[:len(index)-len(keyType)-1]
-			idx := ct.globalIndices[indexName]
-			idx.KeySchema = append(idx.KeySchema, &dynamodb.KeySchemaElement{
-				AttributeName: &name,
-				KeyType:       &keyType,
-			})
-			ct.globalIndices[indexName] = idx
+		if gsi, ok := tagLookup(string(field.Tag), "index"); ok {
+			for _, index := range gsi {
+				ct.add(name, typeOf(fv))
+				keyType := keyTypeFromTag(index)
+				indexName := index[:len(index)-len(keyType)-1]
+				idx := ct.globalIndices[indexName]
+				idx.KeySchema = append(idx.KeySchema, &dynamodb.KeySchemaElement{
+					AttributeName: &name,
+					KeyType:       &keyType,
+				})
+				ct.globalIndices[indexName] = idx
+			}
 		}
 
 		// local secondary index
-		if localIndex := field.Tag.Get("localIndex"); localIndex != "" {
-			ct.add(name, typeOf(fv))
-			keyType := keyTypeFromTag(localIndex)
-			indexName := localIndex[:len(localIndex)-len(keyType)-1]
-			idx := ct.localIndices[indexName]
-			idx.KeySchema = append(idx.KeySchema, &dynamodb.KeySchemaElement{
-				AttributeName: &name,
-				KeyType:       &keyType,
-			})
-			ct.localIndices[indexName] = idx
+		if lsi, ok := tagLookup(string(field.Tag), "localIndex"); ok {
+			for _, localIndex := range lsi {
+				ct.add(name, typeOf(fv))
+				keyType := keyTypeFromTag(localIndex)
+				indexName := localIndex[:len(localIndex)-len(keyType)-1]
+				idx := ct.localIndices[indexName]
+				idx.KeySchema = append(idx.KeySchema, &dynamodb.KeySchemaElement{
+					AttributeName: &name,
+					KeyType:       &keyType,
+				})
+				ct.localIndices[indexName] = idx
+			}
 		}
 	}
 
@@ -348,4 +405,57 @@ func sortKeySchemas(schemas []*dynamodb.KeySchemaElement) {
 	if *schemas[0].KeyType == dynamodb.KeyTypeRange {
 		schemas[0], schemas[1] = schemas[1], schemas[0]
 	}
+}
+
+// ripped from the stdlib
+// Copyright 2009 The Go Authors. All rights reserved.
+func tagLookup(tag, key string) (value []string, ok bool) {
+	for tag != "" {
+		// Skip leading space.
+		i := 0
+		for i < len(tag) && tag[i] == ' ' {
+			i++
+		}
+		tag = tag[i:]
+		if tag == "" {
+			break
+		}
+
+		// Scan to colon. A space, a quote or a control character is a syntax error.
+		// Strictly speaking, control chars include the range [0x7f, 0x9f], not just
+		// [0x00, 0x1f], but in practice, we ignore the multi-byte control characters
+		// as it is simpler to inspect the tag's bytes than the tag's runes.
+		i = 0
+		for i < len(tag) && tag[i] > ' ' && tag[i] != ':' && tag[i] != '"' && tag[i] != 0x7f {
+			i++
+		}
+		if i == 0 || i+1 >= len(tag) || tag[i] != ':' || tag[i+1] != '"' {
+			break
+		}
+		name := string(tag[:i])
+		tag = tag[i+1:]
+
+		// Scan quoted string to find value.
+		i = 1
+		for i < len(tag) && tag[i] != '"' {
+			if tag[i] == '\\' {
+				i++
+			}
+			i++
+		}
+		if i >= len(tag) {
+			break
+		}
+		qvalue := string(tag[:i+1])
+		tag = tag[i+1:]
+
+		if key == name {
+			v, err := strconv.Unquote(qvalue)
+			if err != nil {
+				break
+			}
+			value = append(value, v)
+		}
+	}
+	return value, len(value) > 0
 }

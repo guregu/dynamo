@@ -156,7 +156,7 @@ func marshalReflect(rv reflect.Value, special string) (*dynamodb.AttributeValue,
 		if rv.Type().Key().Kind() != reflect.String {
 			return nil, fmt.Errorf("dynamo marshal: map key must be string: %T", rv.Interface())
 		}
-		if rv.Len() == 0 {
+		if rv.IsNil() {
 			return nil, nil
 		}
 

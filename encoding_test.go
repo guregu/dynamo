@@ -63,6 +63,18 @@ var encodingTests = []struct {
 		}},
 	},
 	{
+		name: "empty maps",
+		in: struct {
+			Empty map[string]bool // dont omit
+			Null  map[string]bool // omit
+		}{
+			Empty: map[string]bool{},
+		},
+		out: &dynamodb.AttributeValue{M: map[string]*dynamodb.AttributeValue{
+			"Empty": &dynamodb.AttributeValue{M: map[string]*dynamodb.AttributeValue{}},
+		}},
+	},
+	{
 		name: "struct",
 		in: struct {
 			OK bool

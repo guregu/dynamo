@@ -137,35 +137,39 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 		switch {
 		case av.M != nil:
 			// TODO: this is probably slow
+			kv := reflect.New(rv.Type().Key()).Elem()
 			for k, v := range av.M {
 				innerRV := reflect.New(rv.Type().Elem())
 				if err := unmarshalReflect(v, innerRV.Elem()); err != nil {
 					return err
 				}
-				rv.SetMapIndex(reflect.ValueOf(k), innerRV.Elem())
+				kv.SetString(k)
+				rv.SetMapIndex(kv, innerRV.Elem())
 			}
 			return nil
 		case av.SS != nil:
+			kv := reflect.New(rv.Type().Key()).Elem()
 			for _, s := range av.SS {
-				rv.SetMapIndex(reflect.ValueOf(*s), truthy)
+				kv.SetString(*s)
+				rv.SetMapIndex(kv, truthy)
 			}
 			return nil
 		case av.NS != nil:
+			kv := reflect.New(rv.Type().Key()).Elem()
 			for _, n := range av.NS {
-				key := reflect.New(rv.Type().Key()).Elem()
-				if err := unmarshalReflect(&dynamodb.AttributeValue{N: n}, key); err != nil {
+				if err := unmarshalReflect(&dynamodb.AttributeValue{N: n}, kv); err != nil {
 					return nil
 				}
-				rv.SetMapIndex(key, truthy)
+				rv.SetMapIndex(kv, truthy)
 			}
 			return nil
 		case av.BS != nil:
 			for _, bb := range av.BS {
-				key := reflect.New(rv.Type().Key()).Elem()
+				kv := reflect.New(rv.Type().Key()).Elem()
 				for i, b := range bb {
-					key.Index(i).Set(reflect.ValueOf(b))
+					kv.Index(i).Set(reflect.ValueOf(b))
 				}
-				rv.SetMapIndex(key, truthy)
+				rv.SetMapIndex(kv, truthy)
 			}
 			return nil
 		}

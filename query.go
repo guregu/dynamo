@@ -120,6 +120,17 @@ func (q *Query) Project(paths ...string) *Query {
 	return q
 }
 
+// ProjectExpr limits the result attributes to the given expression.
+// Use single quotes to specificy reserved names inline (like 'Count').
+// Use the placeholder ? within the expression to substitute values, and use $ for names.
+// You need to use quoted or placeholder names when the name is a reserved word in DynamoDB.
+func (q *Query) ProjectExpr(expr string, args ...interface{}) *Query {
+	expr, err := q.subExpr(expr, args...)
+	q.setError(err)
+	q.projection = expr
+	return q
+}
+
 // Filter takes an expression that all results will be evaluated against.
 // Use single quotes to specificy reserved names inline (like 'Count').
 // Use the placeholder ? within the expression to substitute values, and use $ for names.

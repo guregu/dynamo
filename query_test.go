@@ -17,6 +17,10 @@ func TestGetAllCount(t *testing.T) {
 		UserID: 42,
 		Time:   time.Now().UTC(),
 		Msg:    "hello",
+		Meta: map[string]string{
+			"foo":        "bar",
+			"animal.cow": "moo",
+		},
 	}
 	err := table.Put(item).Run()
 	if err != nil {
@@ -77,6 +81,24 @@ func TestGetAllCount(t *testing.T) {
 		Time:   item.Time,
 	}
 	err = table.Get("UserID", 42).Range("Time", Equal, item.Time).Project("UserID", "Time").Consistent(true).One(&one)
+	if err != nil {
+		t.Error("unexpected error:", err)
+	}
+	if !reflect.DeepEqual(one, projected) {
+		t.Errorf("bad result for get one+project. %v ≠ %v", one, projected)
+	}
+
+	// GetItem + ProjectExpr
+	one = widget{}
+	projected = widget{
+		UserID: item.UserID,
+		Time:   item.Time,
+		Meta: map[string]string{
+			"foo":        "bar",
+			"animal.cow": "moo",
+		},
+	}
+	err = table.Get("UserID", 42).Range("Time", Equal, item.Time).ProjectExpr("UserID, $, Meta.foo, Meta.$", "Time", "animal.cow").Consistent(true).One(&one)
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base32"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -62,8 +63,17 @@ func (s *subber) subExpr(expr string, args ...interface{}) (string, error) {
 			sub := s.subName(item.Val[1 : len(item.Val)-1]) // trim ""
 			_, err = buf.WriteString(sub)
 		case exprs.ItemNamePlaceholder:
-			sub := s.subName(args[idx].(string))
-			_, err = buf.WriteString(sub)
+			switch x := args[idx].(type) {
+			case string:
+				sub := s.subName(x)
+				_, err = buf.WriteString(sub)
+			case int:
+				_, err = buf.WriteString(strconv.Itoa(x))
+			case int64:
+				_, err = buf.WriteString(strconv.FormatInt(x, 10))
+			default:
+				err = fmt.Errorf("dynamo: type of argument for $ must be string, int, or int64 (got %T)", x)
+			}
 			idx++
 		case exprs.ItemValuePlaceholder:
 			var sub string

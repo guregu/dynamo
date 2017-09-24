@@ -19,7 +19,8 @@ func TestUpdate(t *testing.T) {
 		Msg:    "hello",
 		Count:  0,
 		Meta: map[string]string{
-			"foo": "bar",
+			"foo":  "bar",
+			"nope": "痛",
 		},
 	}
 	err := table.Put(item).Run()
@@ -35,6 +36,7 @@ func TestUpdate(t *testing.T) {
 		SetExpr("Meta.$ = ?", "foo", "baz").
 		Add("Count", 1).
 		Add("Test", []string{"A", "B"}).
+		RemoveExpr("Meta.$", "nope").
 		Value(&result)
 	expected := widget{
 		UserID: item.UserID,

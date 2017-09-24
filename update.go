@@ -194,6 +194,15 @@ func (u *Update) Remove(paths ...string) *Update {
 	return u
 }
 
+// RemoveExpr performs a custom remove expression, substituting the args into expr as in filter expressions.
+// 	RemoveExpr("MyList[$]", 5)
+func (u *Update) RemoveExpr(expr string, args ...interface{}) *Update {
+	expr, err := u.subExpr(expr, args...)
+	u.setError(err)
+	u.remove[expr] = struct{}{}
+	return u
+}
+
 // If specifies a conditional expression for this update to succeed.
 // Use single quotes to specificy reserved names inline (like 'Count').
 // Use the placeholder ? within the expression to substitute values, and use $ for names.

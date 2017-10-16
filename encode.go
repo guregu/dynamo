@@ -123,6 +123,9 @@ func marshal(v interface{}, special string) (*dynamodb.AttributeValue, error) {
 	return marshalReflect(reflect.ValueOf(v), special)
 }
 
+var nilTm encoding.TextMarshaler
+var tmType = reflect.TypeOf(&nilTm).Elem()
+
 func marshalReflect(rv reflect.Value, special string) (*dynamodb.AttributeValue, error) {
 	switch rv.Kind() {
 	case reflect.Ptr:
@@ -153,11 +156,27 @@ func marshalReflect(rv reflect.Value, special string) (*dynamodb.AttributeValue,
 			return marshalSet(rv)
 		}
 
-		if rv.Type().Key().Kind() != reflect.String {
-			return nil, fmt.Errorf("dynamo marshal: map key must be string: %T", rv.Interface())
-		}
+		// automatically omit nil maps
 		if rv.IsNil() {
 			return nil, nil
+		}
+
+		var keyString func(k reflect.Value) (string, error)
+		if ktype := rv.Type().Key(); ktype.Implements(tmType) {
+			keyString = func(k reflect.Value) (string, error) {
+				tm := k.Interface().(encoding.TextMarshaler)
+				txt, err := tm.MarshalText()
+				if err != nil {
+					return "", fmt.Errorf("dynamo: marshal map: key error: %v", err)
+				}
+				return string(txt), nil
+			}
+		} else if ktype.Kind() == reflect.String {
+			keyString = func(k reflect.Value) (string, error) {
+				return k.String(), nil
+			}
+		} else {
+			return nil, fmt.Errorf("dynamo marshal: map key must be string: %T", rv.Interface())
 		}
 
 		avs := make(map[string]*dynamodb.AttributeValue)
@@ -167,7 +186,11 @@ func marshalReflect(rv reflect.Value, special string) (*dynamodb.AttributeValue,
 				return nil, err
 			}
 			if v != nil {
-				avs[key.String()] = v
+				kstr, err := keyString(key)
+				if err != nil {
+					return nil, err
+				}
+				avs[kstr] = v
 			}
 		}
 		return &dynamodb.AttributeValue{M: avs}, nil

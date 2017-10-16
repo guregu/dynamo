@@ -2,6 +2,7 @@ package dynamo
 
 import (
 	"bytes"
+	"encoding"
 	"encoding/base32"
 	"fmt"
 	"strconv"
@@ -64,6 +65,13 @@ func (s *subber) subExpr(expr string, args ...interface{}) (string, error) {
 			_, err = buf.WriteString(sub)
 		case exprs.ItemNamePlaceholder:
 			switch x := args[idx].(type) {
+			case encoding.TextMarshaler:
+				var txt []byte
+				txt, err = x.MarshalText()
+				if err == nil {
+					sub := s.subName(string(txt))
+					_, err = buf.WriteString(sub)
+				}
 			case string:
 				sub := s.subName(x)
 				_, err = buf.WriteString(sub)

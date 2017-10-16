@@ -31,6 +31,9 @@ func Unmarshal(av *dynamodb.AttributeValue, out interface{}) error {
 // used in iterators for unmarshaling one item
 type unmarshalFunc func(map[string]*dynamodb.AttributeValue, interface{}) error
 
+var nilTum encoding.TextUnmarshaler
+var tumType = reflect.TypeOf(&nilTum).Elem()
+
 // unmarshals one value
 func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 	// first try interface unmarshal stuff
@@ -137,13 +140,21 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 		switch {
 		case av.M != nil:
 			// TODO: this is probably slow
-			kv := reflect.New(rv.Type().Key()).Elem()
+			kp := reflect.New(rv.Type().Key())
+			kv := kp.Elem()
 			for k, v := range av.M {
 				innerRV := reflect.New(rv.Type().Elem())
 				if err := unmarshalReflect(v, innerRV.Elem()); err != nil {
 					return err
 				}
-				kv.SetString(k)
+				if kp.Type().Implements(tumType) {
+					tm := kp.Interface().(encoding.TextUnmarshaler)
+					if err := tm.UnmarshalText([]byte(k)); err != nil {
+						return fmt.Errorf("dynamo: unmarshal map: key error: %v", err)
+					}
+				} else {
+					kv.SetString(k)
+				}
 				rv.SetMapIndex(kv, innerRV.Elem())
 			}
 			return nil

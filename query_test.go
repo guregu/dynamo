@@ -107,3 +107,70 @@ func TestGetAllCount(t *testing.T) {
 	}
 
 }
+
+func TestGetFilter(t *testing.T) {
+	if testDB == nil {
+		t.Skip(offlineSkipMsg)
+	}
+	table := testDB.Table(testTable)
+
+	userId := 66
+	size := 6
+	limit := int64(4)
+	searchLimit := int64(2)
+
+	items := make([]interface{}, size)
+	widgets := make(map[int]widget)
+	keys := make([]Keyed, size)
+
+	for i := 0; i < size; i++ {
+		count := 0
+		if (i/2)%2 == 1 {
+			count = 1
+		}
+		w := widget{
+			UserID: userId,
+			Time:   time.Now().UTC(),
+			Msg:    "batch test",
+			Count:  count,
+		}
+		widgets[i] = w
+		items[i] = w
+		keys[i] = Keys{userId, w.Time}
+	}
+
+	wrote, err := table.Batch().Write().Put(items...).Run()
+	if wrote != size {
+		t.Error("unexpected wrote:", wrote, "≠", size)
+	}
+	if err != nil {
+		t.Error("unexpected error:", err)
+	}
+
+	q := table.Get("UserID", userId)
+	q.Filter("$ < ?", "Count", 1)
+
+	q.Limit(limit)
+	q.SearchLimit(searchLimit)
+
+	results := []widget{}
+	err = q.All(&results)
+	total := int64(len(results))
+
+	if err != nil {
+		t.Error("unexpected error:", err)
+	}
+	if total != limit {
+		t.Error("unexpected result count:", total, "≠", limit)
+	}
+
+	// delete both
+	wrote, err = table.Batch("UserID", "Time").Write().
+		Delete(keys...).Run()
+	if wrote != size {
+		t.Error("unexpected wrote:", wrote, "≠", size)
+	}
+	if err != nil {
+		t.Error("unexpected error:", err)
+	}
+}

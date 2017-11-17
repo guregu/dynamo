@@ -342,7 +342,7 @@ func (itr *queryIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 	})
 
 	if itr.err != nil || len(itr.output.Items) == 0 {
-		return false
+		return itr.output.LastEvaluatedKey != nil
 	}
 
 	itr.err = itr.unmarshal(itr.output.Items[itr.idx], out)

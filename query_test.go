@@ -130,7 +130,7 @@ func TestGetFilter(t *testing.T) {
 		}
 		w := widget{
 			UserID: userId,
-			Time:   time.Now().UTC(),
+			Time:   time.Now().Add(time.Duration(i) * time.Hour),
 			Msg:    "batch test",
 			Count:  count,
 		}

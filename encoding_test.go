@@ -237,8 +237,8 @@ var itemEncodingTests = []struct {
 	{
 		name: "embedded struct clobber",
 		in: struct {
-			embedded
 			Embedded string
+			embedded
 		}{
 			Embedded: "OK",
 		},

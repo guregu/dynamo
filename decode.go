@@ -306,6 +306,10 @@ func fieldsInStruct(rv reflect.Value) map[string]reflect.Value {
 		if fv.Type().Kind() == reflect.Struct && field.Anonymous {
 			innerFields := fieldsInStruct(fv)
 			for k, v := range innerFields {
+				// don't clobber top-level fields
+				if _, exists := fields[k]; exists {
+					continue
+				}
 				fields[k] = v
 			}
 			continue

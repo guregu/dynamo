@@ -78,6 +78,10 @@ func marshalStruct(rv reflect.Value) (map[string]*dynamodb.AttributeValue, error
 				return nil, err
 			}
 			for k, v := range avs {
+				// don't clobber pre-existing fields
+				if _, exists := item[k]; exists {
+					continue
+				}
 				item[k] = v
 			}
 			continue

@@ -235,6 +235,18 @@ var itemEncodingTests = []struct {
 		},
 	},
 	{
+		name: "embedded struct clobber",
+		in: struct {
+			embedded
+			Embedded string
+		}{
+			Embedded: "OK",
+		},
+		out: map[string]*dynamodb.AttributeValue{
+			"Embedded": &dynamodb.AttributeValue{S: aws.String("OK")},
+		},
+	},
+	{
 		name: "sets",
 		in: struct {
 			SS1 []string                  `dynamo:",set"`

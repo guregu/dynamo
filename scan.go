@@ -14,11 +14,11 @@ type Scan struct {
 	startKey map[string]*dynamodb.AttributeValue
 	index    string
 
-	projection string
-	filter     string
-	consistent bool
-	limit      int64 // TODO
-	segments   int   // TODO
+	projection  string
+	filters     []string
+	consistent  bool
+	limit       int64
+	searchLimit int64
 
 	subber
 
@@ -30,6 +30,13 @@ func (table Table) Scan() *Scan {
 	return &Scan{
 		table: table,
 	}
+}
+
+// StartFrom makes this scan continue from a previous one.
+// Use Scan.Iter's LastEvaluatedKey.
+func (s *Scan) StartFrom(key PagingKey) *Scan {
+	s.startKey = key
+	return s
 }
 
 // Index specifies the name of the index that Scan will operate on.
@@ -50,10 +57,11 @@ func (s *Scan) Project(paths ...string) *Scan {
 // Use single quotes to specificy reserved names inline (like 'Count').
 // Use the placeholder ? within the expression to substitute values, and use $ for names.
 // You need to use quoted or placeholder names when the name is a reserved word in DynamoDB.
+// Multiple calls to Filter will be combined with AND.
 func (s *Scan) Filter(expr string, args ...interface{}) *Scan {
 	expr, err := s.subExpr(expr, args...)
 	s.setError(err)
-	s.filter = expr
+	s.filters = append(s.filters, expr)
 	return s
 }
 
@@ -65,8 +73,22 @@ func (s *Scan) Consistent(on bool) *Scan {
 	return s
 }
 
+// Limit specifies the maximum amount of results to return.
+func (s *Scan) Limit(limit int64) *Scan {
+	s.limit = limit
+	return s
+}
+
+// SearchLimit specifies a maximum amount of results to evaluate.
+// Use this along with StartFrom and Iter's LastEvaluatedKey to split up results.
+// Note that DynamoDB limits result sets to 1MB.
+func (s *Scan) SearchLimit(limit int64) *Scan {
+	s.searchLimit = limit
+	return s
+}
+
 // Iter returns a results iterator for this request.
-func (s *Scan) Iter() Iter {
+func (s *Scan) Iter() PagingIter {
 	return &scanIter{
 		scan:      s,
 		unmarshal: unmarshalItem,
@@ -76,14 +98,37 @@ func (s *Scan) Iter() Iter {
 
 // All executes this request and unmarshals all results to out, which must be a pointer to a slice.
 func (s *Scan) All(out interface{}) error {
+	ctx, cancel := defaultContext()
+	defer cancel()
+	_, err := s.AllWithLastEvaluatedKeyContext(ctx, out)
+	return err
+}
+
+// AllWithContext executes this request and unmarshals all results to out, which must be a pointer to a slice.
+func (s *Scan) AllWithContext(ctx aws.Context, out interface{}) error {
+	_, err := s.AllWithLastEvaluatedKeyContext(ctx, out)
+	return err
+}
+
+// AllWithLastEvaluatedKey executes this request and unmarshals all results to out, which must be a pointer to a slice.
+// It returns a key you can use with StartWith to continue this query.
+func (s *Scan) AllWithLastEvaluatedKey(ctx aws.Context, out interface{}) (PagingKey, error) {
+	ctx, cancel := defaultContext()
+	defer cancel()
+	return s.AllWithLastEvaluatedKeyContext(ctx, out)
+}
+
+// AllWithLastEvaluatedKeyContext executes this request and unmarshals all results to out, which must be a pointer to a slice.
+// It returns a key you can use with StartWith to continue this query.
+func (s *Scan) AllWithLastEvaluatedKeyContext(ctx aws.Context, out interface{}) (PagingKey, error) {
 	itr := &scanIter{
 		scan:      s,
 		unmarshal: unmarshalAppend,
 		err:       s.err,
 	}
-	for itr.Next(out) {
+	for itr.NextWithContext(ctx, out) {
 	}
-	return itr.Err()
+	return itr.LastEvaluatedKey(), itr.Err()
 }
 
 func (s *Scan) scanInput() *dynamodb.ScanInput {
@@ -94,17 +139,23 @@ func (s *Scan) scanInput() *dynamodb.ScanInput {
 		ExpressionAttributeNames:  s.nameExpr,
 		ExpressionAttributeValues: s.valueExpr,
 	}
+	if s.limit > 0 {
+		if len(s.filters) == 0 {
+			input.Limit = &s.limit
+		}
+	}
+	if s.searchLimit > 0 {
+		input.Limit = &s.searchLimit
+	}
 	if s.index != "" {
 		input.IndexName = &s.index
 	}
 	if s.projection != "" {
 		input.ProjectionExpression = &s.projection
 	}
-	if s.filter != "" {
-		input.FilterExpression = &s.filter
-	}
-	if s.limit > 0 {
-		input.Limit = &s.limit
+	if len(s.filters) > 0 {
+		filter := strings.Join(s.filters, " AND ")
+		input.FilterExpression = &filter
 	}
 	return input
 }
@@ -122,6 +173,7 @@ type scanIter struct {
 	output *dynamodb.ScanOutput
 	err    error
 	idx    int
+	n      int64
 
 	unmarshal unmarshalFunc
 }
@@ -140,11 +192,17 @@ func (itr *scanIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 		return false
 	}
 
+	// stop if exceed limit
+	if itr.scan.limit > 0 && itr.n == itr.scan.limit {
+		return false
+	}
+
 	// can we use results we already have?
 	if itr.output != nil && itr.idx < len(itr.output.Items) {
 		item := itr.output.Items[itr.idx]
 		itr.err = itr.unmarshal(item, out)
 		itr.idx++
+		itr.n++
 		return itr.err == nil
 	}
 
@@ -154,7 +212,7 @@ func (itr *scanIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 	}
 	if itr.output != nil && itr.idx >= len(itr.output.Items) {
 		// have we exhausted all results?
-		if itr.output.LastEvaluatedKey == nil {
+		if itr.output.LastEvaluatedKey == nil || itr.scan.searchLimit > 0 {
 			return false
 		}
 
@@ -169,12 +227,20 @@ func (itr *scanIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 		return err
 	})
 
-	if itr.err != nil || len(itr.output.Items) == 0 {
+	if itr.err != nil {
+		return false
+	}
+
+	if len(itr.output.Items) == 0 {
+		if itr.output.LastEvaluatedKey != nil {
+			return itr.NextWithContext(ctx, out)
+		}
 		return false
 	}
 
 	itr.err = itr.unmarshal(itr.output.Items[itr.idx], out)
 	itr.idx++
+	itr.n++
 	return itr.err == nil
 }
 
@@ -182,4 +248,13 @@ func (itr *scanIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 // You should check this after Next is finished.
 func (itr *scanIter) Err() error {
 	return itr.err
+}
+
+// LastEvaluatedKey returns a key that can be used to continue this scan.
+// Use with SearchLimit for best results.
+func (itr *scanIter) LastEvaluatedKey() PagingKey {
+	if itr.output != nil {
+		return itr.output.LastEvaluatedKey
+	}
+	return nil
 }

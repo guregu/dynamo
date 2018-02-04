@@ -50,3 +50,23 @@ func TestScan(t *testing.T) {
 		t.Error("exact match of put item not found in scan")
 	}
 }
+
+func TestScanPaging(t *testing.T) {
+	if testDB == nil {
+		t.Skip(offlineSkipMsg)
+	}
+	table := testDB.Table(testTable)
+
+	widgets := [10]widget{}
+	itr := table.Scan().SearchLimit(1).Iter()
+	for i := 0; i < len(widgets); i++ {
+		more := itr.Next(&widgets[i])
+		if itr.Err() != nil {
+			t.Error("unexpected error", itr.Err())
+		}
+		if !more {
+			break
+		}
+		itr = table.Scan().StartFrom(itr.LastEvaluatedKey()).SearchLimit(1).Iter()
+	}
+}

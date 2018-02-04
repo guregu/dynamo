@@ -99,6 +99,13 @@ func (q *Query) Range(name string, op Operator, values ...interface{}) *Query {
 	return q
 }
 
+// StartFrom makes this query continue from a previous one.
+// Use Query.Iter's LastEvaluatedKey.
+func (q *Query) StartFrom(key PagingKey) *Query {
+	q.startKey = key
+	return q
+}
+
 // Index specifies the name of the index that this query will operate on.
 func (q *Query) Index(name string) *Query {
 	q.index = name
@@ -326,7 +333,7 @@ func (itr *queryIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 	}
 	if itr.output != nil && itr.idx >= len(itr.output.Items) {
 		// have we exhausted all results?
-		if itr.output.LastEvaluatedKey == nil {
+		if itr.output.LastEvaluatedKey == nil || itr.query.searchLimit > 0 {
 			return false
 		}
 
@@ -341,7 +348,10 @@ func (itr *queryIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 		return err
 	})
 
-	if itr.err != nil || len(itr.output.Items) == 0 {
+	if itr.err != nil {
+		return false
+	}
+	if len(itr.output.Items) == 0 {
 		if itr.output.LastEvaluatedKey != nil {
 			// we need to retry until we get some data
 			return itr.NextWithContext(ctx, out)
@@ -362,20 +372,46 @@ func (itr *queryIter) Err() error {
 	return itr.err
 }
 
+func (itr *queryIter) LastEvaluatedKey() PagingKey {
+	if itr.output != nil {
+		return itr.output.LastEvaluatedKey
+	}
+	return nil
+}
+
 // All executes this request and unmarshals all results to out, which must be a pointer to a slice.
 func (q *Query) All(out interface{}) error {
+	ctx, cancel := defaultContext()
+	defer cancel()
+	return q.AllWithContext(ctx, out)
+}
+
+func (q *Query) AllWithContext(ctx aws.Context, out interface{}) error {
+	_, err := q.AllWithLastEvaluatedKeyContext(ctx, out)
+	return err
+}
+
+// AllWithLastEvaluatedKey executes this request and unmarshals all results to out, which must be a pointer to a slice.
+// This returns a PagingKey you can use with StartFrom to split up results.
+func (q *Query) AllWithLastEvaluatedKey(out interface{}) (PagingKey, error) {
+	ctx, cancel := defaultContext()
+	defer cancel()
+	return q.AllWithLastEvaluatedKeyContext(ctx, out)
+}
+
+func (q *Query) AllWithLastEvaluatedKeyContext(ctx aws.Context, out interface{}) (PagingKey, error) {
 	iter := &queryIter{
 		query:     q,
 		unmarshal: unmarshalAppend,
 		err:       q.err,
 	}
-	for iter.Next(out) {
+	for iter.NextWithContext(ctx, out) {
 	}
-	return iter.Err()
+	return iter.LastEvaluatedKey(), iter.Err()
 }
 
 // Iter returns a results iterator for this request.
-func (q *Query) Iter() Iter {
+func (q *Query) Iter() PagingIter {
 	iter := &queryIter{
 		query:     q,
 		unmarshal: unmarshalItem,

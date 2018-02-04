@@ -108,69 +108,49 @@ func TestGetAllCount(t *testing.T) {
 
 }
 
-func TestGetFilter(t *testing.T) {
+func TestQueryPaging(t *testing.T) {
 	if testDB == nil {
 		t.Skip(offlineSkipMsg)
 	}
 	table := testDB.Table(testTable)
 
-	userId := 66
-	size := 6
-	limit := int64(4)
-	searchLimit := int64(2)
+	widgets := []interface{}{
+		widget{
+			UserID: 1969,
+			Time:   time.Date(1969, 4, 00, 0, 0, 0, 0, time.UTC),
+			Msg:    "first widget",
+		},
+		widget{
+			UserID: 1969,
+			Time:   time.Date(1969, 4, 10, 0, 0, 0, 0, time.UTC),
+			Msg:    "second widget",
+		},
+		widget{
+			UserID: 1969,
+			Time:   time.Date(1969, 4, 20, 0, 0, 0, 0, time.UTC),
+			Msg:    "third widget",
+		},
+	}
 
-	items := make([]interface{}, size)
-	widgets := make(map[int]widget)
-	keys := make([]Keyed, size)
+	if _, err := table.Batch().Write().Put(widgets...).Run(); err != nil {
+		t.Error("couldn't write paging prep data", err)
+		return
+	}
 
-	for i := 0; i < size; i++ {
-		count := 0
-		if (i/2)%2 == 1 {
-			count = 1
+	itr := table.Get("UserID", 1969).SearchLimit(1).Iter()
+	for i := 0; i < len(widgets); i++ {
+		var w widget
+		itr.Next(&w)
+		if !reflect.DeepEqual(w, widgets[i]) {
+			t.Error("bad result:", w, "≠", widgets[i])
 		}
-		w := widget{
-			UserID: userId,
-			Time:   time.Now().Add(time.Duration(i) * time.Hour),
-			Msg:    "batch test",
-			Count:  count,
+		if itr.Err() != nil {
+			t.Error("unexpected error", itr.Err())
 		}
-		widgets[i] = w
-		items[i] = w
-		keys[i] = Keys{userId, w.Time}
-	}
-
-	wrote, err := table.Batch().Write().Put(items...).Run()
-	if wrote != size {
-		t.Error("unexpected wrote:", wrote, "≠", size)
-	}
-	if err != nil {
-		t.Error("unexpected error:", err)
-	}
-
-	q := table.Get("UserID", userId)
-	q.Filter("$ < ?", "Count", 1)
-
-	q.Limit(limit)
-	q.SearchLimit(searchLimit)
-
-	results := []widget{}
-	err = q.All(&results)
-	total := int64(len(results))
-
-	if err != nil {
-		t.Error("unexpected error:", err)
-	}
-	if total != limit {
-		t.Error("unexpected result count:", total, "≠", limit)
-	}
-
-	// delete both
-	wrote, err = table.Batch("UserID", "Time").Write().
-		Delete(keys...).Run()
-	if wrote != size {
-		t.Error("unexpected wrote:", wrote, "≠", size)
-	}
-	if err != nil {
-		t.Error("unexpected error:", err)
+		more := itr.Next(&w)
+		if more {
+			t.Error("unexpected more", more)
+		}
+		itr = table.Get("UserID", 1969).StartFrom(itr.LastEvaluatedKey()).SearchLimit(1).Iter()
 	}
 }

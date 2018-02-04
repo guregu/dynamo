@@ -149,3 +149,16 @@ type Iter interface {
 	// You should check this after Next is finished.
 	Err() error
 }
+
+// PagingIter is an iterator of request results that can also return a key
+// used for splitting results.
+type PagingIter interface {
+	Iter
+	// LastEvaluatedKey returns a key that can be passed to StartFrom in Query or Scan.
+	// Combined with SearchLimit, it is useful for paginating partial results.
+	LastEvaluatedKey() PagingKey
+}
+
+// PagingKey is a key used for splitting up partial results.
+// Get a PagingKey from a PagingIter and pass it to StartFrom in Query or Scan.
+type PagingKey map[string]*dynamodb.AttributeValue

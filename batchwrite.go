@@ -16,6 +16,7 @@ type BatchWrite struct {
 	batch Batch
 	ops   []*dynamodb.WriteRequest
 	err   error
+	cc    *ConsumedCapacity
 }
 
 // Write creates a new batch write request, to which
@@ -51,6 +52,12 @@ func (bw *BatchWrite) Delete(keys ...Keyed) *BatchWrite {
 			Key: del.key(),
 		}})
 	}
+	return bw
+}
+
+// ConsumedCapacity will measure the throughput capacity consumed by this operation and add it to cc.
+func (bw *BatchWrite) ConsumedCapacity(cc *ConsumedCapacity) *BatchWrite {
+	bw.cc = cc
 	return bw
 }
 
@@ -91,6 +98,11 @@ func (bw *BatchWrite) RunWithContext(ctx aws.Context) (wrote int, err error) {
 			if err != nil {
 				return wrote, err
 			}
+			if bw.cc != nil {
+				for _, cc := range res.ConsumedCapacity {
+					addConsumedCapacity(bw.cc, cc)
+				}
+			}
 
 			unprocessed := res.UnprocessedItems[bw.batch.table.Name()]
 			wrote += len(ops) - len(unprocessed)
@@ -111,11 +123,15 @@ func (bw *BatchWrite) RunWithContext(ctx aws.Context) (wrote int, err error) {
 }
 
 func (bw *BatchWrite) input(ops []*dynamodb.WriteRequest) *dynamodb.BatchWriteItemInput {
-	return &dynamodb.BatchWriteItemInput{
+	input := &dynamodb.BatchWriteItemInput{
 		RequestItems: map[string][]*dynamodb.WriteRequest{
 			bw.batch.table.Name(): ops,
 		},
 	}
+	if bw.cc != nil {
+		input.ReturnConsumedCapacity = aws.String(dynamodb.ReturnConsumedCapacityIndexes)
+	}
+	return input
 }
 
 func (bw *BatchWrite) setError(err error) {

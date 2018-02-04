@@ -30,13 +30,18 @@ func TestPut(t *testing.T) {
 		Msg:    "new",
 	}
 	var oldValue widget
-	err = table.Put(newItem).OldValue(&oldValue)
+	var cc ConsumedCapacity
+	err = table.Put(newItem).ConsumedCapacity(&cc).OldValue(&oldValue)
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
 
 	if !reflect.DeepEqual(oldValue, item) {
 		t.Errorf("bad old value. %#v ≠ %#v", oldValue, item)
+	}
+
+	if cc.Total != 1 || cc.Table != 1 || cc.TableName != testTable {
+		t.Errorf("bad consumed capacity: %#v", cc)
 	}
 
 	// putting the same item: this should fail

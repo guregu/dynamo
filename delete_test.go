@@ -34,11 +34,15 @@ func TestDelete(t *testing.T) {
 
 	// delete it
 	var old widget
-	err = table.Delete("UserID", item.UserID).Range("Time", item.Time).OldValue(&old)
+	var cc ConsumedCapacity
+	err = table.Delete("UserID", item.UserID).Range("Time", item.Time).ConsumedCapacity(&cc).OldValue(&old)
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
 	if !reflect.DeepEqual(old, item) {
 		t.Errorf("bad old value. %#v ≠ %#v", old, item)
+	}
+	if cc.Total != 1 {
+		t.Error("invalid ConsumedCapacity", cc)
 	}
 }

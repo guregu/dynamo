@@ -45,6 +45,7 @@ type BatchGet struct {
 	projection string
 	consistent bool
 	err        error
+	cc         *ConsumedCapacity
 }
 
 // Get creates a new batch get item request with the given keys.
@@ -85,6 +86,12 @@ func (bg *BatchGet) Consistent(on bool) *BatchGet {
 	return bg
 }
 
+// ConsumedCapacity will measure the throughput capacity consumed by this operation and add it to cc.
+func (bg *BatchGet) ConsumedCapacity(cc *ConsumedCapacity) *BatchGet {
+	bg.cc = cc
+	return bg
+}
+
 // All executes this request and unmarshals all results to out, which must be a pointer to a slice.
 func (bg *BatchGet) All(out interface{}) error {
 	iter := newBGIter(bg, unmarshalAppend, bg.err)
@@ -116,6 +123,9 @@ func (bg *BatchGet) input(start int) *dynamodb.BatchGetItemInput {
 			get.Project(get.projection)
 			bg.setError(get.err)
 		}
+	}
+	if bg.cc != nil {
+		in.ReturnConsumedCapacity = aws.String(dynamodb.ReturnConsumedCapacityIndexes)
 	}
 
 	var kas *dynamodb.KeysAndAttributes
@@ -222,6 +232,11 @@ func (itr *bgIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 		itr.output, err = itr.bg.batch.table.db.client.BatchGetItemWithContext(ctx, itr.input)
 		return err
 	})
+	if itr.bg.cc != nil {
+		for _, cc := range itr.output.ConsumedCapacity {
+			addConsumedCapacity(itr.bg.cc, cc)
+		}
+	}
 
 	items := itr.output.Responses[tableName]
 	if itr.err != nil || len(items) == 0 {

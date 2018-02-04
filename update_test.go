@@ -30,6 +30,7 @@ func TestUpdate(t *testing.T) {
 
 	// change it a bit and check the result
 	var result widget
+	var cc ConsumedCapacity
 	err = table.Update("UserID", item.UserID).
 		Range("Time", item.Time).
 		Set("Msg", "changed").
@@ -37,6 +38,7 @@ func TestUpdate(t *testing.T) {
 		Add("Count", 1).
 		Add("Test", []string{"A", "B"}).
 		RemoveExpr("Meta.$", "nope").
+		ConsumedCapacity(&cc).
 		Value(&result)
 	expected := widget{
 		UserID: item.UserID,
@@ -52,6 +54,9 @@ func TestUpdate(t *testing.T) {
 	}
 	if !reflect.DeepEqual(result, expected) {
 		t.Errorf("bad result. %+v ≠ %+v", result, expected)
+	}
+	if cc.Total != 1 {
+		t.Error("bad consumed capacity", cc)
 	}
 
 	// send an update with a failing condition

@@ -21,6 +21,7 @@ type Delete struct {
 	condition string
 
 	err error
+	cc  *ConsumedCapacity
 }
 
 // Delete creates a new request to delete an item.
@@ -54,6 +55,12 @@ func (d *Delete) If(expr string, args ...interface{}) *Delete {
 	expr, err := d.subExpr(expr, args...)
 	d.setError(err)
 	d.condition = expr
+	return d
+}
+
+// ConsumedCapacity will measure the throughput capacity consumed by this operation and add it to cc.
+func (d *Delete) ConsumedCapacity(cc *ConsumedCapacity) *Delete {
+	d.cc = cc
 	return d
 }
 
@@ -102,6 +109,9 @@ func (d *Delete) run(ctx aws.Context) (*dynamodb.DeleteItemOutput, error) {
 		output, err = d.table.db.client.DeleteItemWithContext(ctx, input)
 		return err
 	})
+	if d.cc != nil {
+		addConsumedCapacity(d.cc, output.ConsumedCapacity)
+	}
 	return output, err
 }
 
@@ -115,6 +125,9 @@ func (d *Delete) deleteInput() *dynamodb.DeleteItemInput {
 	}
 	if d.condition != "" {
 		input.ConditionExpression = &d.condition
+	}
+	if d.cc != nil {
+		input.ReturnConsumedCapacity = aws.String(dynamodb.ReturnConsumedCapacityIndexes)
 	}
 	return input
 }

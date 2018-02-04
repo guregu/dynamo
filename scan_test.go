@@ -25,7 +25,8 @@ func TestScan(t *testing.T) {
 
 	// now check if get all and count return the same amount of items
 	var result []widget
-	err = table.Scan().Filter("UserID = ?", 42).Consistent(true).All(&result)
+	var cc ConsumedCapacity
+	err = table.Scan().Filter("UserID = ?", 42).Consistent(true).ConsumedCapacity(&cc).All(&result)
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
@@ -36,6 +37,9 @@ func TestScan(t *testing.T) {
 	}
 	if int(ct) != len(result) {
 		t.Errorf("count and scan don't match. count: %d, scan: %d", ct, len(result))
+	}
+	if cc.Total == 0 {
+		t.Error("bad consumed capacity", cc)
 	}
 
 	// search for our inserted item

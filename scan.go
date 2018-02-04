@@ -23,6 +23,7 @@ type Scan struct {
 	subber
 
 	err error
+	cc  *ConsumedCapacity
 }
 
 // Scan creates a new request to scan this table.
@@ -84,6 +85,12 @@ func (s *Scan) Limit(limit int64) *Scan {
 // Note that DynamoDB limits result sets to 1MB.
 func (s *Scan) SearchLimit(limit int64) *Scan {
 	s.searchLimit = limit
+	return s
+}
+
+// ConsumedCapacity will measure the throughput capacity consumed by this operation and add it to cc.
+func (s *Scan) ConsumedCapacity(cc *ConsumedCapacity) *Scan {
+	s.cc = cc
 	return s
 }
 
@@ -157,6 +164,9 @@ func (s *Scan) scanInput() *dynamodb.ScanInput {
 		filter := strings.Join(s.filters, " AND ")
 		input.FilterExpression = &filter
 	}
+	if s.cc != nil {
+		input.ReturnConsumedCapacity = aws.String(dynamodb.ReturnConsumedCapacityIndexes)
+	}
 	return input
 }
 
@@ -229,6 +239,10 @@ func (itr *scanIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 
 	if itr.err != nil {
 		return false
+	}
+
+	if itr.scan.cc != nil {
+		addConsumedCapacity(itr.scan.cc, itr.output.ConsumedCapacity)
 	}
 
 	if len(itr.output.Items) == 0 {

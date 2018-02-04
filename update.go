@@ -31,6 +31,7 @@ type Update struct {
 	subber
 
 	err error
+	cc  *ConsumedCapacity
 }
 
 // Update creates a new request to modify an existing item.
@@ -214,6 +215,12 @@ func (u *Update) If(expr string, args ...interface{}) *Update {
 	return u
 }
 
+// ConsumedCapacity will measure the throughput capacity consumed by this operation and add it to cc.
+func (u *Update) ConsumedCapacity(cc *ConsumedCapacity) *Update {
+	u.cc = cc
+	return u
+}
+
 // Run executes this update.
 func (u *Update) Run() error {
 	ctx, cancel := defaultContext()
@@ -270,6 +277,9 @@ func (u *Update) run(ctx aws.Context) (*dynamodb.UpdateItemOutput, error) {
 		output, err = u.table.db.client.UpdateItemWithContext(ctx, input)
 		return err
 	})
+	if u.cc != nil {
+		addConsumedCapacity(u.cc, output.ConsumedCapacity)
+	}
 	return output, err
 }
 
@@ -284,6 +294,9 @@ func (u *Update) updateInput() *dynamodb.UpdateItemInput {
 	}
 	if u.condition != "" {
 		input.ConditionExpression = &u.condition
+	}
+	if u.cc != nil {
+		input.ReturnConsumedCapacity = aws.String(dynamodb.ReturnConsumedCapacityIndexes)
 	}
 	return input
 }

@@ -28,19 +28,25 @@ func TestBatchGetWrite(t *testing.T) {
 		keys[i] = Keys{i, now}
 	}
 
-	wrote, err := table.Batch().Write().Put(items...).Run()
+	var wcc ConsumedCapacity
+	wrote, err := table.Batch().Write().Put(items...).ConsumedCapacity(&wcc).Run()
 	if wrote != batchSize {
 		t.Error("unexpected wrote:", wrote, "≠", batchSize)
 	}
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
+	if wcc.Total == 0 {
+		t.Error("bad consumed capacity", wcc)
+	}
 
 	// get all
 	var results []widget
+	var cc ConsumedCapacity
 	err = table.Batch("UserID", "Time").
 		Get(keys...).
 		Consistent(true).
+		ConsumedCapacity(&cc).
 		All(&results)
 	if err != nil {
 		t.Error("unexpected error:", err)
@@ -48,6 +54,10 @@ func TestBatchGetWrite(t *testing.T) {
 
 	if len(results) != batchSize {
 		t.Error("expected", batchSize, "results, got", len(results))
+	}
+
+	if cc.Total == 0 {
+		t.Error("bad consumed capacity", cc)
 	}
 
 	for _, result := range results {

@@ -71,3 +71,48 @@ func (dt *DeleteTable) input() *dynamodb.DeleteTableInput {
 		TableName: &name,
 	}
 }
+
+// ConsumedCapacity represents the amount of throughput capacity consumed during an operation.
+type ConsumedCapacity struct {
+	// Total is the total number of capacity units consumed during this operation.
+	Total float64
+	// GSI is a map of Global Secondary Index names to consumed capacity units.
+	GSI map[string]float64
+	// GSI is a map of Local Secondary Index names to consumed capacity units.
+	LSI map[string]float64
+	// Table is the amount of throughput consumed by the table.
+	Table float64
+	// TableName is the name of the table affected by this operation.
+	TableName string
+}
+
+func addConsumedCapacity(cc *ConsumedCapacity, raw *dynamodb.ConsumedCapacity) {
+	if cc == nil || raw == nil {
+		return
+	}
+	if raw.CapacityUnits != nil {
+		cc.Total += *raw.CapacityUnits
+	}
+	if len(raw.GlobalSecondaryIndexes) > 0 {
+		if cc.GSI == nil {
+			cc.GSI = make(map[string]float64, len(raw.GlobalSecondaryIndexes))
+		}
+		for name, consumed := range raw.GlobalSecondaryIndexes {
+			cc.GSI[name] = cc.GSI[name] + *consumed.CapacityUnits
+		}
+	}
+	if len(raw.LocalSecondaryIndexes) > 0 {
+		if cc.LSI == nil {
+			cc.LSI = make(map[string]float64, len(raw.LocalSecondaryIndexes))
+		}
+		for name, consumed := range raw.LocalSecondaryIndexes {
+			cc.LSI[name] = cc.LSI[name] + *consumed.CapacityUnits
+		}
+	}
+	if raw.Table != nil {
+		cc.Table += *raw.Table.CapacityUnits
+	}
+	if raw.TableName != nil {
+		cc.TableName = *raw.TableName
+	}
+}

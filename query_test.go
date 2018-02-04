@@ -29,17 +29,25 @@ func TestGetAllCount(t *testing.T) {
 
 	// now check if get all and count return the same amount of items
 	var result []widget
-	err = table.Get("UserID", 42).Consistent(true).Filter("Msg = ?", item.Msg).All(&result)
+	var cc1, cc2 ConsumedCapacity
+	err = table.Get("UserID", 42).Consistent(true).Filter("Msg = ?", item.Msg).ConsumedCapacity(&cc1).All(&result)
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
 
-	ct, err := table.Get("UserID", 42).Consistent(true).Filter("Msg = ?", item.Msg).Count()
+	ct, err := table.Get("UserID", 42).Consistent(true).Filter("Msg = ?", item.Msg).ConsumedCapacity(&cc2).Count()
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
 	if int(ct) != len(result) {
 		t.Errorf("count and GetAll don't match. count: %d, get all: %d", ct, len(result))
+	}
+
+	if cc1.Total == 0 || cc2.Total == 0 {
+		t.Error("blank ConsumedCapacity", cc1, cc2)
+	}
+	if !reflect.DeepEqual(cc1, cc2) {
+		t.Error("ConsumedCapacity not equal", cc1, "≠", cc2)
 	}
 
 	// search for our inserted item

@@ -16,6 +16,7 @@ type Put struct {
 	condition string
 
 	err error
+	cc  *ConsumedCapacity
 }
 
 // Put creates a new request to create or replace an item.
@@ -36,6 +37,12 @@ func (p *Put) If(expr string, args ...interface{}) *Put {
 	expr, err := p.subExpr(expr, args...)
 	p.setError(err)
 	p.condition = expr
+	return p
+}
+
+// ConsumedCapacity will measure the throughput capacity consumed by this operation and add it to cc.
+func (p *Put) ConsumedCapacity(cc *ConsumedCapacity) *Put {
+	p.cc = cc
 	return p
 }
 
@@ -85,6 +92,9 @@ func (p *Put) run(ctx aws.Context) (output *dynamodb.PutItemOutput, err error) {
 		output, err = p.table.db.client.PutItemWithContext(ctx, req)
 		return err
 	})
+	if p.cc != nil {
+		addConsumedCapacity(p.cc, output.ConsumedCapacity)
+	}
 	return
 }
 
@@ -98,6 +108,9 @@ func (p *Put) input() *dynamodb.PutItemInput {
 	}
 	if p.condition != "" {
 		input.ConditionExpression = &p.condition
+	}
+	if p.cc != nil {
+		input.ReturnConsumedCapacity = aws.String(dynamodb.ReturnConsumedCapacityIndexes)
 	}
 	return input
 }

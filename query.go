@@ -35,6 +35,7 @@ type Query struct {
 	subber
 
 	err error
+	cc  *ConsumedCapacity
 }
 
 var (
@@ -179,6 +180,12 @@ func (q *Query) Order(order Order) *Query {
 	return q
 }
 
+// ConsumedCapacity will measure the throughput capacity consumed by this operation and add it to cc.
+func (q *Query) ConsumedCapacity(cc *ConsumedCapacity) *Query {
+	q.cc = cc
+	return q
+}
+
 // One executes this query and retrieves a single result,
 // unmarshaling the result to out.
 func (q *Query) One(out interface{}) error {
@@ -211,6 +218,9 @@ func (q *Query) OneWithContext(ctx aws.Context, out interface{}) error {
 		if err != nil {
 			return err
 		}
+		if q.cc != nil {
+			addConsumedCapacity(q.cc, res.ConsumedCapacity)
+		}
 
 		return unmarshalItem(res.Item, out)
 	}
@@ -239,6 +249,9 @@ func (q *Query) OneWithContext(ctx aws.Context, out interface{}) error {
 	})
 	if err != nil {
 		return err
+	}
+	if q.cc != nil {
+		addConsumedCapacity(q.cc, res.ConsumedCapacity)
 	}
 
 	return unmarshalItem(res.Items[0], out)
@@ -276,6 +289,9 @@ func (q *Query) CountWithContext(ctx aws.Context) (int64, error) {
 		})
 		if err != nil {
 			return 0, err
+		}
+		if q.cc != nil {
+			addConsumedCapacity(q.cc, res.ConsumedCapacity)
 		}
 
 		q.startKey = res.LastEvaluatedKey
@@ -350,6 +366,9 @@ func (itr *queryIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 
 	if itr.err != nil {
 		return false
+	}
+	if itr.query.cc != nil {
+		addConsumedCapacity(itr.query.cc, itr.output.ConsumedCapacity)
 	}
 	if len(itr.output.Items) == 0 {
 		if itr.output.LastEvaluatedKey != nil {
@@ -466,6 +485,9 @@ func (q *Query) queryInput() *dynamodb.QueryInput {
 	if q.order != nil {
 		req.ScanIndexForward = (*bool)(q.order)
 	}
+	if q.cc != nil {
+		req.ReturnConsumedCapacity = aws.String(dynamodb.ReturnConsumedCapacityIndexes)
+	}
 	return req
 }
 
@@ -496,6 +518,9 @@ func (q *Query) getItemInput() *dynamodb.GetItemInput {
 	}
 	if q.projection != "" {
 		req.ProjectionExpression = &q.projection
+	}
+	if q.cc != nil {
+		req.ReturnConsumedCapacity = aws.String(dynamodb.ReturnConsumedCapacityIndexes)
 	}
 	return req
 }

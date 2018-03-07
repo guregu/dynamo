@@ -220,7 +220,11 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 			if err != nil {
 				return err
 			}
-			rv.Set(reflect.ValueOf(iface))
+			if iface == nil {
+				rv.Set(reflect.Zero(rv.Type()))
+			} else {
+				rv.Set(reflect.ValueOf(iface))
+			}
 			return nil
 		}
 	}

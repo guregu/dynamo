@@ -12,14 +12,17 @@ func TestUnmarshalAppend(t *testing.T) {
 		User  int `dynamo:"UserID"`
 		Page  int
 		Limit uint
+		Null  interface{}
 	}
 	id := "12345"
 	page := "5"
 	limit := "20"
+	null := true
 	item := map[string]*dynamodb.AttributeValue{
 		"UserID": &dynamodb.AttributeValue{N: &id},
 		"Page":   &dynamodb.AttributeValue{N: &page},
 		"Limit":  &dynamodb.AttributeValue{N: &limit},
+		"Null":   &dynamodb.AttributeValue{NULL: &null},
 	}
 
 	for range [15]struct{}{} {
@@ -30,8 +33,23 @@ func TestUnmarshalAppend(t *testing.T) {
 	}
 
 	for _, h := range results {
-		if h.User != 12345 || h.Page != 5 || h.Limit != 20 {
+		if h.User != 12345 || h.Page != 5 || h.Limit != 20 || h.Null != nil {
 			t.Error("invalid hit", h)
+		}
+	}
+
+	var mapResults []map[string]interface{}
+
+	for range [15]struct{}{} {
+		err := unmarshalAppend(item, &mapResults)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for _, h := range mapResults {
+		if h["UserID"] != 12345.0 || h["Page"] != 5.0 || h["Limit"] != 20.0 || h["Null"] != nil {
+			t.Error("invalid interface{} hit", h)
 		}
 	}
 }

@@ -81,3 +81,49 @@ func TestUnmarshalItem(t *testing.T) {
 		}
 	}
 }
+
+func TestUnmarshalNULL(t *testing.T) {
+	tru := true
+	arbitrary := "hello world"
+	double := new(*int)
+	item := map[string]*dynamodb.AttributeValue{
+		"String":    &dynamodb.AttributeValue{NULL: &tru},
+		"Slice":     &dynamodb.AttributeValue{NULL: &tru},
+		"Array":     &dynamodb.AttributeValue{NULL: &tru},
+		"StringPtr": &dynamodb.AttributeValue{NULL: &tru},
+		"DoublePtr": &dynamodb.AttributeValue{NULL: &tru},
+		"Map":       &dynamodb.AttributeValue{NULL: &tru},
+		"Interface": &dynamodb.AttributeValue{NULL: &tru},
+	}
+
+	type resultType struct {
+		String    string
+		Slice     []string
+		Array     [2]byte
+		StringPtr *string
+		DoublePtr **int
+		Map       map[string]int
+		Interface interface{}
+	}
+
+	// dirty result, we want this to be reset
+	result := resultType{
+		String:    "ABC",
+		Slice:     []string{"A", "B"},
+		Array:     [2]byte{'A', 'B'},
+		StringPtr: &arbitrary,
+		DoublePtr: double,
+		Map: map[string]int{
+			"A": 1,
+		},
+		Interface: "interface{}",
+	}
+
+	if err := UnmarshalItem(item, &result); err != nil {
+		t.Error(err)
+	}
+
+	if (!reflect.DeepEqual(result, resultType{})) {
+		t.Error("unmarshal null: bad result:", result, "≠", resultType{})
+	}
+}

@@ -60,6 +60,11 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 		}
 	}
 
+	if av.NULL != nil {
+		rv.Set(reflect.Zero(rv.Type()))
+		return nil
+	}
+
 	switch rv.Kind() {
 	case reflect.Ptr:
 		pt := reflect.New(rv.Type().Elem())

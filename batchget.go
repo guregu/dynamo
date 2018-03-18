@@ -212,6 +212,9 @@ func (itr *bgIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 			// yes, try to get next inner batch of 100 items
 			if itr.input = itr.bg.input(itr.total); itr.input == nil {
 				// we're done, no more input
+				if itr.err == nil && itr.total == 0 {
+					itr.err = ErrNotFound
+				}
 				return false
 			}
 		} else {

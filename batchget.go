@@ -160,6 +160,7 @@ type bgIter struct {
 	err       error
 	idx       int
 	total     int
+	processed int
 	backoff   *backoff.ExponentialBackOff
 	unmarshal unmarshalFunc
 }
@@ -203,14 +204,19 @@ func (itr *bgIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 
 	// new bg
 	if itr.input == nil {
-		itr.input = itr.bg.input(itr.total)
+		itr.input = itr.bg.input(itr.processed)
 	}
 
 	if itr.output != nil && itr.idx >= len(itr.output.Responses[tableName]) {
+		var unprocessed int
+		if itr.output.UnprocessedKeys != nil && itr.output.UnprocessedKeys[tableName] != nil {
+			unprocessed = len(itr.output.UnprocessedKeys[tableName].Keys)
+		}
+		itr.processed += len(itr.input.RequestItems[tableName].Keys) - unprocessed
 		// have we exhausted all results?
 		if len(itr.output.UnprocessedKeys) == 0 {
 			// yes, try to get next inner batch of 100 items
-			if itr.input = itr.bg.input(itr.total); itr.input == nil {
+			if itr.input = itr.bg.input(itr.processed); itr.input == nil {
 				// we're done, no more input
 				if itr.err == nil && itr.total == 0 {
 					itr.err = ErrNotFound

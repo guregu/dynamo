@@ -232,6 +232,9 @@ func (itr *bgIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 		itr.output, err = itr.bg.batch.table.db.client.BatchGetItemWithContext(ctx, itr.input)
 		return err
 	})
+	if itr.err != nil {
+		return false
+	}
 	if itr.bg.cc != nil {
 		for _, cc := range itr.output.ConsumedCapacity {
 			addConsumedCapacity(itr.bg.cc, cc)
@@ -239,11 +242,15 @@ func (itr *bgIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 	}
 
 	items := itr.output.Responses[tableName]
-	if itr.err != nil || len(items) == 0 {
-		if itr.total == 0 {
-			itr.err = ErrNotFound
+	if len(items) == 0 {
+		if len(itr.output.UnprocessedKeys) == 0 {
+			if itr.total == 0 {
+				itr.err = ErrNotFound
+			}
+			return false
 		}
-		return false
+		// need to retry to get more keys
+		return itr.NextWithContext(ctx, out)
 	}
 	itr.err = itr.unmarshal(items[itr.idx], out)
 	itr.idx++

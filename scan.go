@@ -119,7 +119,7 @@ func (s *Scan) AllWithContext(ctx aws.Context, out interface{}) error {
 
 // AllWithLastEvaluatedKey executes this request and unmarshals all results to out, which must be a pointer to a slice.
 // It returns a key you can use with StartWith to continue this query.
-func (s *Scan) AllWithLastEvaluatedKey(ctx aws.Context, out interface{}) (PagingKey, error) {
+func (s *Scan) AllWithLastEvaluatedKey(out interface{}) (PagingKey, error) {
 	ctx, cancel := defaultContext()
 	defer cancel()
 	return s.AllWithLastEvaluatedKeyContext(ctx, out)

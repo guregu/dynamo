@@ -17,6 +17,9 @@ import (
 var RetryTimeout = 1 * time.Minute
 
 func defaultContext() (aws.Context, context.CancelFunc) {
+	if retrytimeoutenv, err := strconv.Atoi(os.Getenv("AWS_DYNAMODB_RETRY_TIMEOUT")); err == nil && retrytimeoutenv != 0 {
+		RetryTimeout = time.Duration(retrytimeoutenv) * time.Minute
+	}
 	if RetryTimeout == 0 {
 		return aws.BackgroundContext(), (func() {})
 	}

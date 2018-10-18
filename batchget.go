@@ -100,6 +100,14 @@ func (bg *BatchGet) All(out interface{}) error {
 	return iter.Err()
 }
 
+// AllWithContext executes this request and unmarshals all results to out, which must be a pointer to a slice.
+func (bg *BatchGet) AllWithContext(ctx aws.Context, out interface{}) error {
+	iter := newBGIter(bg, unmarshalAppend, bg.err)
+	for iter.NextWithContext(ctx, out) {
+	}
+	return iter.Err()
+}
+
 // Iter returns a results iterator for this batch.
 func (bg *BatchGet) Iter() Iter {
 	return newBGIter(bg, unmarshalItem, bg.err)

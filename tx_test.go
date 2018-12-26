@@ -21,7 +21,7 @@ func TestTx(t *testing.T) {
 
 	// basic write
 	table := testDB.Table(testTable)
-	tx := testDB.WriteTransaction()
+	tx := testDB.WriteTx()
 	var cc ConsumedCapacity
 	tx.Put(table.Put(widget1))
 	tx.Put(table.Put(widget2))
@@ -35,7 +35,7 @@ func TestTx(t *testing.T) {
 	}
 
 	// GetOne
-	getTx := testDB.GetTransaction()
+	getTx := testDB.GetTx()
 	var record1, record2, record3 widget
 	var cc2 ConsumedCapacity
 	getTx.GetOne(table.Get("UserID", 69).Range("Time", Equal, date1), &record1)
@@ -75,7 +75,7 @@ func TestTx(t *testing.T) {
 
 	// Check & Update
 	widget2.Msg = "bird"
-	tx = testDB.WriteTransaction()
+	tx = testDB.WriteTx()
 	tx.Check(table.Check("UserID", widget1.UserID).Range("Time", widget1.Time).If("Msg = ?", widget1.Msg))
 	tx.Update(table.Update("UserID", widget2.UserID).Range("Time", widget2.Time).Set("Msg", widget2.Msg))
 	if err = tx.Run(); err != nil {
@@ -83,7 +83,7 @@ func TestTx(t *testing.T) {
 	}
 
 	// Delete
-	tx = testDB.WriteTransaction()
+	tx = testDB.WriteTx()
 	tx.Delete(table.Delete("UserID", widget1.UserID).Range("Time", widget1.Time).If("Msg = ?", widget1.Msg))
 	tx.Delete(table.Delete("UserID", widget2.UserID).Range("Time", widget2.Time).If("Msg = ?", widget2.Msg))
 	if err = tx.Run(); err != nil {
@@ -96,7 +96,7 @@ func TestTx(t *testing.T) {
 	}
 
 	// TransactionCanceledException
-	tx = testDB.WriteTransaction()
+	tx = testDB.WriteTx()
 	tx.Put(table.Put(widget{UserID: 69, Time: date1}).If("'Msg' = ?", "should not exist"))
 	tx.Put(table.Put(widget{UserID: 69, Time: date2}))
 	err = tx.Run()

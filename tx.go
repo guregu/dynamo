@@ -1,16 +1,12 @@
 package dynamo
 
 import (
-	"fmt"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
-var errCRItemMissing = fmt.Errorf("dynamo: CancellationReason item is missing")
-
 type getTxOp interface {
-	getTxItem() *dynamodb.TransactGetItem
+	getTxItem() (*dynamodb.TransactGetItem, error)
 }
 
 type GetTx struct {
@@ -57,12 +53,12 @@ func (tx *GetTx) RunWithContext(ctx aws.Context) error {
 	if err != nil {
 		return err
 	}
-	var out *dynamodb.TransactGetItemsOutput
+	var resp *dynamodb.TransactGetItemsOutput
 	err = retry(ctx, func() error {
 		var err error
-		out, err = tx.db.client.TransactGetItems(input)
-		if tx.cc != nil && out != nil {
-			for _, cc := range out.ConsumedCapacity {
+		resp, err = tx.db.client.TransactGetItems(input)
+		if tx.cc != nil && resp != nil {
+			for _, cc := range resp.ConsumedCapacity {
 				addConsumedCapacity(tx.cc, cc)
 			}
 		}
@@ -71,7 +67,14 @@ func (tx *GetTx) RunWithContext(ctx aws.Context) error {
 	if err != nil {
 		return err
 	}
-	for i, item := range out.Responses {
+	if isResponsesEmpty(resp.Responses) {
+		return ErrNotFound
+	}
+	return tx.unmarshal(resp)
+}
+
+func (tx *GetTx) unmarshal(resp *dynamodb.TransactGetItemsOutput) error {
+	for i, item := range resp.Responses {
 		if item.Item == nil {
 			continue
 		}
@@ -84,6 +87,12 @@ func (tx *GetTx) RunWithContext(ctx aws.Context) error {
 	return nil
 }
 
+func (tx *GetTx) All(out interface{}) error {
+	ctx, cancel := defaultContext()
+	defer cancel()
+	return tx.AllWithContext(ctx, out)
+}
+
 func (tx *GetTx) AllWithContext(ctx aws.Context, out interface{}) error {
 	input, err := tx.input()
 	if err != nil {
@@ -93,9 +102,20 @@ func (tx *GetTx) AllWithContext(ctx aws.Context, out interface{}) error {
 	err = retry(ctx, func() error {
 		var err error
 		resp, err = tx.db.client.TransactGetItems(input)
+		if tx.cc != nil && resp != nil {
+			for _, cc := range resp.ConsumedCapacity {
+				addConsumedCapacity(tx.cc, cc)
+			}
+		}
 		return err
 	})
 	if err != nil {
+		return err
+	}
+	if isResponsesEmpty(resp.Responses) {
+		return ErrNotFound
+	}
+	if err := tx.unmarshal(resp); err != nil {
 		return err
 	}
 	for _, item := range resp.Responses {
@@ -112,11 +132,11 @@ func (tx *GetTx) AllWithContext(ctx aws.Context, out interface{}) error {
 func (tx *GetTx) input() (*dynamodb.TransactGetItemsInput, error) {
 	input := &dynamodb.TransactGetItemsInput{}
 	for _, item := range tx.items {
-		tgi := item.getTxItem()
-		if tgi == nil {
-			return nil, fmt.Errorf("dynamo: transaction Query is too complex; no indexes or filters are allowed")
+		tgi, err := item.getTxItem()
+		if err != nil {
+			return nil, err
 		}
-		input.TransactItems = append(input.TransactItems, item.getTxItem())
+		input.TransactItems = append(input.TransactItems, tgi)
 	}
 	if tx.cc != nil {
 		input.ReturnConsumedCapacity = aws.String(dynamodb.ReturnConsumedCapacityIndexes)
@@ -125,7 +145,7 @@ func (tx *GetTx) input() (*dynamodb.TransactGetItemsInput, error) {
 }
 
 type writeTxOp interface {
-	writeTxItem() *dynamodb.TransactWriteItem
+	writeTxItem() (*dynamodb.TransactWriteItem, error)
 }
 
 type WriteTx struct {
@@ -155,8 +175,8 @@ func (tx *WriteTx) Update(u *Update) *WriteTx {
 	return tx
 }
 
-func (tx *WriteTx) Check(q *Query) *WriteTx {
-	tx.items = append(tx.items, q)
+func (tx *WriteTx) Check(check *ConditionCheck) *WriteTx {
+	tx.items = append(tx.items, check)
 	return tx
 }
 
@@ -173,8 +193,11 @@ func (tx *WriteTx) Run() error {
 }
 
 func (tx *WriteTx) RunWithContext(ctx aws.Context) error {
-	input := tx.input()
-	err := retry(ctx, func() error {
+	input, err := tx.input()
+	if err != nil {
+		return err
+	}
+	err = retry(ctx, func() error {
 		out, err := tx.db.client.TransactWriteItems(input)
 		if tx.cc != nil && out != nil {
 			for _, cc := range out.ConsumedCapacity {
@@ -186,13 +209,26 @@ func (tx *WriteTx) RunWithContext(ctx aws.Context) error {
 	return err
 }
 
-func (tx *WriteTx) input() *dynamodb.TransactWriteItemsInput {
+func (tx *WriteTx) input() (*dynamodb.TransactWriteItemsInput, error) {
 	input := &dynamodb.TransactWriteItemsInput{}
 	for _, item := range tx.items {
-		input.TransactItems = append(input.TransactItems, item.writeTxItem())
+		txItem, err := item.writeTxItem()
+		if err != nil {
+			return nil, err
+		}
+		input.TransactItems = append(input.TransactItems, txItem)
 	}
 	if tx.cc != nil {
 		input.ReturnConsumedCapacity = aws.String(dynamodb.ReturnConsumedCapacityIndexes)
 	}
-	return input
+	return input, nil
+}
+
+func isResponsesEmpty(resps []*dynamodb.ItemResponse) bool {
+	for _, resp := range resps {
+		if resp.Item != nil {
+			return false
+		}
+	}
+	return true
 }

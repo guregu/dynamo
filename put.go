@@ -115,19 +115,23 @@ func (p *Put) input() *dynamodb.PutItemInput {
 	return input
 }
 
-func (p *Put) writeTxItem() *dynamodb.TransactWriteItem {
+func (p *Put) writeTxItem() (*dynamodb.TransactWriteItem, error) {
+	if p.err != nil {
+		return nil, p.err
+	}
 	input := p.input()
 	item := &dynamodb.TransactWriteItem{
 		Put: &dynamodb.Put{
 			TableName: input.TableName,
 			Item:      input.Item,
-			ExpressionAttributeNames:            input.ExpressionAttributeNames,
-			ExpressionAttributeValues:           input.ExpressionAttributeValues,
-			ConditionExpression:                 input.ConditionExpression,
-			ReturnValuesOnConditionCheckFailure: aws.String(dynamodb.ReturnValuesOnConditionCheckFailureAllOld),
+			ExpressionAttributeNames:  input.ExpressionAttributeNames,
+			ExpressionAttributeValues: input.ExpressionAttributeValues,
+			ConditionExpression:       input.ConditionExpression,
+			// TODO: add support when aws-sdk-go updates
+			// ReturnValuesOnConditionCheckFailure: aws.String(dynamodb.ReturnValuesOnConditionCheckFailureAllOld),
 		},
 	}
-	return item
+	return item, nil
 }
 
 func (p *Put) setError(err error) {

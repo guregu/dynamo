@@ -22,19 +22,26 @@ func TestTx(t *testing.T) {
 	// basic write
 	table := testDB.Table(testTable)
 	tx := testDB.WriteTransaction()
+	var cc ConsumedCapacity
 	tx.Put(table.Put(widget1))
 	tx.Put(table.Put(widget2))
+	tx.ConsumedCapacity(&cc)
 	err := tx.Run()
 	if err != nil {
 		t.Error(err)
+	}
+	if cc.Total == 0 {
+		t.Error("bad consumed capacity:", cc)
 	}
 
 	// GetOne
 	getTx := testDB.GetTransaction()
 	var record1, record2, record3 widget
+	var cc2 ConsumedCapacity
 	getTx.GetOne(table.Get("UserID", 69).Range("Time", Equal, date1), &record1)
 	getTx.GetOne(table.Get("UserID", 69).Range("Time", Equal, date2), &record2)
 	getTx.GetOne(table.Get("UserID", 69).Range("Time", Equal, date3), &record3)
+	getTx.ConsumedCapacity(&cc2)
 	err = getTx.Run()
 	if err != nil {
 		t.Error(err)
@@ -48,33 +55,45 @@ func TestTx(t *testing.T) {
 	if !reflect.DeepEqual(record3, widget{}) {
 		t.Error("bad results:", record3, "≠", widget{})
 	}
+	if cc2.Total == 0 {
+		t.Error("bad consumed capacity:", cc2)
+	}
 
 	// All
+	oldCC2 := cc2
 	var records []widget
-	ctx, cancel := defaultContext()
-	defer cancel()
-	err = getTx.AllWithContext(ctx, &records)
+	err = getTx.All(&records)
 	if err != nil {
 		t.Error(err)
 	}
 	if !reflect.DeepEqual(records, []widget{widget1, widget2}) {
 		t.Error("bad results:", records)
 	}
+	if cc2.Total == oldCC2.Total {
+		t.Error("consumed capacity didn't increase", cc2, oldCC2)
+	}
 
-	// Delete & Check
+	// Check & Update
+	widget2.Msg = "bird"
 	tx = testDB.WriteTransaction()
-	// tx.Check(table.Get("UserID", widget1.UserID).Range("Time", Equal, widget1.Time).Filter("Msg = ?", "dog"))
-	tx.Delete(table.Delete("UserID", widget1.UserID).Range("Time", widget1.Time))
-	tx.Delete(table.Delete("UserID", widget2.UserID).Range("Time", widget2.Time))
+	tx.Check(table.Check("UserID", widget1.UserID).Range("Time", widget1.Time).If("Msg = ?", widget1.Msg))
+	tx.Update(table.Update("UserID", widget2.UserID).Range("Time", widget2.Time).Set("Msg", widget2.Msg))
+	if err = tx.Run(); err != nil {
+		t.Error(err)
+	}
+
+	// Delete
+	tx = testDB.WriteTransaction()
+	tx.Delete(table.Delete("UserID", widget1.UserID).Range("Time", widget1.Time).If("Msg = ?", widget1.Msg))
+	tx.Delete(table.Delete("UserID", widget2.UserID).Range("Time", widget2.Time).If("Msg = ?", widget2.Msg))
 	if err = tx.Run(); err != nil {
 		t.Error(err)
 	}
 
 	// zero results
-	// TODO: should we actually use ErrNotFound?
-	// if err = getTx.Run(); err != ErrNotFound {
-	// 	t.Error("expected ErrNotFound, got:", err)
-	// }
+	if err = getTx.Run(); err != ErrNotFound {
+		t.Error("expected ErrNotFound, got:", err)
+	}
 
 	// TransactionCanceledException
 	tx = testDB.WriteTransaction()

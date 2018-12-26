@@ -525,9 +525,9 @@ func (q *Query) getItemInput() *dynamodb.GetItemInput {
 	return req
 }
 
-func (q *Query) getTxItem() *dynamodb.TransactGetItem {
+func (q *Query) getTxItem() (*dynamodb.TransactGetItem, error) {
 	if !q.canGetItem() {
-		return nil
+		return nil, errors.New("dynamo: transaction Query is too complex; no indexes or filters are allowed")
 	}
 	input := q.getItemInput()
 	return &dynamodb.TransactGetItem{
@@ -537,20 +537,7 @@ func (q *Query) getTxItem() *dynamodb.TransactGetItem {
 			ExpressionAttributeNames: input.ExpressionAttributeNames,
 			ProjectionExpression:     input.ProjectionExpression,
 		},
-	}
-}
-
-func (q *Query) writeTxItem() *dynamodb.TransactWriteItem {
-	input := q.queryInput()
-	return &dynamodb.TransactWriteItem{
-		ConditionCheck: &dynamodb.ConditionCheck{
-			TableName:                 input.TableName,
-			Key:                       q.keys(),
-			ConditionExpression:       input.FilterExpression,
-			ExpressionAttributeNames:  input.ExpressionAttributeNames,
-			ExpressionAttributeValues: input.ExpressionAttributeValues,
-		},
-	}
+	}, nil
 }
 
 func (q *Query) keys() map[string]*dynamodb.AttributeValue {

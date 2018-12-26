@@ -115,6 +115,21 @@ func (p *Put) input() *dynamodb.PutItemInput {
 	return input
 }
 
+func (p *Put) writeTxItem() *dynamodb.TransactWriteItem {
+	input := p.input()
+	item := &dynamodb.TransactWriteItem{
+		Put: &dynamodb.Put{
+			TableName: input.TableName,
+			Item:      input.Item,
+			ExpressionAttributeNames:            input.ExpressionAttributeNames,
+			ExpressionAttributeValues:           input.ExpressionAttributeValues,
+			ConditionExpression:                 input.ConditionExpression,
+			ReturnValuesOnConditionCheckFailure: aws.String(dynamodb.ReturnValuesOnConditionCheckFailureAllOld),
+		},
+	}
+	return item
+}
+
 func (p *Put) setError(err error) {
 	if p.err != nil {
 		p.err = err

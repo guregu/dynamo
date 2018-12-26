@@ -301,6 +301,23 @@ func (u *Update) updateInput() *dynamodb.UpdateItemInput {
 	return input
 }
 
+func (u *Update) writeTxItem() *dynamodb.TransactWriteItem {
+	input := u.updateInput()
+	item := &dynamodb.TransactWriteItem{
+		Update: &dynamodb.Update{
+			TableName:                 input.TableName,
+			Key:                       input.Key,
+			UpdateExpression:          input.UpdateExpression,
+			ExpressionAttributeNames:  input.ExpressionAttributeNames,
+			ExpressionAttributeValues: input.ExpressionAttributeValues,
+			ConditionExpression:       input.ConditionExpression,
+			// TODO: return values
+			// TODO: return CC
+		},
+	}
+	return item
+}
+
 func (u *Update) key() map[string]*dynamodb.AttributeValue {
 	key := map[string]*dynamodb.AttributeValue{
 		u.hashKey: u.hashValue,

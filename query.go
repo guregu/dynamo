@@ -39,7 +39,7 @@ type Query struct {
 }
 
 var (
-	// ErrNotFound is returned when no items could be found in Get or OldValue a and similar operations.
+	// ErrNotFound is returned when no items could be found in Get or OldValue and similar operations.
 	ErrNotFound = errors.New("dynamo: no item found")
 	// ErrTooMany is returned when one item was requested, but the query returned multiple items.
 	ErrTooMany = errors.New("dynamo: too many items")
@@ -523,6 +523,34 @@ func (q *Query) getItemInput() *dynamodb.GetItemInput {
 		req.ReturnConsumedCapacity = aws.String(dynamodb.ReturnConsumedCapacityIndexes)
 	}
 	return req
+}
+
+func (q *Query) getTxItem() *dynamodb.TransactGetItem {
+	if !q.canGetItem() {
+		return nil
+	}
+	input := q.getItemInput()
+	return &dynamodb.TransactGetItem{
+		Get: &dynamodb.Get{
+			TableName: input.TableName,
+			Key:       input.Key,
+			ExpressionAttributeNames: input.ExpressionAttributeNames,
+			ProjectionExpression:     input.ProjectionExpression,
+		},
+	}
+}
+
+func (q *Query) writeTxItem() *dynamodb.TransactWriteItem {
+	input := q.queryInput()
+	return &dynamodb.TransactWriteItem{
+		ConditionCheck: &dynamodb.ConditionCheck{
+			TableName:                 input.TableName,
+			Key:                       q.keys(),
+			ConditionExpression:       input.FilterExpression,
+			ExpressionAttributeNames:  input.ExpressionAttributeNames,
+			ExpressionAttributeValues: input.ExpressionAttributeValues,
+		},
+	}
 }
 
 func (q *Query) keys() map[string]*dynamodb.AttributeValue {

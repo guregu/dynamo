@@ -19,12 +19,13 @@ func TestTx(t *testing.T) {
 	widget1 := widget{UserID: 69, Time: date1, Msg: "dog"}
 	widget2 := widget{UserID: 69, Time: date2, Msg: "cat"}
 
-	// basic write
+	// basic write & check
 	table := testDB.Table(testTable)
 	tx := testDB.WriteTx()
 	var cc ConsumedCapacity
 	tx.Put(table.Put(widget1))
 	tx.Put(table.Put(widget2))
+	tx.Check(table.Check("UserID", 69).Range("Time", date3).IfNotExists())
 	tx.ConsumedCapacity(&cc)
 	err := tx.Run()
 	if err != nil {
@@ -99,6 +100,7 @@ func TestTx(t *testing.T) {
 	tx = testDB.WriteTx()
 	tx.Put(table.Put(widget{UserID: 69, Time: date1}).If("'Msg' = ?", "should not exist"))
 	tx.Put(table.Put(widget{UserID: 69, Time: date2}))
+	tx.Check(table.Check("UserID", 69).Range("Time", date3).IfExists())
 	err = tx.Run()
 	if err == nil {
 		t.Error("expected error")

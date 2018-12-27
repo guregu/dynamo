@@ -5,6 +5,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
+// ConditionCheck represents a condition for a write transaction to succeed.
+// It is used along with WriteTx.Check.
 type ConditionCheck struct {
 	table      Table
 	hashKey    string
@@ -18,6 +20,9 @@ type ConditionCheck struct {
 	err error
 }
 
+// Check creates a new ConditionCheck, which represents a condition for a write transaction to succeed.
+// hashKey specifies the name of the table's hash key and value specifies the value of the hash key.
+// You must use Range to specify a range key for tables with hash and range keys.
 func (table Table) Check(hashKey string, value interface{}) *ConditionCheck {
 	check := &ConditionCheck{
 		table:   table,
@@ -27,6 +32,7 @@ func (table Table) Check(hashKey string, value interface{}) *ConditionCheck {
 	return check
 }
 
+// Range specifies the name and value of the range key for this item.
 func (check *ConditionCheck) Range(rangeKey string, value interface{}) *ConditionCheck {
 	check.rangeKey = rangeKey
 	var err error
@@ -44,6 +50,16 @@ func (check *ConditionCheck) If(expr string, args ...interface{}) *ConditionChec
 	check.setError(err)
 	check.condition = cond
 	return check
+}
+
+// IfExists sets this check to succeed if the item exists.
+func (check *ConditionCheck) IfExists() *ConditionCheck {
+	return check.If("attribute_exists($)", check.hashKey)
+}
+
+// IfNotExists sets this check to succeed if the item does not exist.
+func (check *ConditionCheck) IfNotExists() *ConditionCheck {
+	return check.If("attribute_not_exists($)", check.hashKey)
 }
 
 func (check *ConditionCheck) writeTxItem() (*dynamodb.TransactWriteItem, error) {

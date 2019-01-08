@@ -3,6 +3,7 @@ package dynamo
 import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/gofrs/uuid"
 )
 
 type getTxOp interface {
@@ -168,7 +169,9 @@ type writeTxOp interface {
 type WriteTx struct {
 	db    *DB
 	items []writeTxOp
+	token string
 	cc    *ConsumedCapacity
+	err   error
 }
 
 // WriteTx begins a new write transaction.
@@ -202,6 +205,24 @@ func (tx *WriteTx) Check(check *ConditionCheck) *WriteTx {
 	return tx
 }
 
+// Idempotent marks this transaction is idempotent when enabled is true.
+// An idempotent transaction ran multiple times will have the same effect as being ran once.
+// An idempotent request is only good for 10 minutes, after that it will be considered a new request.
+func (tx *WriteTx) Idempotent(enabled bool) *WriteTx {
+	if tx.token != "" && enabled {
+		return tx
+	}
+
+	if enabled {
+		uuid, err := uuid.NewV4()
+		tx.setError(err)
+		tx.token = uuid.String()
+	} else {
+		tx.token = ""
+	}
+	return tx
+}
+
 // ConsumedCapacity will measure the throughput capacity consumed by this transaction and add it to cc.
 func (tx *WriteTx) ConsumedCapacity(cc *ConsumedCapacity) *WriteTx {
 	tx.cc = cc
@@ -217,6 +238,9 @@ func (tx *WriteTx) Run() error {
 
 // RunWithContext executes this transaction.
 func (tx *WriteTx) RunWithContext(ctx aws.Context) error {
+	if tx.err != nil {
+		return tx.err
+	}
 	input, err := tx.input()
 	if err != nil {
 		return err
@@ -242,10 +266,19 @@ func (tx *WriteTx) input() (*dynamodb.TransactWriteItemsInput, error) {
 		}
 		input.TransactItems = append(input.TransactItems, wti)
 	}
+	if tx.token != "" {
+		input.ClientRequestToken = aws.String(tx.token)
+	}
 	if tx.cc != nil {
 		input.ReturnConsumedCapacity = aws.String(dynamodb.ReturnConsumedCapacityIndexes)
 	}
 	return input, nil
+}
+
+func (tx *WriteTx) setError(err error) {
+	if tx.err == nil {
+		tx.err = err
+	}
 }
 
 func isResponsesEmpty(resps []*dynamodb.ItemResponse) bool {

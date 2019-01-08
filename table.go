@@ -76,6 +76,10 @@ func (dt *DeleteTable) input() *dynamodb.DeleteTableInput {
 type ConsumedCapacity struct {
 	// Total is the total number of capacity units consumed during this operation.
 	Total float64
+	// Read is the total number of read capacity units consumed during this operation.
+	Read float64
+	// Write is the total number of write capacity units consumed during this operation.
+	Write float64
 	// GSI is a map of Global Secondary Index names to consumed capacity units.
 	GSI map[string]float64
 	// GSI is a map of Local Secondary Index names to consumed capacity units.
@@ -92,6 +96,12 @@ func addConsumedCapacity(cc *ConsumedCapacity, raw *dynamodb.ConsumedCapacity) {
 	}
 	if raw.CapacityUnits != nil {
 		cc.Total += *raw.CapacityUnits
+	}
+	if raw.ReadCapacityUnits != nil {
+		cc.Read += *raw.ReadCapacityUnits
+	}
+	if raw.WriteCapacityUnits != nil {
+		cc.Write += *raw.WriteCapacityUnits
 	}
 	if len(raw.GlobalSecondaryIndexes) > 0 {
 		if cc.GSI == nil {

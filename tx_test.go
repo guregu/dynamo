@@ -22,7 +22,8 @@ func TestTx(t *testing.T) {
 	// basic write & check
 	table := testDB.Table(testTable)
 	tx := testDB.WriteTx()
-	var cc ConsumedCapacity
+	var cc, ccold ConsumedCapacity
+	tx.Idempotent(true)
 	tx.Put(table.Put(widget1))
 	tx.Put(table.Put(widget2))
 	tx.Check(table.Check("UserID", 69).Range("Time", date3).IfNotExists())
@@ -33,6 +34,21 @@ func TestTx(t *testing.T) {
 	}
 	if cc.Total == 0 {
 		t.Error("bad consumed capacity:", cc)
+	}
+	ccold = cc
+
+	err = tx.Run()
+	if err != nil {
+		t.Error(err)
+	}
+	if cc.Total <= ccold.Total {
+		t.Error("bad consumed capacity:", cc.Total, ccold.Total)
+	}
+	if cc.Read <= ccold.Read {
+		t.Error("bad consumed capacity:", cc.Read, ccold.Read)
+	}
+	if cc.Write != ccold.Write {
+		t.Error("bad consumed capacity:", cc.Write, "≠", ccold.Write)
 	}
 
 	// GetOne

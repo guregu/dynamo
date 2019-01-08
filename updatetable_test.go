@@ -2,7 +2,6 @@ package dynamo
 
 import (
 	"testing"
-	// "github.com/davecgh/go-spew/spew"
 )
 
 // TODO: enable this test

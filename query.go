@@ -6,7 +6,6 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
-	// "github.com/davecgh/go-spew/spew"
 )
 
 // Query is a request to get one or more items in a table.
@@ -39,7 +38,7 @@ type Query struct {
 }
 
 var (
-	// ErrNotFound is returned when no items could be found in Get or OldValue a and similar operations.
+	// ErrNotFound is returned when no items could be found in Get or OldValue and similar operations.
 	ErrNotFound = errors.New("dynamo: no item found")
 	// ErrTooMany is returned when one item was requested, but the query returned multiple items.
 	ErrTooMany = errors.New("dynamo: too many items")
@@ -523,6 +522,21 @@ func (q *Query) getItemInput() *dynamodb.GetItemInput {
 		req.ReturnConsumedCapacity = aws.String(dynamodb.ReturnConsumedCapacityIndexes)
 	}
 	return req
+}
+
+func (q *Query) getTxItem() (*dynamodb.TransactGetItem, error) {
+	if !q.canGetItem() {
+		return nil, errors.New("dynamo: transaction Query is too complex; no indexes or filters are allowed")
+	}
+	input := q.getItemInput()
+	return &dynamodb.TransactGetItem{
+		Get: &dynamodb.Get{
+			TableName: input.TableName,
+			Key:       input.Key,
+			ExpressionAttributeNames: input.ExpressionAttributeNames,
+			ProjectionExpression:     input.ProjectionExpression,
+		},
+	}, nil
 }
 
 func (q *Query) keys() map[string]*dynamodb.AttributeValue {

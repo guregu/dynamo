@@ -132,6 +132,23 @@ func (d *Delete) deleteInput() *dynamodb.DeleteItemInput {
 	return input
 }
 
+func (d *Delete) writeTxItem() (*dynamodb.TransactWriteItem, error) {
+	if d.err != nil {
+		return nil, d.err
+	}
+	input := d.deleteInput()
+	item := &dynamodb.TransactWriteItem{
+		Delete: &dynamodb.Delete{
+			TableName: input.TableName,
+			Key:       input.Key,
+			ExpressionAttributeNames:  input.ExpressionAttributeNames,
+			ExpressionAttributeValues: input.ExpressionAttributeValues,
+			ConditionExpression:       input.ConditionExpression,
+		},
+	}
+	return item, nil
+}
+
 func (d *Delete) key() map[string]*dynamodb.AttributeValue {
 	key := map[string]*dynamodb.AttributeValue{
 		d.hashKey: d.hashValue,

@@ -3,8 +3,6 @@ package dynamo
 import (
 	"testing"
 	"time"
-
-	"github.com/guregu/toki"
 )
 
 var (
@@ -16,7 +14,7 @@ var (
 		Page:        1,
 		SkipThis:    "i should disappear",
 		Bonus:       &arbitraryNumber,
-		TestText:    toki.MustParseTime("1:2:3"),
+		TestText:    time.Now(),
 		StringSlice: []string{"A", "B", "C", "QQQ"},
 		embedMe: embedMe{
 			Extra: true,
@@ -117,7 +115,7 @@ type fancyObject struct {
 	SkipThis  string `dynamo:"-"`
 	Bonus     *int   `dynamo:",omitempty"`
 
-	TestText  toki.Time
+	TestText  time.Time
 	SkipMePlz time.Time `dynamo:",omitempty"`
 
 	StringSlice []string

@@ -115,7 +115,13 @@ func (ct *CreateTable) Project(index string, projection IndexProjection, include
 		ProjectionType: &projectionStr,
 	}
 	if projection == IncludeProjection {
+	attribs:
 		for _, attr := range includeAttribs {
+			for _, a := range proj.NonKeyAttributes {
+				if attr == *a {
+					continue attribs
+				}
+			}
 			proj.NonKeyAttributes = append(proj.NonKeyAttributes, &attr)
 		}
 	}

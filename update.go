@@ -208,10 +208,15 @@ func (u *Update) RemoveExpr(expr string, args ...interface{}) *Update {
 // Use single quotes to specificy reserved names inline (like 'Count').
 // Use the placeholder ? within the expression to substitute values, and use $ for names.
 // You need to use quoted or placeholder names when the name is a reserved word in DynamoDB.
+// Multiple calls to Update will be combined with AND.
 func (u *Update) If(expr string, args ...interface{}) *Update {
+	expr = wrapExpr(expr)
 	cond, err := u.subExpr(expr, args...)
 	u.setError(err)
-	u.condition = cond
+	if u.condition != "" {
+		u.condition += " AND "
+	}
+	u.condition += cond
 	return u
 }
 

@@ -51,10 +51,15 @@ func (d *Delete) Range(name string, value interface{}) *Delete {
 // Use single quotes to specificy reserved names inline (like 'Count').
 // Use the placeholder ? within the expression to substitute values, and use $ for names.
 // You need to use quoted or placeholder names when the name is a reserved word in DynamoDB.
+// Multiple calls to If will be combined with AND.
 func (d *Delete) If(expr string, args ...interface{}) *Delete {
+	expr = wrapExpr(expr)
 	expr, err := d.subExpr(expr, args...)
 	d.setError(err)
-	d.condition = expr
+	if d.condition != "" {
+		d.condition += " AND "
+	}
+	d.condition += expr
 	return d
 }
 

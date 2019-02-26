@@ -38,6 +38,8 @@ func TestUpdate(t *testing.T) {
 		Add("Count", 1).
 		Add("Test", []string{"A", "B"}).
 		RemoveExpr("Meta.$", "nope").
+		If("'Count' = ?", 0).
+		If("'Msg' = ?", "hello").
 		ConsumedCapacity(&cc).
 		Value(&result)
 	expected := widget{
@@ -65,6 +67,7 @@ func TestUpdate(t *testing.T) {
 		Set("Msg", "shouldn't happen").
 		Add("Count", 1).
 		If("'Count' > ?", 100).
+		If("MeaningOfLife = ?", 42).
 		Value(&result)
 	if !isConditionalCheckErr(err) {
 		t.Error("expected ConditionalCheckFailedException, not", err)

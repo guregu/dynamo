@@ -33,10 +33,15 @@ func (table Table) Put(item interface{}) *Put {
 // Use single quotes to specificy reserved names inline (like 'Count').
 // Use the placeholder ? within the expression to substitute values, and use $ for names.
 // You need to use quoted or placeholder names when the name is a reserved word in DynamoDB.
+// Multiple calls to If will be combined with AND.
 func (p *Put) If(expr string, args ...interface{}) *Put {
+	expr = wrapExpr(expr)
 	expr, err := p.subExpr(expr, args...)
 	p.setError(err)
-	p.condition = expr
+	if p.condition != "" {
+		p.condition += " AND "
+	}
+	p.condition += expr
 	return p
 }
 

@@ -121,3 +121,14 @@ func (s *subber) escape(name string) (string, error) {
 	// boring
 	return name, nil
 }
+
+// wrapExpr wraps expr in parens if needed
+func wrapExpr(expr string) string {
+	if len(expr) == 0 {
+		return expr
+	}
+	if trim := strings.TrimSpace(expr); trim[0] == '(' && trim[len(trim)-1] == ')' {
+		return expr
+	}
+	return "(" + expr + ")"
+}

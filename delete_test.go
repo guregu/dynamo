@@ -17,6 +17,9 @@ func TestDelete(t *testing.T) {
 		UserID: 42,
 		Time:   time.Now().UTC(),
 		Msg:    "hello",
+		Meta: map[string]string{
+			"color": "octarine",
+		},
 	}
 	err := table.Put(item).Run()
 	if err != nil {
@@ -26,6 +29,7 @@ func TestDelete(t *testing.T) {
 	// fail to delete it
 	err = table.Delete("UserID", item.UserID).
 		Range("Time", item.Time).
+		If("Meta.'color' = ?", "octarine").
 		If("Msg = ?", "wrong msg").
 		Run()
 	if !isConditionalCheckErr(err) {

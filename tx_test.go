@@ -116,7 +116,7 @@ func TestTx(t *testing.T) {
 	tx = testDB.WriteTx()
 	tx.Put(table.Put(widget{UserID: 69, Time: date1}).If("'Msg' = ?", "should not exist"))
 	tx.Put(table.Put(widget{UserID: 69, Time: date2}))
-	tx.Check(table.Check("UserID", 69).Range("Time", date3).IfExists())
+	tx.Check(table.Check("UserID", 69).Range("Time", date3).IfExists().If("Msg = ?", "don't exist foo"))
 	err = tx.Run()
 	if err == nil {
 		t.Error("expected error")

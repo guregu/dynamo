@@ -144,6 +144,7 @@ func (q *Query) ProjectExpr(expr string, args ...interface{}) *Query {
 // You need to use quoted or placeholder names when the name is a reserved word in DynamoDB.
 // Multiple calls to Filter will be combined with AND.
 func (q *Query) Filter(expr string, args ...interface{}) *Query {
+	expr = wrapExpr(expr)
 	expr, err := q.subExpr(expr, args...)
 	q.setError(err)
 	q.filters = append(q.filters, expr)

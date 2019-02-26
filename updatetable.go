@@ -13,6 +13,8 @@ type UpdateTable struct {
 	table Table
 	r, w  int64 // throughput
 
+	billingMode *string
+
 	disableStream bool
 	streamView    StreamView
 
@@ -32,6 +34,17 @@ func (table Table) UpdateTable() *UpdateTable {
 	}
 }
 
+// OnDemand sets this table to use on-demand (pay per request) billing mode if enabled is true.
+// If enabled is false, this table will be changed to provisioned billing mode.
+func (ut *UpdateTable) OnDemand(enabled bool) *UpdateTable {
+	if enabled {
+		ut.billingMode = aws.String(dynamodb.BillingModePayPerRequest)
+	} else {
+		ut.billingMode = aws.String(dynamodb.BillingModeProvisioned)
+	}
+	return ut
+}
+
 // Provision sets this table's read and write throughput capacity.
 func (ut *UpdateTable) Provision(read, write int64) *UpdateTable {
 	ut.r, ut.w = read, write
@@ -45,7 +58,8 @@ func (ut *UpdateTable) ProvisionIndex(name string, read, write int64) *UpdateTab
 }
 
 // CreateIndex adds a new secondary global index.
-// You must specify the index name, keys, key types, projection, and throughput.
+// You must specify the index name, keys, key types, projection.
+// If this table is not on-demand you must also specify throughput.
 func (ut *UpdateTable) CreateIndex(index Index) *UpdateTable {
 	if index.Name == "" {
 		ut.err = errors.New("dynamo: update table: missing index name")
@@ -61,9 +75,6 @@ func (ut *UpdateTable) CreateIndex(index Index) *UpdateTable {
 	}
 	if index.ProjectionType == "" {
 		ut.err = errors.New("dynamo: update table: missing projection type")
-	}
-	if index.Throughput.Read < 1 || index.Throughput.Write < 1 {
-		ut.err = errors.New("dynamo: update table: throughput read and write must be 1 or more")
 	}
 
 	ut.addAD(index.HashKey, index.HashKeyType)
@@ -124,6 +135,7 @@ func (ut *UpdateTable) input() *dynamodb.UpdateTableInput {
 	input := &dynamodb.UpdateTableInput{
 		TableName:            aws.String(ut.table.Name()),
 		AttributeDefinitions: ut.ads,
+		BillingMode:          ut.billingMode,
 	}
 
 	if ut.r != 0 || ut.w != 0 {
@@ -196,13 +208,15 @@ func createIndexAction(index Index) *dynamodb.CreateGlobalSecondaryIndexAction {
 	add := &dynamodb.CreateGlobalSecondaryIndexAction{
 		IndexName: &index.Name,
 		KeySchema: ks,
-		ProvisionedThroughput: &dynamodb.ProvisionedThroughput{
-			ReadCapacityUnits:  aws.Int64(index.Throughput.Read),
-			WriteCapacityUnits: aws.Int64(index.Throughput.Write),
-		},
 		Projection: &dynamodb.Projection{
 			ProjectionType: aws.String((string)(index.ProjectionType)),
 		},
+	}
+	if index.Throughput.Read > 0 && index.Throughput.Write > 0 {
+		add.ProvisionedThroughput = &dynamodb.ProvisionedThroughput{
+			ReadCapacityUnits:  aws.Int64(index.Throughput.Read),
+			WriteCapacityUnits: aws.Int64(index.Throughput.Write),
+		}
 	}
 	if index.ProjectionType == IncludeProjection {
 		add.Projection.NonKeyAttributes = aws.StringSlice(index.ProjectionAttribs)

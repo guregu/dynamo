@@ -49,6 +49,7 @@ type CreateTable struct {
 	readUnits     int64
 	writeUnits    int64
 	streamView    StreamView
+	ondemand      bool
 	err           error
 }
 
@@ -81,8 +82,15 @@ func (db *DB) CreateTable(name string, from interface{}) *CreateTable {
 	return ct
 }
 
+// OnDemand specifies to create the table with on-demand (pay per request) billing mode,
+// if enabled. On-demand mode is disabled by default.
+func (ct *CreateTable) OnDemand(enabled bool) *CreateTable {
+	ct.ondemand = enabled
+	return ct
+}
+
 // Provision specifies the provisioned read and write capacity for this table.
-// If Provision isn't called, the table will be created with 1 unit each.
+// If Provision isn't called and on-demand mode is disabled, the table will be created with 1 unit each.
 func (ct *CreateTable) Provision(readUnits, writeUnits int64) *CreateTable {
 	ct.readUnits, ct.writeUnits = readUnits, writeUnits
 	return ct
@@ -283,10 +291,14 @@ func (ct *CreateTable) input() *dynamodb.CreateTableInput {
 		TableName:            &ct.tableName,
 		AttributeDefinitions: ct.attribs,
 		KeySchema:            ct.schema,
-		ProvisionedThroughput: &dynamodb.ProvisionedThroughput{
+	}
+	if ct.ondemand {
+		input.BillingMode = aws.String(dynamodb.BillingModePayPerRequest)
+	} else {
+		input.ProvisionedThroughput = &dynamodb.ProvisionedThroughput{
 			ReadCapacityUnits:  &ct.readUnits,
 			WriteCapacityUnits: &ct.writeUnits,
-		},
+		}
 	}
 	if ct.streamView != "" {
 		enabled := true
@@ -324,7 +336,9 @@ func (ct *CreateTable) input() *dynamodb.CreateTableInput {
 				ProjectionType: &all,
 			}
 		}
-		if idx.ProvisionedThroughput == nil {
+		if ct.ondemand {
+			idx.ProvisionedThroughput = nil
+		} else if idx.ProvisionedThroughput == nil {
 			units := int64(1)
 			idx.ProvisionedThroughput = &dynamodb.ProvisionedThroughput{
 				ReadCapacityUnits:  &units,

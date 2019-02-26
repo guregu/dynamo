@@ -23,6 +23,8 @@ type Description struct {
 
 	// Provisioned throughput for this table.
 	Throughput Throughput
+	// OnDemand is true if on-demand (pay per request) billing mode is enabled.
+	OnDemand bool
 
 	// The number of items of the table, updated every 6 hours.
 	Items int64
@@ -103,6 +105,10 @@ func newDescription(table *dynamodb.TableDescription) Description {
 	desc.HashKey, desc.RangeKey = schemaKeys(table.KeySchema)
 	desc.HashKeyType = lookupADType(table.AttributeDefinitions, desc.HashKey)
 	desc.RangeKeyType = lookupADType(table.AttributeDefinitions, desc.RangeKey)
+
+	if table.BillingModeSummary != nil && table.BillingModeSummary.BillingMode != nil {
+		desc.OnDemand = *table.BillingModeSummary.BillingMode == dynamodb.BillingModePayPerRequest
+	}
 
 	if table.ProvisionedThroughput != nil {
 		desc.Throughput = newThroughput(table.ProvisionedThroughput)

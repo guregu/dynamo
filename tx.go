@@ -21,7 +21,7 @@ type GetTx struct {
 	cc           *ConsumedCapacity
 }
 
-// GetTransaction begins a new get transaction.
+// GetTx begins a new get transaction.
 func (db *DB) GetTx() *GetTx {
 	return &GetTx{
 		db: db,

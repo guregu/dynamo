@@ -73,7 +73,7 @@ func (p *Put) OldValue(out interface{}) error {
 	return p.OldValueWithContext(ctx, out)
 }
 
-// OldValue executes this put, unmarshaling the previous value into out.
+// OldValueWithContext executes this put, unmarshaling the previous value into out.
 // Returns ErrNotFound is there was no previous value.
 func (p *Put) OldValueWithContext(ctx aws.Context, out interface{}) error {
 	p.returnType = "ALL_OLD"

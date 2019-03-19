@@ -67,7 +67,7 @@ func (tx *GetTx) RunWithContext(ctx aws.Context) error {
 	var resp *dynamodb.TransactGetItemsOutput
 	err = retry(ctx, func() error {
 		var err error
-		resp, err = tx.db.client.TransactGetItems(input)
+		resp, err = tx.db.client.TransactGetItemsWithContext(ctx, input)
 		if tx.cc != nil && resp != nil {
 			for _, cc := range resp.ConsumedCapacity {
 				addConsumedCapacity(tx.cc, cc)
@@ -246,7 +246,7 @@ func (tx *WriteTx) RunWithContext(ctx aws.Context) error {
 		return err
 	}
 	err = retry(ctx, func() error {
-		out, err := tx.db.client.TransactWriteItems(input)
+		out, err := tx.db.client.TransactWriteItemsWithContext(ctx, input)
 		if tx.cc != nil && out != nil {
 			for _, cc := range out.ConsumedCapacity {
 				addConsumedCapacity(tx.cc, cc)

@@ -29,6 +29,7 @@ type widget struct {
 	Friends   []string            `dynamo:",set"` // Sets
 	Set       map[string]struct{} `dynamo:",set"` // Map sets, too!
 	SecretKey string              `dynamo:"-"`    // Ignored
+	Category  string              `dynamo:"Category"` // Global Secondary Index
 	Children  []any               // Lists
 }
 
@@ -48,6 +49,11 @@ func main() {
 		Filter("'Count' = ? AND $ = ?", w.Count, "Message", w.Msg). // placeholders in expressions
 		One(&result)
 	
+	// get by index 
+	err = table.Get("Cateogry", "hoge").
+		Index("category-index").
+		One(&result)
+
 	// get all items
 	var results []widget
 	err = table.Scan().All(&results)

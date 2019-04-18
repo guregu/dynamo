@@ -123,7 +123,7 @@ func marshal(v interface{}, special string) (*dynamodb.AttributeValue, error) {
 		}
 		return &dynamodb.AttributeValue{S: aws.String(string(text))}, err
 	case nil:
-		return nil, nil
+		return &dynamodb.AttributeValue{NULL: aws.Bool(true)}, nil
 	}
 	return marshalReflect(reflect.ValueOf(v), special)
 }
@@ -149,7 +149,7 @@ func marshalReflect(rv reflect.Value, special string) (*dynamodb.AttributeValue,
 	case reflect.String:
 		s := rv.String()
 		if len(s) == 0 {
-			return nil, nil
+			return &dynamodb.AttributeValue{NULL: aws.Bool(true)}, nil
 		}
 		return &dynamodb.AttributeValue{S: aws.String(s)}, nil
 	case reflect.Map:
@@ -163,7 +163,7 @@ func marshalReflect(rv reflect.Value, special string) (*dynamodb.AttributeValue,
 
 		// automatically omit nil maps
 		if rv.IsNil() {
-			return nil, nil
+			return &dynamodb.AttributeValue{NULL: aws.Bool(true)}, nil
 		}
 
 		var keyString func(k reflect.Value) (string, error)
@@ -210,7 +210,7 @@ func marshalReflect(rv reflect.Value, special string) (*dynamodb.AttributeValue,
 		if rv.Type().Elem().Kind() == reflect.Uint8 {
 			// binary values can't be empty
 			if rv.Len() == 0 {
-				return nil, nil
+				return &dynamodb.AttributeValue{NULL: aws.Bool(true)}, nil
 			}
 			var data []byte
 			if rv.Kind() == reflect.Array {

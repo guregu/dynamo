@@ -1,6 +1,7 @@
 package dynamo
 
 import (
+	"github.com/gofrs/uuid"
 	"reflect"
 	"testing"
 	"time"
@@ -39,6 +40,40 @@ func TestTx(t *testing.T) {
 
 	err = tx.Run()
 	if err != nil {
+		t.Error(err)
+	}
+	if cc.Total <= ccold.Total {
+		t.Error("bad consumed capacity:", cc.Total, ccold.Total)
+	}
+	if cc.Read <= ccold.Read {
+		t.Error("bad consumed capacity:", cc.Read, ccold.Read)
+	}
+	if cc.Write != ccold.Write {
+		t.Error("bad consumed capacity:", cc.Write, "≠", ccold.Write)
+	}
+
+	// idempotent write with provided idempotency token
+	tx = testDB.WriteTx()
+	var cc, ccold ConsumedCapacity
+	token, err := uuid.NewV4()
+	if err != nil {
+		t.Error(err)
+	}
+	tx.IdempotentWithToken(true, token.String())
+	tx.Put(table.Put(widget1))
+	tx.Put(table.Put(widget2))
+	tx.ConsumedCapacity(&cc)
+	err = tx.Run()
+	if err != nil {
+		t.Error(err)
+	}
+	if cc.Total == 0 {
+		t.Error("bad consumed capacity:", cc)
+	}
+	ccold = cc
+
+	err = tx.Run()
+	if err == nil {
 		t.Error(err)
 	}
 	if cc.Total <= ccold.Total {

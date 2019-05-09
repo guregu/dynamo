@@ -205,6 +205,20 @@ func (tx *WriteTx) Check(check *ConditionCheck) *WriteTx {
 	return tx
 }
 
+func (tx *WriteTx) IdempotentWithToken(enabled bool, token string) *WriteTx {
+	if tx.token != "" && enabled {
+		return tx
+	}
+
+	if token != "" && enabled {
+		tx.token = token
+	} else {
+		tx.token = ""
+	}
+
+	return tx
+}
+
 // Idempotent marks this transaction is idempotent when enabled is true.
 // An idempotent transaction ran multiple times will have the same effect as being ran once.
 // An idempotent request is only good for 10 minutes, after that it will be considered a new request.

@@ -7,7 +7,7 @@ import (
 
 const batchSize = 101
 
-func TestBatchGetWrite(t *testing.T) {
+func testBatchGetWrite(t *testing.T, isSequential bool) {
 	if testDB == nil {
 		t.Skip(offlineSkipMsg)
 	}
@@ -29,7 +29,13 @@ func TestBatchGetWrite(t *testing.T) {
 	}
 
 	var wcc ConsumedCapacity
-	wrote, err := table.Batch().Write().Put(items...).ConsumedCapacity(&wcc).Run()
+	var wrote int
+	var err error
+	if isSequential {
+		wrote, err = table.Batch().Write().Put(items...).ConsumedCapacity(&wcc).Run()
+	} else {
+		wrote, err = table.Batch().Write().Put(items...).ConsumedCapacity(&wcc).RunConcurrently()
+	}
 	if wrote != batchSize {
 		t.Error("unexpected wrote:", wrote, "≠", batchSize)
 	}
@@ -89,4 +95,12 @@ func TestBatchGetWrite(t *testing.T) {
 	if len(results) != 0 {
 		t.Error("expected 0 results, got", len(results))
 	}
+}
+
+func TestSequentialBatchGetWrite(t *testing.T) {
+	testBatchGetWrite(t, true)
+}
+
+func TestConcurrentBatchGetWrite(t *testing.T) {
+	testBatchGetWrite(t, false)
 }

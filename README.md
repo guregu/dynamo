@@ -121,11 +121,11 @@ you may do so by using [`dynamodbiface`](https://docs.aws.amazon.com/sdk-for-go/
 using the function `dynamo.NewFromIface`:
 
 ```go
-	// Create the session and database using the
-	// using AWS functions
-	s := session.Must(session.NewSession())
-	i := dynamodb.New(s, aws.NewConfig().WithRegion("us-west-2"))
-	db := dynamo.NewFromIface(i)
+// Create the session and database using the
+// using AWS functions
+s := session.Must(session.NewSession())
+i := dynamodb.New(s, aws.NewConfig().WithRegion("us-west-2"))
+db := dynamo.NewFromIface(i)
 ```
 
 You may then create mocks by implementing the following functions corresponding to

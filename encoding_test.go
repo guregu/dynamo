@@ -3,9 +3,11 @@ package dynamo
 import (
 	"encoding"
 	"strconv"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 )
 
 const (
@@ -211,6 +213,10 @@ var itemEncodingTests = []struct {
 			EmptyM     map[string]bool
 			EmptyPtr   *int
 			EmptyIface interface{}
+			NilTime    *time.Time
+			NilCustom  *customMarshaler
+			NilText    *textMarshaler
+			NilAWS     *dynamodbattribute.UnixTime
 		}{
 			OK:     "OK",
 			EmptyL: []int{},

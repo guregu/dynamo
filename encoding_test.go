@@ -168,6 +168,17 @@ var itemEncodingTests = []struct {
 		},
 	},
 	{
+		name: "pointer (value receiver TextMarshaler)",
+		in: &struct {
+			A *textMarshaler
+		}{
+			A: new(textMarshaler),
+		},
+		out: map[string]*dynamodb.AttributeValue{
+			"A": &dynamodb.AttributeValue{S: aws.String("false")},
+		},
+	},
+	{
 		name: "rename",
 		in: struct {
 			A string `dynamo:"renamed"`
@@ -390,9 +401,31 @@ func (tm *textMarshaler) UnmarshalText(text []byte) error {
 	return nil
 }
 
+type ptrTextMarshaler bool
+
+func (tm *ptrTextMarshaler) MarshalText() ([]byte, error) {
+	if tm == nil {
+		return []byte("null"), nil
+	}
+	if *tm {
+		return []byte("true"), nil
+	}
+	return []byte("false"), nil
+}
+
+func (tm *ptrTextMarshaler) UnmarshalText(text []byte) error {
+	if string(text) == "null" {
+		return nil
+	}
+	*tm = string(text) == "true"
+	return nil
+}
+
 var (
 	_ Marshaler                = new(customMarshaler)
 	_ Unmarshaler              = new(customMarshaler)
 	_ encoding.TextMarshaler   = new(textMarshaler)
 	_ encoding.TextUnmarshaler = new(textMarshaler)
+	_ encoding.TextMarshaler   = new(ptrTextMarshaler)
+	_ encoding.TextUnmarshaler = new(ptrTextMarshaler)
 )

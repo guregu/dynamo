@@ -487,3 +487,40 @@ func isAVEqual(a, b *dynamodb.AttributeValue) bool {
 	}
 	return false
 }
+
+// isNil returns true if v is considered nil
+// this is used to determine if an attribute should be set or removed
+func isNil(v interface{}) bool {
+	if v == nil || v == "" {
+		return true
+	}
+
+	// consider v nil if it's a special encoder defined on a value type, but v is a pointer
+	rv := reflect.ValueOf(v)
+	switch v.(type) {
+	case Marshaler:
+		if rv.Kind() == reflect.Ptr && rv.IsNil() {
+			if _, ok := rv.Type().Elem().MethodByName("MarshalDynamo"); ok {
+				return true
+			}
+		}
+	case dynamodbattribute.Marshaler:
+		if rv.Kind() == reflect.Ptr && rv.IsNil() {
+			if _, ok := rv.Type().Elem().MethodByName("MarshalDynamoDBAttributeValue"); ok {
+				return true
+			}
+		}
+	case encoding.TextMarshaler:
+		if rv.Kind() == reflect.Ptr && rv.IsNil() {
+			if _, ok := rv.Type().Elem().MethodByName("MarshalText"); ok {
+				return true
+			}
+		}
+	default:
+		// e.g. (*int)(nil)
+		return rv.Kind() == reflect.Ptr && rv.IsNil()
+	}
+
+	// non-pointers or special encoders with a pointer receiver
+	return false
+}

@@ -59,9 +59,13 @@ func (u *Update) Range(name string, value interface{}) *Update {
 }
 
 // Set changes path to the given value.
+// If value is an empty string or nil, path will be removed instead.
 // Paths that are reserved words are automatically escaped.
 // Use single quotes to escape complex values like 'User'.'Count'.
 func (u *Update) Set(path string, value interface{}) *Update {
+	if isNil(value) {
+		return u.Remove(path)
+	}
 	path, err := u.escape(path)
 	u.setError(err)
 	expr, err := u.subExpr("🝕 = ?", path, value)

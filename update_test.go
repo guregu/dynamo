@@ -73,3 +73,49 @@ func TestUpdate(t *testing.T) {
 		t.Error("expected ConditionalCheckFailedException, not", err)
 	}
 }
+
+func TestUpdateNil(t *testing.T) {
+	if testDB == nil {
+		t.Skip(offlineSkipMsg)
+	}
+	table := testDB.Table(testTable)
+
+	// first, add an item to make sure there is at least one
+	item := widget{
+		UserID: 4242,
+		Time:   time.Now().UTC(),
+		Msg:    "delete me",
+		Meta: map[string]string{
+			"abc": "123",
+		},
+		Count: 100,
+	}
+	err := table.Put(item).Run()
+	if err != nil {
+		t.Error("unexpected error:", err)
+		t.FailNow()
+	}
+
+	// update Msg with 'nil', which should delete it
+	var result widget
+	err = table.Update("UserID", item.UserID).Range("Time", item.Time).
+		Set("Msg", (*textMarshaler)(nil)).
+		Set("Meta.'abc'", nil).
+		Set("Meta.'ok'", (*ptrTextMarshaler)(nil)).
+		Set("Count", (*int)(nil)).
+		Value(&result)
+	if err != nil {
+		t.Error("unexpected error:", err)
+	}
+	expected := widget{
+		UserID: item.UserID,
+		Time:   item.Time,
+		Msg:    "",
+		Meta: map[string]string{
+			"ok": "null",
+		},
+	}
+	if !reflect.DeepEqual(result, expected) {
+		t.Errorf("bad result. %+v ≠ %+v", result, expected)
+	}
+}

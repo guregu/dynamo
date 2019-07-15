@@ -105,15 +105,34 @@ func Marshal(v interface{}) (*dynamodb.AttributeValue, error) {
 }
 
 func marshal(v interface{}, special string) (*dynamodb.AttributeValue, error) {
+	rv := reflect.ValueOf(v)
 	switch x := v.(type) {
 	case *dynamodb.AttributeValue:
 		return x, nil
 	case Marshaler:
+		if rv.Kind() == reflect.Ptr && rv.IsNil() {
+			if _, ok := rv.Type().Elem().MethodByName("MarshalDynamo"); ok {
+				// MarshalDynamo is defined on value type, but this is a nil ptr
+				return nil, nil
+			}
+		}
 		return x.MarshalDynamo()
 	case dynamodbattribute.Marshaler:
+		if rv.Kind() == reflect.Ptr && rv.IsNil() {
+			if _, ok := rv.Type().Elem().MethodByName("MarshalDynamoDBAttributeValue"); ok {
+				// MarshalDynamoDBAttributeValue is defined on value type, but this is a nil ptr
+				return nil, nil
+			}
+		}
 		av := &dynamodb.AttributeValue{}
 		return av, x.MarshalDynamoDBAttributeValue(av)
 	case encoding.TextMarshaler:
+		if rv.Kind() == reflect.Ptr && rv.IsNil() {
+			if _, ok := rv.Type().Elem().MethodByName("MarshalText"); ok {
+				// MarshalText is defined on value type, but this is a nil ptr
+				return nil, nil
+			}
+		}
 		text, err := x.MarshalText()
 		if err != nil {
 			return nil, err
@@ -125,7 +144,7 @@ func marshal(v interface{}, special string) (*dynamodb.AttributeValue, error) {
 	case nil:
 		return nil, nil
 	}
-	return marshalReflect(reflect.ValueOf(v), special)
+	return marshalReflect(rv, special)
 }
 
 var nilTm encoding.TextMarshaler

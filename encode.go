@@ -430,6 +430,12 @@ func isZero(rv reflect.Value) bool {
 	// use IsZero for supported types
 	if rv.CanInterface() {
 		if zeroer, ok := rv.Interface().(isZeroer); ok {
+			if rv.Kind() == reflect.Ptr && rv.IsNil() {
+				if _, cantCall := rv.Type().Elem().MethodByName("IsZero"); cantCall {
+					// can't call a value method on a nil pointer type
+					return true
+				}
+			}
 			return zeroer.IsZero()
 		}
 	}

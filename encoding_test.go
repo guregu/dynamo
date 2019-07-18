@@ -205,8 +205,10 @@ var itemEncodingTests = []struct {
 	{
 		name: "omitempty",
 		in: struct {
-			A     bool `dynamo:",omitempty"`
-			Other bool
+			A       bool       `dynamo:",omitempty"`
+			B       *bool      `dynamo:",omitempty"`
+			NilTime *time.Time `dynamo:",omitempty"`
+			Other   bool
 		}{
 			Other: true,
 		},

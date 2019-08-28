@@ -50,6 +50,7 @@ type CreateTable struct {
 	writeUnits    int64
 	streamView    StreamView
 	ondemand      bool
+	tags          []*dynamodb.Tag
 	err           error
 }
 
@@ -76,6 +77,7 @@ func (db *DB) CreateTable(name string, from interface{}) *CreateTable {
 		localIndices:  make(map[string]dynamodb.LocalSecondaryIndex),
 		readUnits:     1,
 		writeUnits:    1,
+		tags:          []*dynamodb.Tag{},
 	}
 	rv := reflect.ValueOf(from)
 	ct.setError(ct.from(rv))
@@ -194,6 +196,16 @@ func (ct *CreateTable) Index(index Index) *CreateTable {
 		idx.Projection = proj
 	}
 	ct.globalIndices[index.Name] = idx
+	return ct
+}
+
+// Tag add tag.
+func (ct *CreateTable) Tag(key, value string) *CreateTable {
+	tag := &dynamodb.Tag{
+		Key:   aws.String(key),
+		Value: aws.String(value),
+	}
+	ct.tags = append(ct.tags, tag)
 	return ct
 }
 
@@ -347,6 +359,9 @@ func (ct *CreateTable) input() *dynamodb.CreateTableInput {
 		}
 		sortKeySchemas(idx.KeySchema)
 		input.GlobalSecondaryIndexes = append(input.GlobalSecondaryIndexes, &idx)
+	}
+	if len(ct.tags) > 0 {
+		input.Tags = ct.tags
 	}
 	return input
 }

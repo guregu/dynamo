@@ -31,6 +31,7 @@ func TestCreateTable(t *testing.T) {
 		Project("ID-Seq-index", IncludeProjection, "UUID").
 		Provision(4, 2).
 		ProvisionIndex("Embedded-index", 1, 2).
+		Tag("Tag-Key", "Tag-Value").
 		input()
 
 	expected := &dynamodb.CreateTableInput{
@@ -90,6 +91,12 @@ func TestCreateTable(t *testing.T) {
 		ProvisionedThroughput: &dynamodb.ProvisionedThroughput{
 			ReadCapacityUnits:  aws.Int64(4),
 			WriteCapacityUnits: aws.Int64(2),
+		},
+		Tags: []*dynamodb.Tag{
+			&dynamodb.Tag{
+				Key:   aws.String("Tag-Key"),
+				Value: aws.String("Tag-Value"),
+			},
 		},
 		TableName: aws.String("UserActions"),
 	}

@@ -31,6 +31,7 @@ func TestCreateTable(t *testing.T) {
 		Project("ID-Seq-index", IncludeProjection, "UUID").
 		Provision(4, 2).
 		ProvisionIndex("Embedded-index", 1, 2).
+		Tag("Tag-Key", "old value").
 		Tag("Tag-Key", "Tag-Value").
 		input()
 

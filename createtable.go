@@ -199,8 +199,14 @@ func (ct *CreateTable) Index(index Index) *CreateTable {
 	return ct
 }
 
-// Tag add tag.
+// Tag specifies a metadata tag for this table. Multiple tags may be specified.
 func (ct *CreateTable) Tag(key, value string) *CreateTable {
+	for _, tag := range ct.tags {
+		if *tag.Key == key {
+			*tag.Value = value
+			return ct
+		}
+	}
 	tag := &dynamodb.Tag{
 		Key:   aws.String(key),
 		Value: aws.String(value),

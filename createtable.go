@@ -419,7 +419,8 @@ check:
 	case reflect.String:
 		return "S"
 	case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16,
-		reflect.Int8, reflect.Float64, reflect.Float32:
+		reflect.Int8, reflect.Float64, reflect.Float32,
+		reflect.Uint, reflect.Uint64, reflect.Uint32, reflect.Uint16, reflect.Uint8:
 		return "N"
 	case reflect.Slice, reflect.Array:
 		if typ.Elem().Kind() == reflect.Uint8 {

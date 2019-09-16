@@ -7,6 +7,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 )
 
 type UserAction struct {
@@ -19,6 +20,12 @@ type UserAction struct {
 
 type embeddedWithKeys struct {
 	Embedded **[]byte `index:"Embedded-index,hash"`
+}
+
+type Metric struct {
+	ID    uint64                     `dynamo:"ID,hash"`
+	Time  dynamodbattribute.UnixTime `dynamo:",range"`
+	Value uint64
 }
 
 func TestCreateTable(t *testing.T) {
@@ -105,4 +112,34 @@ func TestCreateTable(t *testing.T) {
 	if !reflect.DeepEqual(input, expected) {
 		t.Error("unexpected input", input)
 	}
+
+	t.Run("uint and UnixTime", func(t *testing.T) {
+		input := testDB.CreateTable("Metrics", Metric{}).
+			OnDemand(true).
+			input()
+		expected := &dynamodb.CreateTableInput{
+			AttributeDefinitions: []*dynamodb.AttributeDefinition{
+				{
+					AttributeName: aws.String("ID"),
+					AttributeType: aws.String("N"),
+				},
+				{
+					AttributeName: aws.String("Time"),
+					AttributeType: aws.String("N"),
+				},
+			},
+			KeySchema: []*dynamodb.KeySchemaElement{{
+				AttributeName: aws.String("ID"),
+				KeyType:       aws.String("HASH"),
+			}, {
+				AttributeName: aws.String("Time"),
+				KeyType:       aws.String("RANGE"),
+			}},
+			BillingMode: aws.String(dynamodb.BillingModePayPerRequest),
+			TableName:   aws.String("Metrics"),
+		}
+		if !reflect.DeepEqual(input, expected) {
+			t.Error("unexpected input", input)
+		}
+	})
 }

@@ -406,10 +406,15 @@ func typeOf(rv reflect.Value) string {
 					return typeOf(reflect.ValueOf(iface))
 				}
 			}
+		case dynamodbattribute.Marshaler:
+			av := &dynamodb.AttributeValue{}
+			if err := x.MarshalDynamoDBAttributeValue(av); err == nil {
+				if iface, err := av2iface(av); err == nil {
+					return typeOf(reflect.ValueOf(iface))
+				}
+			}
 		case encoding.TextMarshaler:
 			return "S"
-		case dynamodbattribute.UnixTime, *dynamodbattribute.UnixTime:
-			return "N"
 		}
 	}
 

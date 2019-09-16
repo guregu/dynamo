@@ -1,7 +1,7 @@
 module github.com/guregu/dynamo
 
 require (
-	github.com/aws/aws-sdk-go v1.18.5
+	github.com/aws/aws-sdk-go v1.19.18
 	github.com/cenkalti/backoff v2.1.1+incompatible
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/gofrs/uuid v3.2.0+incompatible

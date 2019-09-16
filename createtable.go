@@ -9,6 +9,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 )
 
 // StreamView determines what information is written to a table's stream.
@@ -407,6 +408,8 @@ func typeOf(rv reflect.Value) string {
 			}
 		case encoding.TextMarshaler:
 			return "S"
+		case dynamodbattribute.UnixTime, *dynamodbattribute.UnixTime:
+			return "N"
 		}
 	}
 

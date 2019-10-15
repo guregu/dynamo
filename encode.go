@@ -106,24 +106,25 @@ func Marshal(v interface{}) (*dynamodb.AttributeValue, error) {
 }
 
 func marshal(v interface{}, special string) (*dynamodb.AttributeValue, error) {
-	rv := reflect.ValueOf(v)
-
 	// encoders with precedence over interfaces
-	switch x := v.(type) {
-	case time.Time:
-		if special != "unixtime" {
-			// fall back to regular encoding
-			break
-		}
+	if special == "unixtime" {
+		switch x := v.(type) {
+		case *time.Time:
+			if x != nil {
+				return marshal(*x, special)
+			}
+		case time.Time:
+			if x.IsZero() {
+				// omitempty behaviour
+				return nil, nil
+			}
 
-		if x.IsZero() {
-			// omitempty behaviour
-			return nil, nil
+			ts := strconv.FormatInt(x.Unix(), 10)
+			return &dynamodb.AttributeValue{N: &ts}, nil
 		}
-
-		ts := strconv.FormatInt(x.Unix(), 10)
-		return &dynamodb.AttributeValue{N: &ts}, nil
 	}
+
+	rv := reflect.ValueOf(v)
 
 	switch x := v.(type) {
 	case *dynamodb.AttributeValue:

@@ -399,6 +399,26 @@ var itemEncodingTests = []struct {
 		},
 		out: map[string]*dynamodb.AttributeValue{},
 	},
+	{
+		name: "*time.Time (unixtime encoding)",
+		in: struct {
+			TTL *time.Time `dynamo:",unixtime"`
+		}{
+			TTL: aws.Time(time.Date(2019, 1, 1, 0, 0, 0, 0, time.UTC)),
+		},
+		out: map[string]*dynamodb.AttributeValue{
+			"TTL": &dynamodb.AttributeValue{N: aws.String("1546300800")},
+		},
+	},
+	{
+		name: "*time.Time (zero unixtime encoding)",
+		in: struct {
+			TTL *time.Time `dynamo:",unixtime"`
+		}{
+			TTL: nil,
+		},
+		out: map[string]*dynamodb.AttributeValue{},
+	},
 }
 
 type embedded struct {

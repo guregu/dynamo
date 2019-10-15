@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
@@ -106,6 +107,18 @@ func Marshal(v interface{}) (*dynamodb.AttributeValue, error) {
 
 func marshal(v interface{}, special string) (*dynamodb.AttributeValue, error) {
 	rv := reflect.ValueOf(v)
+
+	// encoders with precedence over interfaces
+	switch x := v.(type) {
+	case time.Time:
+		if special != "unixtime" {
+			break // fall back to regular encoding
+		}
+
+		ts := strconv.FormatInt(x.Unix(), 10)
+		return &dynamodb.AttributeValue{N: &ts}, nil
+	}
+
 	switch x := v.(type) {
 	case *dynamodb.AttributeValue:
 		return x, nil

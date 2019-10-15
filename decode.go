@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"time"
 
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
@@ -42,6 +43,17 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 			iface = rv.Addr().Interface()
 		} else {
 			iface = rv.Interface()
+		}
+
+		if x, ok := iface.(*time.Time); ok && av.N != nil {
+			// implicit unixtime
+			ts, err := strconv.ParseInt(*av.N, 10, 64)
+			if err != nil {
+				return err
+			}
+
+			*x = time.Unix(ts, 0).UTC()
+			return nil
 		}
 
 		switch x := iface.(type) {

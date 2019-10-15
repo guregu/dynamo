@@ -112,7 +112,13 @@ func marshal(v interface{}, special string) (*dynamodb.AttributeValue, error) {
 	switch x := v.(type) {
 	case time.Time:
 		if special != "unixtime" {
-			break // fall back to regular encoding
+			// fall back to regular encoding
+			break
+		}
+
+		if x.IsZero() {
+			// omitempty behaviour
+			return nil, nil
 		}
 
 		ts := strconv.FormatInt(x.Unix(), 10)

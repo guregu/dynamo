@@ -12,11 +12,11 @@ const (
 	// The table or index is ready for use.
 	ActiveStatus Status = "ACTIVE"
 	// The table or index is being created.
-	CreatingStatus = "CREATING"
+	CreatingStatus Status = "CREATING"
 	// The table or index is being updated.
-	UpdatingStatus = "UPDATING"
+	UpdatingStatus Status = "UPDATING"
 	// The table or index is being deleted.
-	DeletingStatus = "DELETING"
+	DeletingStatus Status = "DELETING"
 )
 
 // Table is a DynamoDB table.

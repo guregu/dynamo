@@ -6,9 +6,9 @@ type KeyType string
 // Key types for table and index hash/range keys.
 const (
 	BinaryType KeyType = "B"
-	StringType         = "S"
-	NumberType         = "N"
-	NoneType           = ""
+	StringType KeyType = "S"
+	NumberType KeyType = "N"
+	NoneType   KeyType = ""
 )
 
 // Keyed provides hash key and range key values.

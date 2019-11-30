@@ -50,13 +50,13 @@ type Operator string
 // Operators used for comparing against the range key in queries.
 const (
 	Equal          Operator = "EQ"
-	NotEqual                = "NE"
-	Less                    = "LT"
-	LessOrEqual             = "LE"
-	Greater                 = "GT"
-	GreaterOrEqual          = "GE"
-	BeginsWith              = "BEGINS_WITH"
-	Between                 = "BETWEEN"
+	NotEqual       Operator = "NE"
+	Less           Operator = "LT"
+	LessOrEqual    Operator = "LE"
+	Greater        Operator = "GT"
+	GreaterOrEqual Operator = "GE"
+	BeginsWith     Operator = "BEGINS_WITH"
+	Between        Operator = "BETWEEN"
 )
 
 // Order is used for specifying the order of results.
@@ -509,8 +509,8 @@ func (q *Query) keyConditions() map[string]*dynamodb.Condition {
 
 func (q *Query) getItemInput() *dynamodb.GetItemInput {
 	req := &dynamodb.GetItemInput{
-		TableName: &q.table.name,
-		Key:       q.keys(),
+		TableName:                &q.table.name,
+		Key:                      q.keys(),
 		ExpressionAttributeNames: q.nameExpr,
 	}
 	if q.consistent {
@@ -532,8 +532,8 @@ func (q *Query) getTxItem() (*dynamodb.TransactGetItem, error) {
 	input := q.getItemInput()
 	return &dynamodb.TransactGetItem{
 		Get: &dynamodb.Get{
-			TableName: input.TableName,
-			Key:       input.Key,
+			TableName:                input.TableName,
+			Key:                      input.Key,
 			ExpressionAttributeNames: input.ExpressionAttributeNames,
 			ProjectionExpression:     input.ProjectionExpression,
 		},
@@ -552,7 +552,7 @@ func (q *Query) keys() map[string]*dynamodb.AttributeValue {
 
 func (q *Query) keysAndAttribs() *dynamodb.KeysAndAttributes {
 	kas := &dynamodb.KeysAndAttributes{
-		Keys: []map[string]*dynamodb.AttributeValue{q.keys()},
+		Keys:                     []map[string]*dynamodb.AttributeValue{q.keys()},
 		ExpressionAttributeNames: q.nameExpr,
 		ConsistentRead:           &q.consistent,
 	}

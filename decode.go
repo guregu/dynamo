@@ -47,6 +47,7 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 
 		if x, ok := iface.(*time.Time); ok && av.N != nil {
 			// implicit unixtime
+			// TODO(guregu): have unixtime unmarshal explicitly check struct tags
 			ts, err := strconv.ParseInt(*av.N, 10, 64)
 			if err != nil {
 				return err

@@ -28,6 +28,12 @@ type Metric struct {
 	Value uint64
 }
 
+type Metric2 struct {
+	ID    uint64    `dynamo:"ID,hash"`
+	Time  time.Time `dynamo:",range,unixtime"`
+	Value uint64
+}
+
 func TestCreateTable(t *testing.T) {
 	// until I do DeleteTable let's just compare the input
 	// if testDB == nil {
@@ -118,6 +124,9 @@ func TestCreateTableUintUnixTime(t *testing.T) {
 	input := testDB.CreateTable("Metrics", Metric{}).
 		OnDemand(true).
 		input()
+	input2 := testDB.CreateTable("Metrics", Metric2{}).
+		OnDemand(true).
+		input()
 	expected := &dynamodb.CreateTableInput{
 		AttributeDefinitions: []*dynamodb.AttributeDefinition{
 			{
@@ -141,5 +150,8 @@ func TestCreateTableUintUnixTime(t *testing.T) {
 	}
 	if !reflect.DeepEqual(input, expected) {
 		t.Error("unexpected input", input)
+	}
+	if !reflect.DeepEqual(input2, expected) {
+		t.Error("unexpected input (unixtime tag)", input2)
 	}
 }

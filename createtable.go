@@ -263,7 +263,7 @@ func (ct *CreateTable) from(rv reflect.Value) error {
 
 		// primary keys
 		if keyType := keyTypeFromTag(field.Tag.Get("dynamo")); keyType != "" {
-			ct.add(name, typeOf(fv))
+			ct.add(name, typeOf(fv, field.Tag.Get("dynamo")))
 			ct.schema = append(ct.schema, &dynamodb.KeySchemaElement{
 				AttributeName: &name,
 				KeyType:       &keyType,
@@ -273,7 +273,7 @@ func (ct *CreateTable) from(rv reflect.Value) error {
 		// global secondary index
 		if gsi, ok := tagLookup(string(field.Tag), "index"); ok {
 			for _, index := range gsi {
-				ct.add(name, typeOf(fv))
+				ct.add(name, typeOf(fv, field.Tag.Get("dynamo")))
 				keyType := keyTypeFromTag(index)
 				indexName := index[:len(index)-len(keyType)-1]
 				idx := ct.globalIndices[indexName]
@@ -288,7 +288,7 @@ func (ct *CreateTable) from(rv reflect.Value) error {
 		// local secondary index
 		if lsi, ok := tagLookup(string(field.Tag), "localIndex"); ok {
 			for _, localIndex := range lsi {
-				ct.add(name, typeOf(fv))
+				ct.add(name, typeOf(fv, field.Tag.Get("dynamo")))
 				keyType := keyTypeFromTag(localIndex)
 				indexName := localIndex[:len(localIndex)-len(keyType)-1]
 				idx := ct.localIndices[indexName]
@@ -397,20 +397,28 @@ func (ct *CreateTable) setError(err error) {
 	}
 }
 
-func typeOf(rv reflect.Value) string {
+func typeOf(rv reflect.Value, tag string) string {
+	split := strings.Split(tag, ",")
+	if len(split) > 1 {
+		for _, v := range split[1:] {
+			if v == "unixtime" {
+				return "N"
+			}
+		}
+	}
 	if rv.CanInterface() {
 		switch x := rv.Interface().(type) {
 		case Marshaler:
 			if av, err := x.MarshalDynamo(); err == nil {
 				if iface, err := av2iface(av); err == nil {
-					return typeOf(reflect.ValueOf(iface))
+					return typeOf(reflect.ValueOf(iface), tag)
 				}
 			}
 		case dynamodbattribute.Marshaler:
 			av := &dynamodb.AttributeValue{}
 			if err := x.MarshalDynamoDBAttributeValue(av); err == nil {
 				if iface, err := av2iface(av); err == nil {
-					return typeOf(reflect.ValueOf(iface))
+					return typeOf(reflect.ValueOf(iface), tag)
 				}
 			}
 		case encoding.TextMarshaler:
@@ -440,7 +448,11 @@ check:
 }
 
 func keyTypeFromTag(tag string) string {
-	for _, v := range strings.Split(tag, ",") {
+	split := strings.Split(tag, ",")
+	if len(split) <= 1 {
+		return ""
+	}
+	for _, v := range split[1:] {
 		switch v {
 		case "hash", "partition":
 			return dynamodb.KeyTypeHash

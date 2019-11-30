@@ -54,12 +54,12 @@ func TestTx(t *testing.T) {
 
 	// idempotent write with provided idempotency token
 	tx = testDB.WriteTx()
-	var cc, ccold ConsumedCapacity
+	cc, ccold = ConsumedCapacity{}, ConsumedCapacity{}
 	token, err := uuid.NewV4()
 	if err != nil {
 		t.Error(err)
 	}
-	tx.IdempotentWithToken(true, token.String())
+	tx.IdempotentWithToken(token.String())
 	tx.Put(table.Put(widget1))
 	tx.Put(table.Put(widget2))
 	tx.ConsumedCapacity(&cc)
@@ -73,7 +73,7 @@ func TestTx(t *testing.T) {
 	ccold = cc
 
 	err = tx.Run()
-	if err == nil {
+	if err != nil {
 		t.Error(err)
 	}
 	if cc.Total <= ccold.Total {

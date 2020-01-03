@@ -8,3 +8,5 @@ require (
 	github.com/stretchr/testify v1.3.0 // indirect
 	golang.org/x/net v0.0.0-20190318221613-d196dffd7c2b
 )
+
+go 1.12

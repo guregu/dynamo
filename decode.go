@@ -176,9 +176,17 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 			}
 			return nil
 		case av.SS != nil:
-			kv := reflect.New(rv.Type().Key()).Elem()
+			kp := reflect.New(rv.Type().Key())
+			kv := kp.Elem()
 			for _, s := range av.SS {
-				kv.SetString(*s)
+				if kp.Type().Implements(tumType) {
+					tm := kp.Interface().(encoding.TextUnmarshaler)
+					if err := tm.UnmarshalText([]byte(*s)); err != nil {
+						return fmt.Errorf("dynamo: unmarshal map (SS): key error: %v", err)
+					}
+				} else {
+					kv.SetString(*s)
+				}
 				rv.SetMapIndex(kv, truthy)
 			}
 			return nil

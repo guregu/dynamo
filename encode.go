@@ -348,6 +348,20 @@ func marshalSet(rv reflect.Value) (*dynamodb.AttributeValue, error) {
 			return nil, fmt.Errorf("dynamo: cannot marshal type %v into a set", rv.Type())
 		}
 
+		if rv.Type().Key().Implements(tmType) {
+			ss := make([]*string, 0, rv.Len())
+			for _, k := range rv.MapKeys() {
+				if !useBool || rv.MapIndex(k).Bool() {
+					txt, err := k.Interface().(encoding.TextMarshaler).MarshalText()
+					if err != nil {
+						return nil, err
+					}
+					ss = append(ss, aws.String(string(txt)))
+				}
+			}
+			return &dynamodb.AttributeValue{SS: ss}, nil
+		}
+
 		switch rv.Type().Key().Kind() {
 		case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
 			ns := make([]*string, 0, rv.Len())

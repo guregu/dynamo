@@ -375,7 +375,7 @@ func (u *Update) updateExpr() *string {
 }
 
 func (u *Update) setError(err error) {
-	if err != nil {
+	if u.err == nil {
 		u.err = err
 	}
 }

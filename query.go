@@ -563,7 +563,7 @@ func (q *Query) keysAndAttribs() *dynamodb.KeysAndAttributes {
 }
 
 func (q *Query) setError(err error) {
-	if err != nil {
+	if q.err == nil {
 		q.err = err
 	}
 }

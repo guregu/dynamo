@@ -144,8 +144,8 @@ func (d *Delete) writeTxItem() (*dynamodb.TransactWriteItem, error) {
 	input := d.deleteInput()
 	item := &dynamodb.TransactWriteItem{
 		Delete: &dynamodb.Delete{
-			TableName: input.TableName,
-			Key:       input.Key,
+			TableName:                 input.TableName,
+			Key:                       input.Key,
 			ExpressionAttributeNames:  input.ExpressionAttributeNames,
 			ExpressionAttributeValues: input.ExpressionAttributeValues,
 			ConditionExpression:       input.ConditionExpression,
@@ -165,7 +165,7 @@ func (d *Delete) key() map[string]*dynamodb.AttributeValue {
 }
 
 func (d *Delete) setError(err error) {
-	if err != nil {
+	if d.err == nil {
 		d.err = err
 	}
 }

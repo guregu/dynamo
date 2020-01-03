@@ -127,8 +127,8 @@ func (p *Put) writeTxItem() (*dynamodb.TransactWriteItem, error) {
 	input := p.input()
 	item := &dynamodb.TransactWriteItem{
 		Put: &dynamodb.Put{
-			TableName: input.TableName,
-			Item:      input.Item,
+			TableName:                 input.TableName,
+			Item:                      input.Item,
 			ExpressionAttributeNames:  input.ExpressionAttributeNames,
 			ExpressionAttributeValues: input.ExpressionAttributeValues,
 			ConditionExpression:       input.ConditionExpression,
@@ -140,7 +140,7 @@ func (p *Put) writeTxItem() (*dynamodb.TransactWriteItem, error) {
 }
 
 func (p *Put) setError(err error) {
-	if p.err != nil {
+	if p.err == nil {
 		p.err = err
 	}
 }

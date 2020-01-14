@@ -77,15 +77,35 @@ type ConsumedCapacity struct {
 	// Total is the total number of capacity units consumed during this operation.
 	Total float64
 	// Read is the total number of read capacity units consumed during this operation.
+	// This seems to be only set for transactions.
 	Read float64
 	// Write is the total number of write capacity units consumed during this operation.
+	// This seems to be only set for transactions.
 	Write float64
-	// GSI is a map of Global Secondary Index names to consumed capacity units.
+	// GSI is a map of Global Secondary Index names to total consumed capacity units.
 	GSI map[string]float64
-	// GSI is a map of Local Secondary Index names to consumed capacity units.
+	// GSIRead is a map of Global Secondary Index names to consumed read capacity units.
+	// This seems to be only set for transactions.
+	GSIRead map[string]float64
+	// GSIWrite is a map of Global Secondary Index names to consumed write capacity units.
+	// This seems to be only set for transactions.
+	GSIWrite map[string]float64
+	// LSI is a map of Local Secondary Index names to total consumed capacity units.
 	LSI map[string]float64
-	// Table is the amount of throughput consumed by the table.
+	// LSIRead is a map of Local Secondary Index names to consumed read capacity units.
+	// This seems to be only set for transactions.
+	LSIRead map[string]float64
+	// LSIWrite is a map of Local Secondary Index names to consumed write capacity units.
+	// This seems to be only set for transactions.
+	LSIWrite map[string]float64
+	// Table is the amount of total throughput consumed by the table.
 	Table float64
+	// TableRead is the amount of read throughput consumed by the table.
+	// This seems to be only set for transactions.
+	TableRead float64
+	// TableWrite is the amount of write throughput consumed by the table.
+	// This seems to be only set for transactions.
+	TableWrite float64
 	// TableName is the name of the table affected by this operation.
 	TableName string
 }
@@ -109,6 +129,18 @@ func addConsumedCapacity(cc *ConsumedCapacity, raw *dynamodb.ConsumedCapacity) {
 		}
 		for name, consumed := range raw.GlobalSecondaryIndexes {
 			cc.GSI[name] = cc.GSI[name] + *consumed.CapacityUnits
+			if consumed.ReadCapacityUnits != nil {
+				if cc.GSIRead == nil {
+					cc.GSIRead = make(map[string]float64, len(raw.GlobalSecondaryIndexes))
+				}
+				cc.GSIRead[name] = cc.GSIRead[name] + *consumed.ReadCapacityUnits
+			}
+			if consumed.WriteCapacityUnits != nil {
+				if cc.GSIWrite == nil {
+					cc.GSIWrite = make(map[string]float64, len(raw.GlobalSecondaryIndexes))
+				}
+				cc.GSIWrite[name] = cc.GSIWrite[name] + *consumed.WriteCapacityUnits
+			}
 		}
 	}
 	if len(raw.LocalSecondaryIndexes) > 0 {
@@ -117,10 +149,28 @@ func addConsumedCapacity(cc *ConsumedCapacity, raw *dynamodb.ConsumedCapacity) {
 		}
 		for name, consumed := range raw.LocalSecondaryIndexes {
 			cc.LSI[name] = cc.LSI[name] + *consumed.CapacityUnits
+			if consumed.ReadCapacityUnits != nil {
+				if cc.LSIRead == nil {
+					cc.LSIRead = make(map[string]float64, len(raw.LocalSecondaryIndexes))
+				}
+				cc.LSIRead[name] = cc.LSIRead[name] + *consumed.ReadCapacityUnits
+			}
+			if consumed.WriteCapacityUnits != nil {
+				if cc.LSIWrite == nil {
+					cc.LSIWrite = make(map[string]float64, len(raw.LocalSecondaryIndexes))
+				}
+				cc.LSIWrite[name] = cc.LSIWrite[name] + *consumed.WriteCapacityUnits
+			}
 		}
 	}
 	if raw.Table != nil {
 		cc.Table += *raw.Table.CapacityUnits
+		if raw.Table.ReadCapacityUnits != nil {
+			cc.TableRead += *raw.Table.ReadCapacityUnits
+		}
+		if raw.Table.WriteCapacityUnits != nil {
+			cc.TableWrite += *raw.Table.WriteCapacityUnits
+		}
 	}
 	if raw.TableName != nil {
 		cc.TableName = *raw.TableName

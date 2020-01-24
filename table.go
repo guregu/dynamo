@@ -25,8 +25,15 @@ type Table struct {
 	db   *DB
 }
 
-// Table returns a Table handle specified by name.
+// Table returns a Table handle specified by name. If an exact match to
+// name exists in the DB's alias map, the value of that is used instead.
 func (db *DB) Table(name string) Table {
+	if db.Alias != nil {
+		if v, ok := db.Alias[name]; ok {
+			name = v
+		}
+	}
+
 	return Table{
 		name: name,
 		db:   db,

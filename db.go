@@ -13,19 +13,24 @@ import (
 // DB is a DynamoDB client.
 type DB struct {
 	client dynamodbiface.DynamoDBAPI
+	Alias  map[string]string // Maps table aliases to physical names.
 }
 
 // New creates a new client with the given configuration.
 func New(p client.ConfigProvider, cfgs ...*aws.Config) *DB {
 	db := &DB{
-		dynamodb.New(p, cfgs...),
+		client: dynamodb.New(p, cfgs...),
+		Alias:  map[string]string{},
 	}
 	return db
 }
 
 // NewFromIface creates a new client with the given interface.
 func NewFromIface(client dynamodbiface.DynamoDBAPI) *DB {
-	return &DB{client}
+	return &DB{
+		client: client,
+		Alias:  map[string]string{},
+	}
 }
 
 // Client returns this DB's internal client used to make API requests.

@@ -14,6 +14,7 @@ import (
 type DB struct {
 	client dynamodbiface.DynamoDBAPI
 	Alias  map[string]string // Maps table aliases to physical names.
+	Prefix string            // Prepended to table names.
 }
 
 // New creates a new client with the given configuration.

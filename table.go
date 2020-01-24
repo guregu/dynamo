@@ -30,14 +30,8 @@ type Table struct {
 // If the DB is configured with a prefix, it is prepended to the table name
 // regardless of whether an alias was used or not.
 func (db *DB) Table(name string) Table {
-	if db.Alias != nil {
-		if v, ok := db.Alias[name]; ok {
-			name = v
-		}
-	}
-
 	return Table{
-		name: db.Prefix + name,
+		name: db.resolveTableName(name),
 		db:   db,
 	}
 }

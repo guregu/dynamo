@@ -57,7 +57,8 @@ type CreateTable struct {
 
 // CreateTable begins a new operation to create a table with the given name.
 // The second parameter must be a struct with appropriate hash and range key struct tags
-// for the primary key and all indices.
+// for the primary key and all indices. The name of the table follows the same alias and
+// prefix resolution rules as db.Table().
 //
 // An example of a from struct follows:
 // 	type UserAction struct {
@@ -70,6 +71,8 @@ type CreateTable struct {
 // It creates two global secondary indices called UUID-index and Seq-ID-index,
 // and a local secondary index called ID-Seq-index.
 func (db *DB) CreateTable(name string, from interface{}) *CreateTable {
+	name = db.resolveTableName(name)
+
 	ct := &CreateTable{
 		db:            db,
 		tableName:     name,

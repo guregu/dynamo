@@ -39,6 +39,20 @@ func (db *DB) Client() dynamodbiface.DynamoDBAPI {
 	return db.client
 }
 
+func (db *DB) resolveTableName(name string) string {
+	if db == nil {
+		return name
+	}
+
+	if db.Alias != nil {
+		if v, ok := db.Alias[name]; ok {
+			name = v
+		}
+	}
+
+	return db.Prefix + name
+}
+
 // ListTables is a request to list tables.
 // See: http://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_ListTables.html
 type ListTables struct {

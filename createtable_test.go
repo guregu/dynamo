@@ -159,9 +159,9 @@ func TestCreateTableUintUnixTime(t *testing.T) {
 
 func TestCreateTableAliasAndPrefix(t *testing.T) {
 	db := NewFromIface(nil)
-	db.Alias["Table1"] = "real-table-1"
-	db.Prefix = "Test-"
+	db.Alias["Alias1"] = "table1"
+	db.Prefix = "test-"
 
-	input := db.CreateTable("Table1", Metric{})
-	require.Equal(t, "Test-real-table-1", input.tableName)
+	input := db.CreateTable("Alias1", Metric{})
+	require.Equal(t, "test-table1", input.tableName)
 }

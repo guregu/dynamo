@@ -61,14 +61,14 @@ func TestAddConsumedCapacity(t *testing.T) {
 
 func TestTableAliasAndPrefix(t *testing.T) {
 	db := NewFromIface(nil)
-	require.Equal(t, "MyTable", db.Table("MyTable").name)
+	require.Equal(t, "Alias1", db.Table("Alias1").name)
 
-	db.Alias["MyTable"] = "my-actual-table"
-	db.Alias["OtherTable"] = "my-other-table"
-	require.Equal(t, "my-actual-table", db.Table("MyTable").name)
-	require.Equal(t, "AnotherTable", db.Table("AnotherTable").name)
+	db.Alias["Alias1"] = "table1"
+	db.Alias["Alias2"] = "table2"
+	require.Equal(t, "table1", db.Table("Alias1").name)
+	require.Equal(t, "Alias3", db.Table("Alias3").name)
 
-	db.Prefix = "Test-"
-	require.Equal(t, "Test-my-actual-table", db.Table("MyTable").name)
-	require.Equal(t, "Test-AnotherTable", db.Table("AnotherTable").name)
+	db.Prefix = "test-"
+	require.Equal(t, "test-table1", db.Table("Alias1").name)
+	require.Equal(t, "test-Alias3", db.Table("Alias3").name)
 }

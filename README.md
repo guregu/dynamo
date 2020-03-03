@@ -50,7 +50,7 @@ func main() {
 		One(&result)
 	
 	// get by index 
-	err = table.Get("Cateogry", "hoge").
+	err = table.Get("Category", "hoge").
 		Index("category-index").
 		One(&result)
 

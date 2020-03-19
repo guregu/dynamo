@@ -1,6 +1,7 @@
 package dynamo
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -69,6 +70,10 @@ func (bg *BatchGet) And(keys ...Keyed) *BatchGet {
 
 func (bg *BatchGet) add(keys []Keyed) {
 	for _, key := range keys {
+		if key == nil {
+			bg.setError(errors.New("dynamo: batch: the Keyed interface must not be nil"))
+			continue
+		}
 		get := bg.batch.table.Get(bg.batch.hashKey, key.HashKey())
 		if rk := key.RangeKey(); bg.batch.rangeKey != "" && rk != nil {
 			get.Range(bg.batch.rangeKey, Equal, rk)

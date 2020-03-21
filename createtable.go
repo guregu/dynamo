@@ -154,14 +154,14 @@ func (ct *CreateTable) Index(index Index) *CreateTable {
 	ks := []*dynamodb.KeySchemaElement{
 		&dynamodb.KeySchemaElement{
 			AttributeName: &index.HashKey,
-			KeyType:       aws.String(string(index.HashKeyType)),
+			KeyType:       aws.String(dynamodb.KeyTypeHash),
 		},
 	}
 	if index.RangeKey != "" {
 		ct.add(index.RangeKey, string(index.RangeKeyType))
 		ks = append(ks, &dynamodb.KeySchemaElement{
 			AttributeName: &index.RangeKey,
-			KeyType:       aws.String(string(index.RangeKeyType)),
+			KeyType:       aws.String(dynamodb.KeyTypeRange),
 		})
 	}
 

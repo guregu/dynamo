@@ -72,7 +72,7 @@ func (bg *BatchGet) add(keys []Keyed) {
 	for _, key := range keys {
 		if key == nil {
 			bg.setError(errors.New("dynamo: batch: the Keyed interface must not be nil"))
-			continue
+			break
 		}
 		get := bg.batch.table.Get(bg.batch.hashKey, key.HashKey())
 		if rk := key.RangeKey(); bg.batch.rangeKey != "" && rk != nil {

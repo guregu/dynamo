@@ -449,6 +449,8 @@ func (q *Query) canGetItem() bool {
 		return false
 	case len(q.filters) > 0:
 		return false
+	case q.limit > 0:
+		return false
 	}
 	return true
 }

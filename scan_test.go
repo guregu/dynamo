@@ -42,6 +42,19 @@ func TestScan(t *testing.T) {
 		t.Error("bad consumed capacity", cc)
 	}
 
+	// check this against Scan's count, too
+	var cc2 ConsumedCapacity
+	scanCt, err := table.Scan().Filter("UserID = ?", 42).Consistent(true).ConsumedCapacity(&cc2).Count()
+	if err != nil {
+		t.Error("unexpected error:", err)
+	}
+	if scanCt != ct {
+		t.Errorf("scan count and get count don't match. scan count: %d, get count: %d", scanCt, ct)
+	}
+	if cc2.Total == 0 {
+		t.Error("bad consumed capacity", cc2)
+	}
+
 	// search for our inserted item
 	found := false
 	for _, w := range result {

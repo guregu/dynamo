@@ -139,6 +139,58 @@ func (s *Scan) AllWithLastEvaluatedKeyContext(ctx aws.Context, out interface{}) 
 	return itr.LastEvaluatedKey(), itr.Err()
 }
 
+// Count executes this request and returns the number of items matching the scan.
+// It takes into account the filter, limit, search limit, and all other parameters given.
+// It may return a higher count than the limits.
+func (s *Scan) Count() (int64, error) {
+	ctx, cancel := defaultContext()
+	defer cancel()
+	return s.CountWithContext(ctx)
+}
+
+// CountWithContext executes this request and returns the number of items matching the scan.
+// It takes into account the filter, limit, search limit, and all other parameters given.
+// It may return a higher count than the limits.
+func (s *Scan) CountWithContext(ctx aws.Context) (int64, error) {
+	if s.err != nil {
+		return 0, s.err
+	}
+	var count, scanned int64
+	input := s.scanInput()
+	input.Select = aws.String(dynamodb.SelectCount)
+	for {
+		var out *dynamodb.ScanOutput
+		err := retry(ctx, func() error {
+			var err error
+			out, err = s.table.db.client.ScanWithContext(ctx, input)
+			return err
+		})
+		if err != nil {
+			return count, err
+		}
+
+		count += *out.Count
+		scanned += *out.ScannedCount
+
+		if s.cc != nil {
+			addConsumedCapacity(s.cc, out.ConsumedCapacity)
+		}
+
+		if s.limit > 0 && count >= s.limit {
+			break
+		}
+		if s.searchLimit > 0 && scanned >= s.searchLimit {
+			break
+		}
+		if out.LastEvaluatedKey == nil {
+			break
+		}
+
+		input.ExclusiveStartKey = out.LastEvaluatedKey
+	}
+	return count, nil
+}
+
 func (s *Scan) scanInput() *dynamodb.ScanInput {
 	input := &dynamodb.ScanInput{
 		ExclusiveStartKey:         s.startKey,

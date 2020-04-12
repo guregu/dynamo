@@ -25,10 +25,13 @@ type Table struct {
 	db   *DB
 }
 
-// Table returns a Table handle specified by name.
+// Table returns a Table handle specified by name. If an exact match to
+// name exists in the DB's alias map, the value of that is used instead.
+// If the DB is configured with a prefix, it is prepended to the table name
+// regardless of whether an alias was used or not.
 func (db *DB) Table(name string) Table {
 	return Table{
-		name: name,
+		name: db.resolveTableName(name),
 		db:   db,
 	}
 }

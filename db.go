@@ -13,24 +13,44 @@ import (
 // DB is a DynamoDB client.
 type DB struct {
 	client dynamodbiface.DynamoDBAPI
+	Alias  map[string]string // Maps table aliases to physical names.
+	Prefix string            // Prepended to table names.
 }
 
 // New creates a new client with the given configuration.
 func New(p client.ConfigProvider, cfgs ...*aws.Config) *DB {
 	db := &DB{
-		dynamodb.New(p, cfgs...),
+		client: dynamodb.New(p, cfgs...),
+		Alias:  map[string]string{},
 	}
 	return db
 }
 
 // NewFromIface creates a new client with the given interface.
 func NewFromIface(client dynamodbiface.DynamoDBAPI) *DB {
-	return &DB{client}
+	return &DB{
+		client: client,
+		Alias:  map[string]string{},
+	}
 }
 
 // Client returns this DB's internal client used to make API requests.
 func (db *DB) Client() dynamodbiface.DynamoDBAPI {
 	return db.client
+}
+
+func (db *DB) resolveTableName(name string) string {
+	if db == nil {
+		return name
+	}
+
+	if db.Alias != nil {
+		if v, ok := db.Alias[name]; ok {
+			name = v
+		}
+	}
+
+	return db.Prefix + name
 }
 
 // ListTables is a request to list tables.

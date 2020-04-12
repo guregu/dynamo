@@ -5,7 +5,7 @@ require (
 	github.com/cenkalti/backoff v2.1.1+incompatible
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/gofrs/uuid v3.2.0+incompatible
-	github.com/stretchr/testify v1.3.0 // indirect
+	github.com/stretchr/testify v1.3.0
 	golang.org/x/net v0.0.0-20190318221613-d196dffd7c2b
 )
 

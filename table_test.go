@@ -6,6 +6,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAddConsumedCapacity(t *testing.T) {
@@ -56,4 +57,18 @@ func TestAddConsumedCapacity(t *testing.T) {
 	if !reflect.DeepEqual(cc, expected) {
 		t.Error("bad ConsumedCapacity:", cc, "≠", expected)
 	}
+}
+
+func TestTableAliasAndPrefix(t *testing.T) {
+	db := NewFromIface(nil)
+	require.Equal(t, "Alias1", db.Table("Alias1").name)
+
+	db.Alias["Alias1"] = "table1"
+	db.Alias["Alias2"] = "table2"
+	require.Equal(t, "table1", db.Table("Alias1").name)
+	require.Equal(t, "Alias3", db.Table("Alias3").name)
+
+	db.Prefix = "test-"
+	require.Equal(t, "test-table1", db.Table("Alias1").name)
+	require.Equal(t, "test-Alias3", db.Table("Alias3").name)
 }

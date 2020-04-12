@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+	"github.com/stretchr/testify/require"
 )
 
 type UserAction struct {
@@ -154,4 +155,13 @@ func TestCreateTableUintUnixTime(t *testing.T) {
 	if !reflect.DeepEqual(input2, expected) {
 		t.Error("unexpected input (unixtime tag)", input2)
 	}
+}
+
+func TestCreateTableAliasAndPrefix(t *testing.T) {
+	db := NewFromIface(nil)
+	db.Alias["Alias1"] = "table1"
+	db.Prefix = "test-"
+
+	input := db.CreateTable("Alias1", Metric{})
+	require.Equal(t, "test-table1", input.tableName)
 }

@@ -254,9 +254,7 @@ func marshalReflect(rv reflect.Value, special string) (*dynamodb.AttributeValue,
 			var data []byte
 			if rv.Kind() == reflect.Array {
 				data = make([]byte, rv.Len())
-				for i := 0; i < rv.Len(); i++ {
-					data[i] = rv.Index(i).Interface().(byte)
-				}
+				reflect.Copy(reflect.ValueOf(data), rv)
 			} else {
 				data = rv.Bytes()
 			}
@@ -402,11 +400,8 @@ func marshalSet(rv reflect.Value) (*dynamodb.AttributeValue, error) {
 					if useBool && !rv.MapIndex(k).Bool() {
 						continue
 					}
-					// TODO: is there a better way to turn [n]byte into []byte with reflection?
 					key := make([]byte, k.Len())
-					for i := 0; i < k.Len(); i++ {
-						key[i] = (byte)(k.Index(i).Uint())
-					}
+					reflect.Copy(reflect.ValueOf(key), k)
 					bs = append(bs, key)
 				}
 				return &dynamodb.AttributeValue{BS: bs}, nil

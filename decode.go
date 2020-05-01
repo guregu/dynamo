@@ -202,9 +202,7 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 		case av.BS != nil:
 			for _, bb := range av.BS {
 				kv := reflect.New(rv.Type().Key()).Elem()
-				for i, b := range bb {
-					kv.Index(i).Set(reflect.ValueOf(b))
-				}
+				reflect.Copy(kv, reflect.ValueOf(bb))
 				rv.SetMapIndex(kv, truthy)
 			}
 			return nil
@@ -217,9 +215,10 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 		elemtype := arr.Type().Elem()
 		switch {
 		case av.B != nil:
-			for i, b := range av.B {
-				arr.Index(i).Set(reflect.ValueOf(b))
+			if len(av.B) > arr.Len() {
+				return fmt.Errorf("dynamo: cannot marshal %s into %s; too small (dst len: %d, src len: %d)", avTypeName(av), arr.Type().String(), arr.Len(), len(av.B))
 			}
+			reflect.Copy(arr, reflect.ValueOf(av.B))
 			rv.Set(arr)
 			return nil
 		case av.L != nil:

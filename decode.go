@@ -222,6 +222,9 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 			rv.Set(arr)
 			return nil
 		case av.L != nil:
+			if len(av.L) > arr.Len() {
+				return fmt.Errorf("dynamo: cannot marshal %s into %s; too small (dst len: %d, src len: %d)", avTypeName(av), arr.Type().String(), arr.Len(), len(av.L))
+			}
 			for i, innerAV := range av.L {
 				innerRV := reflect.New(elemtype).Elem()
 				if err := unmarshalReflect(innerAV, innerRV); err != nil {

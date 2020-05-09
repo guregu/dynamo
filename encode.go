@@ -26,6 +26,11 @@ func MarshalItem(v interface{}) (map[string]*dynamodb.AttributeValue, error) {
 }
 
 func marshalItem(v interface{}) (map[string]*dynamodb.AttributeValue, error) {
+	// TODO(guregu): this is a bit of a hack, we should have an interface for unmarshaling items
+	if awsEnc, ok := v.(awsEncoder); ok {
+		return dynamodbattribute.MarshalMap(awsEnc.iface)
+	}
+
 	rv := reflect.ValueOf(v)
 	switch rv.Type().Kind() {
 	case reflect.Ptr:

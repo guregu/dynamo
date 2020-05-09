@@ -50,3 +50,43 @@ func TestPut(t *testing.T) {
 		t.Error("expected ConditionalCheckFailedException, not", err)
 	}
 }
+
+func TestPutAWSEncoding(t *testing.T) {
+	if testDB == nil {
+		t.Skip(offlineSkipMsg)
+	}
+	table := testDB.Table(testTable)
+
+	type awsWidget struct {
+		XUserID int               `dynamodbav:"UserID"`
+		XTime   string            `dynamodbav:"Time"`
+		XMsg    string            `dynamodbav:"Msg"`
+		XCount  int               `dynamodbav:"Count"`
+		XMeta   map[string]string `dynamodbav:"Meta"`
+	}
+
+	now := time.Now().UTC()
+	nowtext, err := now.MarshalText()
+	if err != nil {
+		t.Error(err)
+	}
+	item := awsWidget{
+		XUserID: -1,
+		XTime:   string(nowtext),
+		XMsg:    "hello world",
+	}
+
+	err = table.Put(AWSEncoding(item)).Run()
+	if err != nil {
+		t.Error(err)
+	}
+
+	var result awsWidget
+	err = table.Get("UserID", item.XUserID).Range("Time", Equal, item.XTime).One(AWSEncoding(&result))
+	if err != nil {
+		t.Error(err)
+	}
+	if !reflect.DeepEqual(item, result) {
+		t.Errorf("bad aws put/get result. %#v ≠ %#v", item, result)
+	}
+}

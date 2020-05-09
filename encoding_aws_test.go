@@ -80,3 +80,38 @@ func TestAWSIfaces(t *testing.T) {
 		t.Error("unmarshal not equal.", result, "≠", officialResult)
 	}
 }
+
+func TestAWSItems(t *testing.T) {
+	type Foo struct {
+		ID string `dynamodbav:"id"`
+	}
+
+	item := Foo{
+		ID: "abcdefg",
+	}
+
+	result, err := marshalItem(AWSEncoding(item))
+	if err != nil {
+		t.Error(err)
+	}
+	official, err := dynamodbattribute.MarshalMap(item)
+	if err != nil {
+		t.Error(err)
+	}
+	if !reflect.DeepEqual(result, official) {
+		t.Error("marshal not equal.", result, "≠", official)
+	}
+
+	var unmarshaled, unmarshaledOfficial Foo
+	err = unmarshalItem(official, AWSEncoding(&unmarshaled))
+	if err != nil {
+		t.Error(err)
+	}
+	err = dynamodbattribute.UnmarshalMap(official, &unmarshaledOfficial)
+	if err != nil {
+		t.Error(err)
+	}
+	if !reflect.DeepEqual(unmarshaled, unmarshaledOfficial) {
+		t.Error("marshal not equal.", unmarshaled, "≠", unmarshaledOfficial)
+	}
+}

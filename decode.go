@@ -352,6 +352,10 @@ func unmarshalItem(item map[string]*dynamodb.AttributeValue, out interface{}) er
 		*out = item
 		return nil
 	}
+	// TODO(guregu): hack?
+	if awsEnc, ok := out.(awsEncoder); ok {
+		return dynamodbattribute.UnmarshalMap(item, awsEnc.iface)
+	}
 
 	rv := reflect.ValueOf(out)
 	if rv.Kind() != reflect.Ptr {

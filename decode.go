@@ -17,6 +17,12 @@ type Unmarshaler interface {
 	UnmarshalDynamo(av *dynamodb.AttributeValue) error
 }
 
+// ItemUnmarshaler is the interface implemented by objects that can unmarshal
+// an Item (a map of strings to AttributeValues) into themselves.
+type ItemUnmarshaler interface {
+	UnmarshalDynamoItem(item map[string]*dynamodb.AttributeValue) error
+}
+
 // Unmarshal decodes a DynamoDB item into out, which must be a pointer.
 func UnmarshalItem(item map[string]*dynamodb.AttributeValue, out interface{}) error {
 	return unmarshalItem(item, out)
@@ -360,6 +366,21 @@ func unmarshalItem(item map[string]*dynamodb.AttributeValue, out interface{}) er
 	rv := reflect.ValueOf(out)
 	if rv.Kind() != reflect.Ptr {
 		return fmt.Errorf("dynamo: unmarshal: not a pointer: %T", out)
+	}
+
+
+	if rv.CanInterface() {
+		var iface interface{}
+		if rv.CanAddr() {
+			iface = rv.Addr().Interface()
+		} else {
+			iface = rv.Interface()
+		}
+
+		x, ok := iface.(ItemUnmarshaler)
+		if ok {
+			return x.UnmarshalDynamoItem(item)
+		}
 	}
 
 	switch rv.Elem().Kind() {

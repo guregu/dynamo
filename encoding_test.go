@@ -1,6 +1,7 @@
 package dynamo
 
 import (
+	"errors"
 	"encoding"
 	"strconv"
 	"time"
@@ -425,6 +426,13 @@ var itemEncodingTests = []struct {
 		},
 		out: map[string]*dynamodb.AttributeValue{},
 	},
+	{
+		name: "dynamodb.ItemUnmarshaler",
+		in: customItemMarshaler{Thing: 52},
+		out: map[string]*dynamodb.AttributeValue{
+			"thing": &dynamodb.AttributeValue{N: aws.String("52")},
+		},
+	},
 }
 
 type embedded struct {
@@ -480,9 +488,44 @@ func (tm *ptrTextMarshaler) UnmarshalText(text []byte) error {
 	return nil
 }
 
+type customItemMarshaler struct {
+	Thing interface{} 	`dynamo:"thing"`
+}
+
+func (cim *customItemMarshaler) MarshalDynamoItem() (map[string]*dynamodb.AttributeValue, error) {
+	thing := strconv.Itoa(cim.Thing.(int))
+	attrs := map[string]*dynamodb.AttributeValue{
+		"thing": &dynamodb.AttributeValue{
+			N: &thing,
+		},
+	}
+
+	return attrs, nil
+}
+
+
+func (cim *customItemMarshaler) UnmarshalDynamoItem(item map[string]*dynamodb.AttributeValue) error {
+	thingAttr := item["thing"]
+
+	if thingAttr == nil || thingAttr.N == nil {
+		return errors.New("Missing or not a number")
+	}
+
+	thing, err := strconv.Atoi(*thingAttr.N)
+	if err != nil {
+		return errors.New("Invalid number")
+	}
+
+	cim.Thing = thing
+	return nil
+}
+
+
 var (
 	_ Marshaler                = new(customMarshaler)
 	_ Unmarshaler              = new(customMarshaler)
+	_ ItemMarshaler            = new(customItemMarshaler)
+	_ ItemUnmarshaler          = new(customItemMarshaler)
 	_ encoding.TextMarshaler   = new(textMarshaler)
 	_ encoding.TextUnmarshaler = new(textMarshaler)
 	_ encoding.TextMarshaler   = new(ptrTextMarshaler)

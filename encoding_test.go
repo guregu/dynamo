@@ -1,8 +1,8 @@
 package dynamo
 
 import (
-	"errors"
 	"encoding"
+	"errors"
 	"strconv"
 	"time"
 
@@ -428,7 +428,14 @@ var itemEncodingTests = []struct {
 	},
 	{
 		name: "dynamodb.ItemUnmarshaler",
-		in: customItemMarshaler{Thing: 52},
+		in:   customItemMarshaler{Thing: 52},
+		out: map[string]*dynamodb.AttributeValue{
+			"thing": &dynamodb.AttributeValue{N: aws.String("52")},
+		},
+	},
+	{
+		name: "*dynamodb.ItemUnmarshaler",
+		in:   &customItemMarshaler{Thing: 52},
 		out: map[string]*dynamodb.AttributeValue{
 			"thing": &dynamodb.AttributeValue{N: aws.String("52")},
 		},
@@ -489,7 +496,7 @@ func (tm *ptrTextMarshaler) UnmarshalText(text []byte) error {
 }
 
 type customItemMarshaler struct {
-	Thing interface{} 	`dynamo:"thing"`
+	Thing interface{} `dynamo:"thing"`
 }
 
 func (cim *customItemMarshaler) MarshalDynamoItem() (map[string]*dynamodb.AttributeValue, error) {
@@ -502,7 +509,6 @@ func (cim *customItemMarshaler) MarshalDynamoItem() (map[string]*dynamodb.Attrib
 
 	return attrs, nil
 }
-
 
 func (cim *customItemMarshaler) UnmarshalDynamoItem(item map[string]*dynamodb.AttributeValue) error {
 	thingAttr := item["thing"]
@@ -519,7 +525,6 @@ func (cim *customItemMarshaler) UnmarshalDynamoItem(item map[string]*dynamodb.At
 	cim.Thing = thing
 	return nil
 }
-
 
 var (
 	_ Marshaler                = new(customMarshaler)

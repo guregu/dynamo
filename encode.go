@@ -20,7 +20,7 @@ type Marshaler interface {
 	MarshalDynamo() (*dynamodb.AttributeValue, error)
 }
 
-// ItemMarshaler is the interface implemented by objects that can marshal themselves 
+// ItemMarshaler is the interface implemented by objects that can marshal themselves
 // into an Item (a map of strings to AttributeValues).
 type ItemMarshaler interface {
 	MarshalDynamoItem() (map[string]*dynamodb.AttributeValue, error)
@@ -32,26 +32,15 @@ func MarshalItem(v interface{}) (map[string]*dynamodb.AttributeValue, error) {
 }
 
 func marshalItem(v interface{}) (map[string]*dynamodb.AttributeValue, error) {
-	// TODO(guregu): this is a bit of a hack, we should have an interface for unmarshaling items
-	if awsEnc, ok := v.(awsEncoder); ok {
-		return dynamodbattribute.MarshalMap(awsEnc.iface)
+	switch x := v.(type) {
+	case awsEncoder:
+		// special case for AWSEncoding
+		return dynamodbattribute.MarshalMap(x.iface)
+	case ItemMarshaler:
+		return x.MarshalDynamoItem()
 	}
 
 	rv := reflect.ValueOf(v)
-
-	if rv.CanInterface() {
-		var iface interface{}
-		if rv.CanAddr() {
-			iface = rv.Addr().Interface()
-		} else {
-			iface = rv.Interface()
-		}
-
-		x, ok := iface.(ItemMarshaler)
-		if ok {
-			return x.MarshalDynamoItem()
-		}
-	}
 
 	switch rv.Type().Kind() {
 	case reflect.Ptr:

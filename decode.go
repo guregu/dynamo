@@ -354,33 +354,20 @@ func fieldsInStruct(rv reflect.Value) map[string]reflect.Value {
 
 // unmarshals a struct
 func unmarshalItem(item map[string]*dynamodb.AttributeValue, out interface{}) error {
-	if out, ok := out.(*map[string]*dynamodb.AttributeValue); ok {
-		*out = item
+	switch x := out.(type) {
+	case *map[string]*dynamodb.AttributeValue:
+		*x = item
 		return nil
-	}
-	// TODO(guregu): hack?
-	if awsEnc, ok := out.(awsEncoder); ok {
-		return dynamodbattribute.UnmarshalMap(item, awsEnc.iface)
+	case awsEncoder:
+		// special case for AWSEncoding
+		return dynamodbattribute.UnmarshalMap(item, x.iface)
+	case ItemUnmarshaler:
+		return x.UnmarshalDynamoItem(item)
 	}
 
 	rv := reflect.ValueOf(out)
 	if rv.Kind() != reflect.Ptr {
 		return fmt.Errorf("dynamo: unmarshal: not a pointer: %T", out)
-	}
-
-
-	if rv.CanInterface() {
-		var iface interface{}
-		if rv.CanAddr() {
-			iface = rv.Addr().Interface()
-		} else {
-			iface = rv.Interface()
-		}
-
-		x, ok := iface.(ItemUnmarshaler)
-		if ok {
-			return x.UnmarshalDynamoItem(item)
-		}
 	}
 
 	switch rv.Elem().Kind() {

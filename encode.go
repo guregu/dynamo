@@ -33,6 +33,8 @@ func MarshalItem(v interface{}) (map[string]*dynamodb.AttributeValue, error) {
 
 func marshalItem(v interface{}) (map[string]*dynamodb.AttributeValue, error) {
 	switch x := v.(type) {
+	case map[string]*dynamodb.AttributeValue:
+		return x, nil
 	case awsEncoder:
 		// special case for AWSEncoding
 		return dynamodbattribute.MarshalMap(x.iface)

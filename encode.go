@@ -359,7 +359,7 @@ func marshalSet(rv reflect.Value) (*dynamodb.AttributeValue, error) {
 		}
 	case reflect.Map:
 		useBool := rv.Type().Elem().Kind() == reflect.Bool
-		if !useBool && rv.Type().Elem() != emptyStructType {
+		if !useBool && rv.Type().Elem() != emptyStructType && !(rv.Type().Elem().Kind() == reflect.Struct && rv.Type().Elem().NumField() == 0) {
 			return nil, fmt.Errorf("dynamo: cannot marshal type %v into a set", rv.Type())
 		}
 

@@ -22,6 +22,7 @@ var (
 )
 
 type customString string
+type customEmpty struct{}
 
 var encodingTests = []struct {
 	name string
@@ -277,6 +278,7 @@ var itemEncodingTests = []struct {
 			SS6 []customString             `dynamo:",set"`
 			SS7 map[textMarshaler]struct{} `dynamo:",set"`
 			SS8 map[textMarshaler]bool     `dynamo:",set"`
+			SS9 map[string]customEmpty     `dynamo:",set"`
 			BS1 [][]byte                   `dynamo:",set"`
 			BS2 map[[1]byte]struct{}       `dynamo:",set"`
 			BS3 map[[1]byte]bool           `dynamo:",set"`
@@ -294,6 +296,7 @@ var itemEncodingTests = []struct {
 			SS6: []customString{"A", "B"},
 			SS7: map[textMarshaler]struct{}{textMarshaler(true): struct{}{}},
 			SS8: map[textMarshaler]bool{textMarshaler(false): true},
+			SS9: map[string]customEmpty{"A": customEmpty{}},
 			BS1: [][]byte{[]byte{'A'}, []byte{'B'}},
 			BS2: map[[1]byte]struct{}{[1]byte{'A'}: struct{}{}},
 			BS3: map[[1]byte]bool{[1]byte{'A'}: true},
@@ -312,6 +315,7 @@ var itemEncodingTests = []struct {
 			"SS6": &dynamodb.AttributeValue{SS: []*string{aws.String("A"), aws.String("B")}},
 			"SS7": &dynamodb.AttributeValue{SS: []*string{aws.String("true")}},
 			"SS8": &dynamodb.AttributeValue{SS: []*string{aws.String("false")}},
+			"SS9": &dynamodb.AttributeValue{SS: []*string{aws.String("A")}},
 			"BS1": &dynamodb.AttributeValue{BS: [][]byte{[]byte{'A'}, []byte{'B'}}},
 			"BS2": &dynamodb.AttributeValue{BS: [][]byte{[]byte{'A'}}},
 			"BS3": &dynamodb.AttributeValue{BS: [][]byte{[]byte{'A'}}},

@@ -41,7 +41,14 @@ func main() {
 	// put item
 	w := widget{UserID: 613, Time: time.Now(), Msg: "hello"}
 	err := table.Put(w).Run()
-
+	
+	// update item field
+	w.Msg = "hello again"
+	m, err := dynamo.MarshalItem(w)
+	err = table.Update("UserID", m["UserID"]).
+		Set("Msg", m["Msg"]).
+		Run()
+		
 	// get the same item
 	var result widget
 	err = table.Get("UserID", w.UserID).

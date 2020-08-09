@@ -22,6 +22,7 @@ var (
 )
 
 type customString string
+type customEmpty struct{}
 
 var encodingTests = []struct {
 	name string
@@ -439,63 +440,66 @@ var itemEncodingTests = []struct {
 	{
 		name: "sets",
 		in: struct {
-			SS1 []string                   `dynamo:",set"`
-			SS2 []textMarshaler            `dynamo:",set"`
-			SS3 map[string]struct{}        `dynamo:",set"`
-			SS4 map[string]bool            `dynamo:",set"`
-			SS5 map[customString]struct{}  `dynamo:",set"`
-			SS6 []customString             `dynamo:",set"`
-			SS7 map[textMarshaler]struct{} `dynamo:",set"`
-			SS8 map[textMarshaler]bool     `dynamo:",set"`
-			SS9 []string                   `dynamo:",set"`
-			BS1 [][]byte                   `dynamo:",set"`
-			BS2 map[[1]byte]struct{}       `dynamo:",set"`
-			BS3 map[[1]byte]bool           `dynamo:",set"`
-			BS4 [][]byte                   `dynamo:",set"`
-			NS1 []int                      `dynamo:",set"`
-			NS2 []float64                  `dynamo:",set"`
-			NS3 []uint                     `dynamo:",set"`
-			NS4 map[int]struct{}           `dynamo:",set"`
-			NS5 map[uint]bool              `dynamo:",set"`
+			SS1  []string                   `dynamo:",set"`
+			SS2  []textMarshaler            `dynamo:",set"`
+			SS3  map[string]struct{}        `dynamo:",set"`
+			SS4  map[string]bool            `dynamo:",set"`
+			SS5  map[customString]struct{}  `dynamo:",set"`
+			SS6  []customString             `dynamo:",set"`
+			SS7  map[textMarshaler]struct{} `dynamo:",set"`
+			SS8  map[textMarshaler]bool     `dynamo:",set"`
+			SS9  []string                   `dynamo:",set"`
+			SS10 map[string]customEmpty     `dynamo:",set"`
+			BS1  [][]byte                   `dynamo:",set"`
+			BS2  map[[1]byte]struct{}       `dynamo:",set"`
+			BS3  map[[1]byte]bool           `dynamo:",set"`
+			BS4  [][]byte                   `dynamo:",set"`
+			NS1  []int                      `dynamo:",set"`
+			NS2  []float64                  `dynamo:",set"`
+			NS3  []uint                     `dynamo:",set"`
+			NS4  map[int]struct{}           `dynamo:",set"`
+			NS5  map[uint]bool              `dynamo:",set"`
 		}{
-			SS1: []string{"A", "B"},
-			SS2: []textMarshaler{textMarshaler(true), textMarshaler(false)},
-			SS3: map[string]struct{}{"A": struct{}{}},
-			SS4: map[string]bool{"A": true},
-			SS5: map[customString]struct{}{"A": struct{}{}},
-			SS6: []customString{"A", "B"},
-			SS7: map[textMarshaler]struct{}{textMarshaler(true): struct{}{}},
-			SS8: map[textMarshaler]bool{textMarshaler(false): true},
-			SS9: []string{"A", "B", ""},
-			BS1: [][]byte{[]byte{'A'}, []byte{'B'}},
-			BS2: map[[1]byte]struct{}{[1]byte{'A'}: struct{}{}},
-			BS3: map[[1]byte]bool{[1]byte{'A'}: true},
-			BS4: [][]byte{[]byte{'A'}, []byte{'B'}, []byte{}},
-			NS1: []int{1, 2},
-			NS2: []float64{1, 2},
-			NS3: []uint{1, 2},
-			NS4: map[int]struct{}{maxInt: struct{}{}},
-			NS5: map[uint]bool{maxUint: true},
+			SS1:  []string{"A", "B"},
+			SS2:  []textMarshaler{textMarshaler(true), textMarshaler(false)},
+			SS3:  map[string]struct{}{"A": struct{}{}},
+			SS4:  map[string]bool{"A": true},
+			SS5:  map[customString]struct{}{"A": struct{}{}},
+			SS6:  []customString{"A", "B"},
+			SS7:  map[textMarshaler]struct{}{textMarshaler(true): struct{}{}},
+			SS8:  map[textMarshaler]bool{textMarshaler(false): true},
+			SS9:  []string{"A", "B", ""},
+			SS10: map[string]customEmpty{"A": customEmpty{}},
+			BS1:  [][]byte{[]byte{'A'}, []byte{'B'}},
+			BS2:  map[[1]byte]struct{}{[1]byte{'A'}: struct{}{}},
+			BS3:  map[[1]byte]bool{[1]byte{'A'}: true},
+			BS4:  [][]byte{[]byte{'A'}, []byte{'B'}, []byte{}},
+			NS1:  []int{1, 2},
+			NS2:  []float64{1, 2},
+			NS3:  []uint{1, 2},
+			NS4:  map[int]struct{}{maxInt: struct{}{}},
+			NS5:  map[uint]bool{maxUint: true},
 		},
 		out: map[string]*dynamodb.AttributeValue{
-			"SS1": &dynamodb.AttributeValue{SS: []*string{aws.String("A"), aws.String("B")}},
-			"SS2": &dynamodb.AttributeValue{SS: []*string{aws.String("true"), aws.String("false")}},
-			"SS3": &dynamodb.AttributeValue{SS: []*string{aws.String("A")}},
-			"SS4": &dynamodb.AttributeValue{SS: []*string{aws.String("A")}},
-			"SS5": &dynamodb.AttributeValue{SS: []*string{aws.String("A")}},
-			"SS6": &dynamodb.AttributeValue{SS: []*string{aws.String("A"), aws.String("B")}},
-			"SS7": &dynamodb.AttributeValue{SS: []*string{aws.String("true")}},
-			"SS8": &dynamodb.AttributeValue{SS: []*string{aws.String("false")}},
-			"SS9": &dynamodb.AttributeValue{SS: []*string{aws.String("A"), aws.String("B"), aws.String("")}},
-			"BS1": &dynamodb.AttributeValue{BS: [][]byte{[]byte{'A'}, []byte{'B'}}},
-			"BS2": &dynamodb.AttributeValue{BS: [][]byte{[]byte{'A'}}},
-			"BS3": &dynamodb.AttributeValue{BS: [][]byte{[]byte{'A'}}},
-			"BS4": &dynamodb.AttributeValue{BS: [][]byte{[]byte{'A'}, []byte{'B'}, []byte{}}},
-			"NS1": &dynamodb.AttributeValue{NS: []*string{aws.String("1"), aws.String("2")}},
-			"NS2": &dynamodb.AttributeValue{NS: []*string{aws.String("1"), aws.String("2")}},
-			"NS3": &dynamodb.AttributeValue{NS: []*string{aws.String("1"), aws.String("2")}},
-			"NS4": &dynamodb.AttributeValue{NS: []*string{aws.String(maxIntStr)}},
-			"NS5": &dynamodb.AttributeValue{NS: []*string{aws.String(maxUintStr)}},
+			"SS1":  &dynamodb.AttributeValue{SS: []*string{aws.String("A"), aws.String("B")}},
+			"SS2":  &dynamodb.AttributeValue{SS: []*string{aws.String("true"), aws.String("false")}},
+			"SS3":  &dynamodb.AttributeValue{SS: []*string{aws.String("A")}},
+			"SS4":  &dynamodb.AttributeValue{SS: []*string{aws.String("A")}},
+			"SS5":  &dynamodb.AttributeValue{SS: []*string{aws.String("A")}},
+			"SS6":  &dynamodb.AttributeValue{SS: []*string{aws.String("A"), aws.String("B")}},
+			"SS7":  &dynamodb.AttributeValue{SS: []*string{aws.String("true")}},
+			"SS8":  &dynamodb.AttributeValue{SS: []*string{aws.String("false")}},
+			"SS9":  &dynamodb.AttributeValue{SS: []*string{aws.String("A"), aws.String("B"), aws.String("")}},
+			"SS10": &dynamodb.AttributeValue{SS: []*string{aws.String("A")}},
+			"BS1":  &dynamodb.AttributeValue{BS: [][]byte{[]byte{'A'}, []byte{'B'}}},
+			"BS2":  &dynamodb.AttributeValue{BS: [][]byte{[]byte{'A'}}},
+			"BS3":  &dynamodb.AttributeValue{BS: [][]byte{[]byte{'A'}}},
+			"BS4":  &dynamodb.AttributeValue{BS: [][]byte{[]byte{'A'}, []byte{'B'}, []byte{}}},
+			"NS1":  &dynamodb.AttributeValue{NS: []*string{aws.String("1"), aws.String("2")}},
+			"NS2":  &dynamodb.AttributeValue{NS: []*string{aws.String("1"), aws.String("2")}},
+			"NS3":  &dynamodb.AttributeValue{NS: []*string{aws.String("1"), aws.String("2")}},
+			"NS4":  &dynamodb.AttributeValue{NS: []*string{aws.String(maxIntStr)}},
+			"NS5":  &dynamodb.AttributeValue{NS: []*string{aws.String(maxUintStr)}},
 		},
 	},
 	{

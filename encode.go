@@ -50,14 +50,14 @@ func marshalItem(v interface{}) (map[string]*dynamodb.AttributeValue, error) {
 	case reflect.Struct:
 		return marshalStruct(rv)
 	case reflect.Map:
-		return marshalMap(rv.Interface())
+		return marshalMap(rv.Interface(), "item")
 	}
 	return nil, fmt.Errorf("dynamo: marshal item: unsupported type %T: %v", rv.Interface(), rv.Interface())
 }
 
-func marshalMap(v interface{}) (map[string]*dynamodb.AttributeValue, error) {
+func marshalMap(v interface{}, special string) (map[string]*dynamodb.AttributeValue, error) {
 	// TODO: maybe unify this with the map stuff in marshal
-	av, err := marshal(v, "")
+	av, err := marshal(v, special)
 	if err != nil {
 		return nil, err
 	}
@@ -205,6 +205,9 @@ func marshalReflect(rv reflect.Value, special string) (*dynamodb.AttributeValue,
 	case reflect.String:
 		s := rv.String()
 		if len(s) == 0 {
+			if special == "allowempty" {
+				return &dynamodb.AttributeValue{S: aws.String("")}, nil
+			}
 			return nil, nil
 		}
 		return &dynamodb.AttributeValue{S: aws.String(s)}, nil
@@ -241,17 +244,23 @@ func marshalReflect(rv reflect.Value, special string) (*dynamodb.AttributeValue,
 		}
 
 		avs := make(map[string]*dynamodb.AttributeValue)
+		var subflag string
+		if special != "item" {
+			subflag = "allowempty"
+		}
 		for _, key := range rv.MapKeys() {
-			v, err := marshal(rv.MapIndex(key).Interface(), "")
+			v, err := marshal(rv.MapIndex(key).Interface(), subflag)
+			if err != nil {
+				return nil, err
+			}
+			kstr, err := keyString(key)
 			if err != nil {
 				return nil, err
 			}
 			if v != nil {
-				kstr, err := keyString(key)
-				if err != nil {
-					return nil, err
-				}
 				avs[kstr] = v
+			} else if special != "item" {
+				avs[kstr] = &dynamodb.AttributeValue{NULL: aws.Bool(true)}
 			}
 		}
 		return &dynamodb.AttributeValue{M: avs}, nil
@@ -264,8 +273,7 @@ func marshalReflect(rv reflect.Value, special string) (*dynamodb.AttributeValue,
 	case reflect.Slice, reflect.Array:
 		// special case: byte slice is B
 		if rv.Type().Elem().Kind() == reflect.Uint8 {
-			// binary values can't be empty
-			if rv.Len() == 0 {
+			if rv.Len() == 0 && special != "allowempty" {
 				return nil, nil
 			}
 			var data []byte
@@ -291,11 +299,15 @@ func marshalReflect(rv reflect.Value, special string) (*dynamodb.AttributeValue,
 		avs := make([]*dynamodb.AttributeValue, 0, rv.Len())
 		for i := 0; i < rv.Len(); i++ {
 			innerVal := rv.Index(i)
-			av, err := marshal(innerVal.Interface(), "")
+			av, err := marshal(innerVal.Interface(), "allowempty")
 			if err != nil {
 				return nil, err
 			}
-			avs = append(avs, av)
+			if av == nil {
+				avs = append(avs, &dynamodb.AttributeValue{NULL: aws.Bool(true)})
+			} else {
+				avs = append(avs, av)
+			}
 		}
 		return &dynamodb.AttributeValue{L: avs}, nil
 	default:
@@ -314,9 +326,7 @@ func marshalSet(rv reflect.Value) (*dynamodb.AttributeValue, error) {
 			if err != nil {
 				return nil, err
 			}
-			if len(text) > 0 {
-				ss = append(ss, aws.String(string(text)))
-			}
+			ss = append(ss, aws.String(string(text)))
 		}
 		return &dynamodb.AttributeValue{SS: ss}, nil
 	}

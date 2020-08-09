@@ -4,6 +4,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/aws/aws-sdk-go/aws"
 )
 
 func TestPut(t *testing.T) {
@@ -12,11 +14,23 @@ func TestPut(t *testing.T) {
 	}
 	table := testDB.Table(testTable)
 
+	type widget2 struct {
+		widget
+		List []*string
+		Set1 []string            `dynamo:",set"`
+		Set2 map[string]struct{} `dynamo:",set"`
+		Map1 map[string]string
+		Map2 map[string]*string
+	}
+
 	now := time.Now().UTC()
-	item := widget{
-		UserID: 42,
-		Time:   now,
-		Msg:    "old",
+	item := widget2{
+		widget: widget{
+			UserID: 42,
+			Time:   now,
+			Msg:    "old",
+		},
+		List: []*string{},
 	}
 
 	err := table.Put(item).Run()
@@ -24,12 +38,19 @@ func TestPut(t *testing.T) {
 		t.Error("unexpected error:", err)
 	}
 
-	newItem := widget{
-		UserID: 42,
-		Time:   now,
-		Msg:    "new",
+	newItem := widget2{
+		widget: widget{
+			UserID: 42,
+			Time:   now,
+			Msg:    "new",
+		},
+		List: []*string{aws.String("abc"), aws.String(""), aws.String("def"), nil, aws.String("ghi")},
+		Set1: []string{"A", "B", ""},
+		Set2: map[string]struct{}{"C": struct{}{}, "D": struct{}{}, "": struct{}{}},
+		Map1: map[string]string{"A": "hello", "B": ""},
+		Map2: map[string]*string{"C": aws.String("world"), "D": nil, "E": aws.String("")},
 	}
-	var oldValue widget
+	var oldValue widget2
 	var cc ConsumedCapacity
 	err = table.Put(newItem).ConsumedCapacity(&cc).OldValue(&oldValue)
 	if err != nil {

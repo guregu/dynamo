@@ -139,6 +139,112 @@ var encodingTests = []struct {
 			{N: aws.String("3")},
 		}},
 	},
+	{
+		name: "slice with nil",
+		in:   []*int64{nil, aws.Int64(0), nil, aws.Int64(1337), nil},
+		out: &dynamodb.AttributeValue{L: []*dynamodb.AttributeValue{
+			{NULL: aws.Bool(true)},
+			{N: aws.String("0")},
+			{NULL: aws.Bool(true)},
+			{N: aws.String("1337")},
+			{NULL: aws.Bool(true)},
+		}},
+	},
+	{
+		name: "array with nil",
+		in:   [...]*int64{nil, aws.Int64(0), nil, aws.Int64(1337), nil},
+		out: &dynamodb.AttributeValue{L: []*dynamodb.AttributeValue{
+			{NULL: aws.Bool(true)},
+			{N: aws.String("0")},
+			{NULL: aws.Bool(true)},
+			{N: aws.String("1337")},
+			{NULL: aws.Bool(true)},
+		}},
+	},
+	{
+		name: "slice with empty string",
+		in:   []string{"", "hello", "", "world", ""},
+		out: &dynamodb.AttributeValue{L: []*dynamodb.AttributeValue{
+			{S: aws.String("")},
+			{S: aws.String("hello")},
+			{S: aws.String("")},
+			{S: aws.String("world")},
+			{S: aws.String("")},
+		}},
+	},
+	{
+		name: "array with empty string",
+		in:   [...]string{"", "hello", "", "world", ""},
+		out: &dynamodb.AttributeValue{L: []*dynamodb.AttributeValue{
+			{S: aws.String("")},
+			{S: aws.String("hello")},
+			{S: aws.String("")},
+			{S: aws.String("world")},
+			{S: aws.String("")},
+		}},
+	},
+	{
+		name: "slice of string pointers",
+		in:   []*string{nil, aws.String("hello"), aws.String(""), aws.String("world"), nil},
+		out: &dynamodb.AttributeValue{L: []*dynamodb.AttributeValue{
+			{NULL: aws.Bool(true)},
+			{S: aws.String("hello")},
+			{S: aws.String("")},
+			{S: aws.String("world")},
+			{NULL: aws.Bool(true)},
+		}},
+	},
+	{
+		name: "map with empty string values",
+		in:   map[string]string{"A": "", "B": "hello", "C": ""},
+		out: &dynamodb.AttributeValue{M: map[string]*dynamodb.AttributeValue{
+			"A": {S: aws.String("")},
+			"B": {S: aws.String("hello")},
+			"C": {S: aws.String("")},
+		}},
+	},
+	{
+		name: "map with string pointer values",
+		in:   map[string]*string{"A": aws.String(""), "B": aws.String("hello"), "C": nil},
+		out: &dynamodb.AttributeValue{M: map[string]*dynamodb.AttributeValue{
+			"A": {S: aws.String("")},
+			"B": {S: aws.String("hello")},
+			"C": {NULL: aws.Bool(true)},
+		}},
+	},
+	{
+		name: "slice with empty binary",
+		in:   [][]byte{[]byte{}, []byte("hello"), []byte{}, []byte("world"), []byte{}},
+		out: &dynamodb.AttributeValue{L: []*dynamodb.AttributeValue{
+			{B: []byte{}},
+			{B: []byte{'h', 'e', 'l', 'l', 'o'}},
+			{B: []byte{}},
+			{B: []byte{'w', 'o', 'r', 'l', 'd'}},
+			{B: []byte{}},
+		}},
+	},
+	{
+		name: "array with empty binary",
+		in:   [...][]byte{[]byte{}, []byte("hello"), []byte{}, []byte("world"), []byte{}},
+		out: &dynamodb.AttributeValue{L: []*dynamodb.AttributeValue{
+			{B: []byte{}},
+			{B: []byte{'h', 'e', 'l', 'l', 'o'}},
+			{B: []byte{}},
+			{B: []byte{'w', 'o', 'r', 'l', 'd'}},
+			{B: []byte{}},
+		}},
+	},
+	{
+		name: "array with empty binary ptrs",
+		in:   [...]*[]byte{byteSlicePtr([]byte{}), byteSlicePtr([]byte("hello")), nil, byteSlicePtr([]byte("world")), byteSlicePtr([]byte{})},
+		out: &dynamodb.AttributeValue{L: []*dynamodb.AttributeValue{
+			{B: []byte{}},
+			{B: []byte{'h', 'e', 'l', 'l', 'o'}},
+			{NULL: aws.Bool(true)},
+			{B: []byte{'w', 'o', 'r', 'l', 'd'}},
+			{B: []byte{}},
+		}},
+	},
 }
 
 var itemEncodingTests = []struct {
@@ -240,7 +346,6 @@ var itemEncodingTests = []struct {
 			"EmptyL": &dynamodb.AttributeValue{L: []*dynamodb.AttributeValue{}},
 		},
 	},
-
 	{
 		name: "embedded struct",
 		in: struct {
@@ -277,9 +382,11 @@ var itemEncodingTests = []struct {
 			SS6 []customString             `dynamo:",set"`
 			SS7 map[textMarshaler]struct{} `dynamo:",set"`
 			SS8 map[textMarshaler]bool     `dynamo:",set"`
+			SS9 []string                   `dynamo:",set"`
 			BS1 [][]byte                   `dynamo:",set"`
 			BS2 map[[1]byte]struct{}       `dynamo:",set"`
 			BS3 map[[1]byte]bool           `dynamo:",set"`
+			BS4 [][]byte                   `dynamo:",set"`
 			NS1 []int                      `dynamo:",set"`
 			NS2 []float64                  `dynamo:",set"`
 			NS3 []uint                     `dynamo:",set"`
@@ -294,9 +401,11 @@ var itemEncodingTests = []struct {
 			SS6: []customString{"A", "B"},
 			SS7: map[textMarshaler]struct{}{textMarshaler(true): struct{}{}},
 			SS8: map[textMarshaler]bool{textMarshaler(false): true},
+			SS9: []string{"A", "B", ""},
 			BS1: [][]byte{[]byte{'A'}, []byte{'B'}},
 			BS2: map[[1]byte]struct{}{[1]byte{'A'}: struct{}{}},
 			BS3: map[[1]byte]bool{[1]byte{'A'}: true},
+			BS4: [][]byte{[]byte{'A'}, []byte{'B'}, []byte{}},
 			NS1: []int{1, 2},
 			NS2: []float64{1, 2},
 			NS3: []uint{1, 2},
@@ -312,9 +421,11 @@ var itemEncodingTests = []struct {
 			"SS6": &dynamodb.AttributeValue{SS: []*string{aws.String("A"), aws.String("B")}},
 			"SS7": &dynamodb.AttributeValue{SS: []*string{aws.String("true")}},
 			"SS8": &dynamodb.AttributeValue{SS: []*string{aws.String("false")}},
+			"SS9": &dynamodb.AttributeValue{SS: []*string{aws.String("A"), aws.String("B"), aws.String("")}},
 			"BS1": &dynamodb.AttributeValue{BS: [][]byte{[]byte{'A'}, []byte{'B'}}},
 			"BS2": &dynamodb.AttributeValue{BS: [][]byte{[]byte{'A'}}},
 			"BS3": &dynamodb.AttributeValue{BS: [][]byte{[]byte{'A'}}},
+			"BS4": &dynamodb.AttributeValue{BS: [][]byte{[]byte{'A'}, []byte{'B'}, []byte{}}},
 			"NS1": &dynamodb.AttributeValue{NS: []*string{aws.String("1"), aws.String("2")}},
 			"NS2": &dynamodb.AttributeValue{NS: []*string{aws.String("1"), aws.String("2")}},
 			"NS3": &dynamodb.AttributeValue{NS: []*string{aws.String("1"), aws.String("2")}},
@@ -524,6 +635,10 @@ func (cim *customItemMarshaler) UnmarshalDynamoItem(item map[string]*dynamodb.At
 
 	cim.Thing = thing
 	return nil
+}
+
+func byteSlicePtr(a []byte) *[]byte {
+	return &a
 }
 
 var (

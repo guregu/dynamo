@@ -153,6 +153,8 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 		case rv.Type().Elem().Kind() == reflect.Bool:
 			truthy = reflect.ValueOf(true)
 		case rv.Type().Elem() == emptyStructType:
+			fallthrough
+		case rv.Type().Elem().Kind() == reflect.Struct && rv.Type().Elem().NumField() == 0:
 			truthy = reflect.ValueOf(struct{}{})
 		default:
 			if av.M == nil {

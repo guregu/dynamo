@@ -30,13 +30,13 @@ func (s *subber) subName(name string) string {
 	return sub
 }
 
-func (s *subber) subValue(value interface{}, special string) (string, error) {
+func (s *subber) subValue(value interface{}, flags encodeFlags) (string, error) {
 	if s.valueExpr == nil {
 		s.valueExpr = make(map[string]*dynamodb.AttributeValue)
 	}
 
 	sub := fmt.Sprintf(":v%d", len(s.valueExpr))
-	av, err := marshal(value, special)
+	av, err := marshal(value, flags)
 	if err != nil {
 		return "", err
 	}
@@ -47,6 +47,15 @@ func (s *subber) subValue(value interface{}, special string) (string, error) {
 // subExpr takes a dynamo-flavored expression and fills in its placeholders
 // with the given args.
 func (s *subber) subExpr(expr string, args ...interface{}) (string, error) {
+	return s.subExprFlags(flagNone, expr, args...)
+}
+
+// subExprN is like subExpr, but allows empty and null args
+func (s *subber) subExprN(expr string, args ...interface{}) (string, error) {
+	return s.subExprFlags(flagAllowEmpty|flagNull, expr, args...)
+}
+
+func (s *subber) subExprFlags(flags encodeFlags, expr string, args ...interface{}) (string, error) {
 	// TODO: real parsing?
 	lexed, err := exprs.Parse(expr)
 	if err != nil {
@@ -85,7 +94,7 @@ func (s *subber) subExpr(expr string, args ...interface{}) (string, error) {
 			idx++
 		case exprs.ItemValuePlaceholder:
 			var sub string
-			if sub, err = s.subValue(args[idx], ""); err == nil {
+			if sub, err = s.subValue(args[idx], flags); err == nil {
 				_, err = buf.WriteString(sub)
 			}
 			idx++

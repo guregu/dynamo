@@ -248,7 +248,7 @@ func (ct *CreateTable) from(rv reflect.Value) error {
 		field := rv.Type().Field(i)
 		fv := rv.Field(i)
 
-		name, _, _ := fieldInfo(field)
+		name, _ := fieldInfo(field)
 		if name == "-" {
 			// skip
 			continue

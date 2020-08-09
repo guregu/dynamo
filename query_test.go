@@ -21,6 +21,7 @@ func TestGetAllCount(t *testing.T) {
 			"foo":        "bar",
 			"animal.cow": "moo",
 		},
+		StrPtr: new(string),
 	}
 	err := table.Put(item).Run()
 	if err != nil {
@@ -30,12 +31,12 @@ func TestGetAllCount(t *testing.T) {
 	// now check if get all and count return the same amount of items
 	var result []widget
 	var cc1, cc2 ConsumedCapacity
-	err = table.Get("UserID", 42).Consistent(true).Filter("Msg = ?", item.Msg).ConsumedCapacity(&cc1).All(&result)
+	err = table.Get("UserID", 42).Consistent(true).Filter("Msg = ?", item.Msg).Filter("StrPtr = ?", "").ConsumedCapacity(&cc1).All(&result)
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
 
-	ct, err := table.Get("UserID", 42).Consistent(true).Filter("Msg = ?", item.Msg).ConsumedCapacity(&cc2).Count()
+	ct, err := table.Get("UserID", 42).Consistent(true).Filter("Msg = ?", item.Msg).Filter("StrPtr = ?", "").ConsumedCapacity(&cc2).Count()
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
@@ -74,7 +75,7 @@ func TestGetAllCount(t *testing.T) {
 
 	// query specifically against the inserted item (using Query)
 	one = widget{}
-	err = table.Get("UserID", 42).Range("Time", Equal, item.Time).Filter("Msg = ?", item.Msg).Consistent(true).One(&one)
+	err = table.Get("UserID", 42).Range("Time", Equal, item.Time).Filter("Msg = ?", item.Msg).Filter("StrPtr = ?", "").Consistent(true).One(&one)
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}

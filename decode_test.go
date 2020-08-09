@@ -70,6 +70,9 @@ func TestUnmarshal(t *testing.T) {
 
 func TestUnmarshalItem(t *testing.T) {
 	for _, tc := range itemEncodingTests {
+		if tc.asymmetric {
+			continue
+		}
 		rv := reflect.New(reflect.TypeOf(tc.in))
 		err := unmarshalItem(tc.out, rv.Interface())
 		if err != nil {

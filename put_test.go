@@ -29,6 +29,7 @@ func TestPut(t *testing.T) {
 			UserID: 42,
 			Time:   now,
 			Msg:    "old",
+			StrPtr: new(string),
 		},
 		List: []*string{},
 	}

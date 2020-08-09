@@ -328,7 +328,7 @@ func fieldsInStruct(rv reflect.Value) map[string]reflect.Value {
 		field := rv.Type().Field(i)
 		fv := rv.Field(i)
 
-		name, _, _ := fieldInfo(field)
+		name, _ := fieldInfo(field)
 		if name == "-" {
 			// skip
 			continue

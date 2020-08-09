@@ -82,7 +82,7 @@ func (table Table) Get(name string, value interface{}) *Query {
 		table:   table,
 		hashKey: name,
 	}
-	q.hashValue, q.err = marshal(value, "")
+	q.hashValue, q.err = marshal(value, flagNone)
 	return q
 }
 
@@ -145,7 +145,7 @@ func (q *Query) ProjectExpr(expr string, args ...interface{}) *Query {
 // Multiple calls to Filter will be combined with AND.
 func (q *Query) Filter(expr string, args ...interface{}) *Query {
 	expr = wrapExpr(expr)
-	expr, err := q.subExpr(expr, args...)
+	expr, err := q.subExprN(expr, args...)
 	q.setError(err)
 	q.filters = append(q.filters, expr)
 	return q

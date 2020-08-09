@@ -7,7 +7,7 @@ import (
 
 func TestMarshal(t *testing.T) {
 	for _, tc := range encodingTests {
-		item, err := marshal(tc.in, "")
+		item, err := marshal(tc.in, flagNone)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", tc.name, err)
 		}

@@ -32,7 +32,7 @@ func (table Table) Delete(name string, value interface{}) *Delete {
 		table:   table,
 		hashKey: name,
 	}
-	d.hashValue, d.err = marshal(value, "")
+	d.hashValue, d.err = marshal(value, flagNone)
 	return d
 }
 
@@ -42,7 +42,7 @@ func (table Table) Delete(name string, value interface{}) *Delete {
 func (d *Delete) Range(name string, value interface{}) *Delete {
 	var err error
 	d.rangeKey = name
-	d.rangeValue, err = marshal(value, "")
+	d.rangeValue, err = marshal(value, flagNone)
 	d.setError(err)
 	return d
 }
@@ -54,7 +54,7 @@ func (d *Delete) Range(name string, value interface{}) *Delete {
 // Multiple calls to If will be combined with AND.
 func (d *Delete) If(expr string, args ...interface{}) *Delete {
 	expr = wrapExpr(expr)
-	expr, err := d.subExpr(expr, args...)
+	expr, err := d.subExprN(expr, args...)
 	d.setError(err)
 	if d.condition != "" {
 		d.condition += " AND "

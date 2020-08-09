@@ -96,24 +96,33 @@ func TestUpdateNil(t *testing.T) {
 		t.FailNow()
 	}
 
+	type widget2 struct {
+		widget
+		MsgPtr *string
+	}
+
 	// update Msg with 'nil', which should delete it
-	var result widget
+	var result widget2
 	err = table.Update("UserID", item.UserID).Range("Time", item.Time).
-		Set("Msg", (*textMarshaler)(nil)).
+		Set("Msg", "").
 		Set("Meta.'abc'", nil).
 		Set("Meta.'ok'", (*ptrTextMarshaler)(nil)).
-		Set("Count", (*int)(nil)).
+		SetExpr("'Count' = ?", (*textMarshaler)(nil)).
+		SetExpr("MsgPtr = ?", "").
 		Value(&result)
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
-	expected := widget{
-		UserID: item.UserID,
-		Time:   item.Time,
-		Msg:    "",
-		Meta: map[string]string{
-			"ok": "null",
+	expected := widget2{
+		widget: widget{
+			UserID: item.UserID,
+			Time:   item.Time,
+			Msg:    "",
+			Meta: map[string]string{
+				"ok": "null",
+			},
 		},
+		MsgPtr: new(string),
 	}
 	if !reflect.DeepEqual(result, expected) {
 		t.Errorf("bad result. %+v ≠ %+v", result, expected)

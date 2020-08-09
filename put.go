@@ -36,7 +36,7 @@ func (table Table) Put(item interface{}) *Put {
 // Multiple calls to If will be combined with AND.
 func (p *Put) If(expr string, args ...interface{}) *Put {
 	expr = wrapExpr(expr)
-	expr, err := p.subExpr(expr, args...)
+	expr, err := p.subExprN(expr, args...)
 	p.setError(err)
 	if p.condition != "" {
 		p.condition += " AND "

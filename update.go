@@ -45,7 +45,7 @@ func (table Table) Update(hashKey string, value interface{}) *Update {
 		del:    make(map[string]string),
 		remove: make(map[string]struct{}),
 	}
-	u.hashValue, u.err = marshal(value, "")
+	u.hashValue, u.err = marshal(value, flagNone)
 	return u
 }
 
@@ -53,7 +53,7 @@ func (table Table) Update(hashKey string, value interface{}) *Update {
 func (u *Update) Range(name string, value interface{}) *Update {
 	var err error
 	u.rangeKey = name
-	u.rangeValue, err = marshal(value, "")
+	u.rangeValue, err = marshal(value, flagNone)
 	u.setError(err)
 	return u
 }
@@ -74,13 +74,27 @@ func (u *Update) Set(path string, value interface{}) *Update {
 	return u
 }
 
+// SetNullable changes path to the given value, allowing empty and nil values.
+// If value is an empty string or []byte, it will be set as-is.
+// If value is nil, the DynamoDB NULL type will be used.
+// Paths that are reserved words are automatically escaped.
+// Use single quotes to escape complex values like 'User'.'Count'.
+func (u *Update) SetNullable(path string, value interface{}) *Update {
+	path, err := u.escape(path)
+	u.setError(err)
+	expr, err := u.subExprN("🝕 = ?", path, value)
+	u.setError(err)
+	u.set = append(u.set, expr)
+	return u
+}
+
 // SetSet changes a set at the given path to the given value.
 // SetSet marshals value to a string set, number set, or binary set.
 // If value is of zero length or nil, path will be removed instead.
 // Paths that are reserved words are automatically escaped.
 // Use single quotes to escape complex values like 'User'.'Count'.
 func (u *Update) SetSet(path string, value interface{}) *Update {
-	v, err := marshal(value, "set")
+	v, err := marshal(value, flagSet)
 	if v == nil && err == nil {
 		// empty set
 		return u.Remove(path)
@@ -99,7 +113,7 @@ func (u *Update) SetSet(path string, value interface{}) *Update {
 func (u *Update) SetIfNotExists(path string, value interface{}) *Update {
 	path, err := u.escape(path)
 	u.setError(err)
-	expr, err := u.subExpr("🝕 = if_not_exists(🝕, ?)", path, path, value)
+	expr, err := u.subExprN("🝕 = if_not_exists(🝕, ?)", path, path, value)
 	u.setError(err)
 	u.set = append(u.set, expr)
 	return u
@@ -110,17 +124,17 @@ func (u *Update) SetIfNotExists(path string, value interface{}) *Update {
 //	SetExpr("MyMap.$.$ = ?", key1, key2, val)
 //	SetExpr("'Counter' = 'Counter' + ?", 1)
 func (u *Update) SetExpr(expr string, args ...interface{}) *Update {
-	expr, err := u.subExpr(expr, args...)
+	expr, err := u.subExprN(expr, args...)
 	u.setError(err)
 	u.set = append(u.set, expr)
 	return u
 }
 
-// Append appends value  to the end of the list specified by path.
+// Append appends value to the end of the list specified by path.
 func (u *Update) Append(path string, value interface{}) *Update {
 	path, err := u.escape(path)
 	u.setError(err)
-	expr, err := u.subExpr("🝕 = list_append(🝕, ?)", path, path, value)
+	expr, err := u.subExprN("🝕 = list_append(🝕, ?)", path, path, value)
 	u.setError(err)
 	u.set = append(u.set, expr)
 	return u
@@ -130,7 +144,7 @@ func (u *Update) Append(path string, value interface{}) *Update {
 func (u *Update) Prepend(path string, value interface{}) *Update {
 	path, err := u.escape(path)
 	u.setError(err)
-	expr, err := u.subExpr("🝕 = list_append(?, 🝕)", path, value, path)
+	expr, err := u.subExprN("🝕 = list_append(?, 🝕)", path, value, path)
 	u.setError(err)
 	u.set = append(u.set, expr)
 	return u
@@ -144,7 +158,7 @@ func (u *Update) Prepend(path string, value interface{}) *Update {
 func (u *Update) Add(path string, value interface{}) *Update {
 	path, err := u.escape(path)
 	u.setError(err)
-	vsub, err := u.subValue(value, "set")
+	vsub, err := u.subValue(value, flagSet)
 	u.setError(err)
 	u.add[path] = vsub
 	return u
@@ -168,7 +182,7 @@ func (u *Update) AddFloatsToSet(path string, values ...float64) *Update {
 func (u *Update) delete(path string, value interface{}) *Update {
 	path, err := u.escape(path)
 	u.setError(err)
-	vsub, err := u.subValue(value, "set")
+	vsub, err := u.subValue(value, flagSet)
 	u.setError(err)
 	u.del[path] = vsub
 	return u
@@ -215,7 +229,7 @@ func (u *Update) RemoveExpr(expr string, args ...interface{}) *Update {
 // Multiple calls to Update will be combined with AND.
 func (u *Update) If(expr string, args ...interface{}) *Update {
 	expr = wrapExpr(expr)
-	cond, err := u.subExpr(expr, args...)
+	cond, err := u.subExprN(expr, args...)
 	u.setError(err)
 	if u.condition != "" {
 		u.condition += " AND "

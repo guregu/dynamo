@@ -28,7 +28,7 @@ func (table Table) Check(hashKey string, value interface{}) *ConditionCheck {
 		table:   table,
 		hashKey: hashKey,
 	}
-	check.hashValue, check.err = marshal(value, "")
+	check.hashValue, check.err = marshal(value, flagNone)
 	return check
 }
 
@@ -36,7 +36,7 @@ func (table Table) Check(hashKey string, value interface{}) *ConditionCheck {
 func (check *ConditionCheck) Range(rangeKey string, value interface{}) *ConditionCheck {
 	check.rangeKey = rangeKey
 	var err error
-	check.rangeValue, err = marshal(value, "")
+	check.rangeValue, err = marshal(value, flagNone)
 	check.setError(err)
 	return check
 }
@@ -48,7 +48,7 @@ func (check *ConditionCheck) Range(rangeKey string, value interface{}) *Conditio
 // Multiple calls to If will be combined with AND.
 func (check *ConditionCheck) If(expr string, args ...interface{}) *ConditionCheck {
 	expr = wrapExpr(expr)
-	cond, err := check.subExpr(expr, args...)
+	cond, err := check.subExprN(expr, args...)
 	check.setError(err)
 	if check.condition != "" {
 		check.condition += " AND "
@@ -72,8 +72,8 @@ func (check *ConditionCheck) writeTxItem() (*dynamodb.TransactWriteItem, error) 
 		return nil, check.err
 	}
 	item := &dynamodb.ConditionCheck{
-		TableName: aws.String(check.table.name),
-		Key:       check.keys(),
+		TableName:                 aws.String(check.table.name),
+		Key:                       check.keys(),
 		ExpressionAttributeNames:  check.nameExpr,
 		ExpressionAttributeValues: check.valueExpr,
 	}

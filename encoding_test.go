@@ -195,24 +195,6 @@ var encodingTests = []struct {
 		}},
 	},
 	{
-		name: "map with empty string values",
-		in:   map[string]string{"A": "", "B": "hello", "C": ""},
-		out: &dynamodb.AttributeValue{M: map[string]*dynamodb.AttributeValue{
-			"A": {S: aws.String("")},
-			"B": {S: aws.String("hello")},
-			"C": {S: aws.String("")},
-		}},
-	},
-	{
-		name: "map with string pointer values",
-		in:   map[string]*string{"A": aws.String(""), "B": aws.String("hello"), "C": nil},
-		out: &dynamodb.AttributeValue{M: map[string]*dynamodb.AttributeValue{
-			"A": {S: aws.String("")},
-			"B": {S: aws.String("hello")},
-			"C": {NULL: aws.Bool(true)},
-		}},
-	},
-	{
 		name: "slice with empty binary",
 		in:   [][]byte{[]byte{}, []byte("hello"), []byte{}, []byte("world"), []byte{}},
 		out: &dynamodb.AttributeValue{L: []*dynamodb.AttributeValue{
@@ -248,9 +230,10 @@ var encodingTests = []struct {
 }
 
 var itemEncodingTests = []struct {
-	name string
-	in   interface{}
-	out  map[string]*dynamodb.AttributeValue
+	name       string
+	in         interface{}
+	out        map[string]*dynamodb.AttributeValue
+	asymmetric bool
 }{
 	{
 		name: "strings",
@@ -315,6 +298,7 @@ var itemEncodingTests = []struct {
 			A       bool       `dynamo:",omitempty"`
 			B       *bool      `dynamo:",omitempty"`
 			NilTime *time.Time `dynamo:",omitempty"`
+			L       []string   `dynamo:",omitempty"`
 			Other   bool
 		}{
 			Other: true,
@@ -322,6 +306,42 @@ var itemEncodingTests = []struct {
 		out: map[string]*dynamodb.AttributeValue{
 			"Other": &dynamodb.AttributeValue{BOOL: aws.Bool(true)},
 		},
+	},
+	{
+		name: "omitemptyelem",
+		in: struct {
+			L     []*string         `dynamo:",omitemptyelem"`
+			SS    []string          `dynamo:",omitemptyelem,set"`
+			M     map[string]string `dynamo:",omitemptyelem"`
+			Other bool
+		}{
+			L:     []*string{nil, aws.String("")},
+			SS:    []string{""},
+			M:     map[string]string{"test": ""},
+			Other: true,
+		},
+		out: map[string]*dynamodb.AttributeValue{
+			"L":     &dynamodb.AttributeValue{L: []*dynamodb.AttributeValue{}},
+			"M":     &dynamodb.AttributeValue{M: map[string]*dynamodb.AttributeValue{}},
+			"Other": &dynamodb.AttributeValue{BOOL: aws.Bool(true)},
+		},
+		asymmetric: true,
+	},
+	{
+		name: "omitemptyelem + omitempty",
+		in: struct {
+			L     []*string         `dynamo:",omitemptyelem,omitempty"`
+			M     map[string]string `dynamo:",omitemptyelem,omitempty"`
+			Other bool
+		}{
+			L:     []*string{nil, aws.String("")},
+			M:     map[string]string{"test": ""},
+			Other: true,
+		},
+		out: map[string]*dynamodb.AttributeValue{
+			"Other": &dynamodb.AttributeValue{BOOL: aws.Bool(true)},
+		},
+		asymmetric: true,
 	},
 	{
 		name: "automatic omitempty",
@@ -344,6 +364,51 @@ var itemEncodingTests = []struct {
 		out: map[string]*dynamodb.AttributeValue{
 			"OK":     &dynamodb.AttributeValue{S: aws.String("OK")},
 			"EmptyL": &dynamodb.AttributeValue{L: []*dynamodb.AttributeValue{}},
+		},
+	},
+	{
+		name: "allowempty flag",
+		in: struct {
+			S string `dynamo:",allowempty"`
+			B []byte `dynamo:",allowempty"`
+		}{
+			B: []byte{},
+		},
+		out: map[string]*dynamodb.AttributeValue{
+			"S": &dynamodb.AttributeValue{S: aws.String("")},
+			"B": &dynamodb.AttributeValue{B: []byte{}},
+		},
+	},
+	{
+		name: "allowemptyelem flag",
+		in: struct {
+			M map[string]*string `dynamo:",allowemptyelem"`
+		}{
+			M: map[string]*string{"null": nil, "empty": aws.String(""), "normal": aws.String("hello")},
+		},
+		out: map[string]*dynamodb.AttributeValue{
+			"M": &dynamodb.AttributeValue{M: map[string]*dynamodb.AttributeValue{
+				"null":   &dynamodb.AttributeValue{NULL: aws.Bool(true)},
+				"empty":  &dynamodb.AttributeValue{S: aws.String("")},
+				"normal": &dynamodb.AttributeValue{S: aws.String("hello")},
+			}},
+		},
+	},
+	{
+		name: "null flag",
+		in: struct {
+			S       string             `dynamo:",null"`
+			B       []byte             `dynamo:",null"`
+			NilTime *time.Time         `dynamo:",null"`
+			M       map[string]*string `dynamo:",null"`
+			SS      []string           `dynamo:",null,set"`
+		}{},
+		out: map[string]*dynamodb.AttributeValue{
+			"S":       &dynamodb.AttributeValue{NULL: aws.Bool(true)},
+			"B":       &dynamodb.AttributeValue{NULL: aws.Bool(true)},
+			"NilTime": &dynamodb.AttributeValue{NULL: aws.Bool(true)},
+			"M":       &dynamodb.AttributeValue{NULL: aws.Bool(true)},
+			"SS":      &dynamodb.AttributeValue{NULL: aws.Bool(true)},
 		},
 	},
 	{

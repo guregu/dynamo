@@ -19,7 +19,10 @@ const offlineSkipMsg = "DYNAMO_TEST_REGION not set"
 
 func init() {
 	if region := os.Getenv("DYNAMO_TEST_REGION"); region != "" {
-		testDB = New(session.New(), &aws.Config{Region: aws.String(region)})
+		testDB = New(session.New(), &aws.Config{
+			Region: aws.String(region),
+			// LogLevel: aws.LogLevel(aws.LogDebugWithHTTPBody),
+		})
 	}
 	if table := os.Getenv("DYNAMO_TEST_TABLE"); table != "" {
 		testTable = table
@@ -33,6 +36,7 @@ type widget struct {
 	Msg    string
 	Count  int
 	Meta   map[string]string
+	StrPtr *string `dynamo:",allowempty"`
 }
 
 func isConditionalCheckErr(err error) bool {

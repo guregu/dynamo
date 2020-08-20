@@ -70,17 +70,23 @@ func TestUnmarshal(t *testing.T) {
 
 func TestUnmarshalItem(t *testing.T) {
 	for _, tc := range itemEncodingTests {
+		expected := tc.in
 		if tc.asymmetric {
-			continue
+			if tc.expectedDecode == nil {
+				continue
+			}
+
+			expected = tc.expectedDecode
 		}
+
 		rv := reflect.New(reflect.TypeOf(tc.in))
 		err := unmarshalItem(tc.out, rv.Interface())
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", tc.name, err)
 		}
 
-		if !reflect.DeepEqual(rv.Elem().Interface(), tc.in) {
-			t.Errorf("%s: bad result: %#v ≠ %#v", tc.name, rv.Elem().Interface(), tc.in)
+		if !reflect.DeepEqual(rv.Elem().Interface(), expected) {
+			t.Errorf("%s: bad result: %#v ≠ %#v", tc.name, rv.Elem().Interface(), expected)
 		}
 	}
 }

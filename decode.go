@@ -329,6 +329,7 @@ func fieldsInStruct(rv reflect.Value) map[string]reflect.Value {
 	for i := 0; i < rv.Type().NumField(); i++ {
 		field := rv.Type().Field(i)
 		fv := rv.Field(i)
+		isPtr := fv.Type().Kind() == reflect.Ptr
 
 		name, _ := fieldInfo(field)
 		if name == "-" {
@@ -336,8 +337,20 @@ func fieldsInStruct(rv reflect.Value) map[string]reflect.Value {
 			continue
 		}
 
-		// embed anonymous structs
-		if fv.Type().Kind() == reflect.Struct && field.Anonymous {
+		// need to protect from setting unexported pointers because it will panic
+		if !fv.CanSet() && isPtr {
+			continue
+		}
+
+		// embed anonymous structs, they could be pointers so test that too
+		if (fv.Type().Kind() == reflect.Struct || isPtr && fv.Type().Elem().Kind() == reflect.Struct) && field.Anonymous {
+			// set zero value for pointer
+			if isPtr {
+				zero := reflect.New(fv.Type().Elem())
+				fv.Set(zero)
+				fv = zero
+			}
+
 			innerFields := fieldsInStruct(fv)
 			for k, v := range innerFields {
 				// don't clobber top-level fields

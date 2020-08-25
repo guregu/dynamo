@@ -4,8 +4,65 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
+
+var itemDecodeOnlyTests = []struct {
+	name   string
+	given  map[string]*dynamodb.AttributeValue
+	expect interface{}
+}{
+	{
+		// unexported embedded pointers should be ignored
+		name: "embedded unexported pointer",
+		given: map[string]*dynamodb.AttributeValue{
+			"Embedded": &dynamodb.AttributeValue{BOOL: aws.Bool(true)},
+		},
+		expect: struct {
+			*embedded
+		}{},
+	},
+	{
+		// unexported fields should be ignored
+		name: "unexported fields",
+		given: map[string]*dynamodb.AttributeValue{
+			"a": &dynamodb.AttributeValue{BOOL: aws.Bool(true)},
+		},
+		expect: struct {
+			a bool
+		}{},
+	},
+	{
+		// embedded pointers shouldn't clobber existing fields
+		name: "exported pointer embedded struct clobber",
+		given: map[string]*dynamodb.AttributeValue{
+			"Embedded": &dynamodb.AttributeValue{S: aws.String("OK")},
+		},
+		expect: struct {
+			Embedded string
+			*ExportedEmbedded
+		}{
+			Embedded:         "OK",
+			ExportedEmbedded: &ExportedEmbedded{},
+		},
+	},
+}
+
+func TestUnmarshalAsymmetric(t *testing.T) {
+	for _, tc := range itemDecodeOnlyTests {
+		rv := reflect.New(reflect.TypeOf(tc.expect))
+		expect := rv.Interface()
+		err := UnmarshalItem(tc.given, expect)
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", tc.name, err)
+			continue
+		}
+		if !reflect.DeepEqual(rv.Elem().Interface(), tc.expect) {
+			t.Errorf("%s: bad result: %#v ≠ %#v", tc.name, rv.Elem().Interface(), tc.expect)
+		}
+	}
+}
 
 func TestUnmarshalAppend(t *testing.T) {
 	var results []struct {
@@ -70,9 +127,6 @@ func TestUnmarshal(t *testing.T) {
 
 func TestUnmarshalItem(t *testing.T) {
 	for _, tc := range itemEncodingTests {
-		if tc.asymmetric {
-			continue
-		}
 		rv := reflect.New(reflect.TypeOf(tc.in))
 		err := unmarshalItem(tc.out, rv.Interface())
 		if err != nil {

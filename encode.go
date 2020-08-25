@@ -78,9 +78,11 @@ func marshalStruct(rv reflect.Value) (map[string]*dynamodb.AttributeValue, error
 		name, flags := fieldInfo(field)
 		omitempty := flags&flagOmitEmpty != 0
 		anonStruct := fv.Type().Kind() == reflect.Struct && field.Anonymous
+		pointerAnonStruct := fv.Type().Kind() == reflect.Ptr && fv.Type().Elem().Kind() == reflect.Struct && field.Anonymous
 		switch {
 		case !fv.CanInterface():
-			if !anonStruct {
+			// skip unexported unembedded fields
+			if !anonStruct && !pointerAnonStruct {
 				continue
 			}
 		case name == "-":
@@ -92,7 +94,14 @@ func marshalStruct(rv reflect.Value) (map[string]*dynamodb.AttributeValue, error
 		}
 
 		// embed anonymous structs
-		if anonStruct {
+		if anonStruct || pointerAnonStruct {
+			if pointerAnonStruct {
+				if fv.IsNil() {
+					continue
+				}
+				fv = fv.Elem()
+			}
+
 			avs, err := marshalStruct(fv)
 			if err != nil {
 				return nil, err

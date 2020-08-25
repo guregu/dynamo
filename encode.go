@@ -81,7 +81,8 @@ func marshalStruct(rv reflect.Value) (map[string]*dynamodb.AttributeValue, error
 		pointerAnonStruct := fv.Type().Kind() == reflect.Ptr && fv.Type().Elem().Kind() == reflect.Struct && field.Anonymous
 		switch {
 		case !fv.CanInterface():
-			if !(!anonStruct || !pointerAnonStruct) {
+			// skip unexported unembedded fields
+			if !anonStruct && !pointerAnonStruct {
 				continue
 			}
 		case name == "-":

@@ -231,11 +231,9 @@ var encodingTests = []struct {
 }
 
 var itemEncodingTests = []struct {
-	name           string
-	in             interface{}
-	out            map[string]*dynamodb.AttributeValue
-	expectedDecode interface{}
-	asymmetric     bool
+	name string
+	in   interface{}
+	out  map[string]*dynamodb.AttributeValue
 }{
 	{
 		name: "strings",
@@ -308,42 +306,6 @@ var itemEncodingTests = []struct {
 		out: map[string]*dynamodb.AttributeValue{
 			"Other": &dynamodb.AttributeValue{BOOL: aws.Bool(true)},
 		},
-	},
-	{
-		name: "omitemptyelem",
-		in: struct {
-			L     []*string         `dynamo:",omitemptyelem"`
-			SS    []string          `dynamo:",omitemptyelem,set"`
-			M     map[string]string `dynamo:",omitemptyelem"`
-			Other bool
-		}{
-			L:     []*string{nil, aws.String("")},
-			SS:    []string{""},
-			M:     map[string]string{"test": ""},
-			Other: true,
-		},
-		out: map[string]*dynamodb.AttributeValue{
-			"L":     &dynamodb.AttributeValue{L: []*dynamodb.AttributeValue{}},
-			"M":     &dynamodb.AttributeValue{M: map[string]*dynamodb.AttributeValue{}},
-			"Other": &dynamodb.AttributeValue{BOOL: aws.Bool(true)},
-		},
-		asymmetric: true,
-	},
-	{
-		name: "omitemptyelem + omitempty",
-		in: struct {
-			L     []*string         `dynamo:",omitemptyelem,omitempty"`
-			M     map[string]string `dynamo:",omitemptyelem,omitempty"`
-			Other bool
-		}{
-			L:     []*string{nil, aws.String("")},
-			M:     map[string]string{"test": ""},
-			Other: true,
-		},
-		out: map[string]*dynamodb.AttributeValue{
-			"Other": &dynamodb.AttributeValue{BOOL: aws.Bool(true)},
-		},
-		asymmetric: true,
 	},
 	{
 		name: "automatic omitempty",
@@ -427,23 +389,6 @@ var itemEncodingTests = []struct {
 		},
 	},
 	{
-		name: "pointer embedded struct",
-		in: struct {
-			*embedded
-		}{
-			embedded: &embedded{
-				Embedded: true,
-			},
-		},
-		out: map[string]*dynamodb.AttributeValue{
-			"Embedded": &dynamodb.AttributeValue{BOOL: aws.Bool(true)},
-		},
-		expectedDecode: struct {
-			*embedded
-		}{},
-		asymmetric: true,
-	},
-	{
 		name: "exported embedded struct",
 		in: struct {
 			ExportedEmbedded
@@ -504,26 +449,6 @@ var itemEncodingTests = []struct {
 		out: map[string]*dynamodb.AttributeValue{
 			"Embedded": &dynamodb.AttributeValue{S: aws.String("OK")},
 		},
-	},
-	{
-		name: "exported pointer embedded struct clobber",
-		in: struct {
-			Embedded string
-			*ExportedEmbedded
-		}{
-			Embedded: "OK",
-		},
-		out: map[string]*dynamodb.AttributeValue{
-			"Embedded": &dynamodb.AttributeValue{S: aws.String("OK")},
-		},
-		expectedDecode: struct {
-			Embedded string
-			*ExportedEmbedded
-		}{
-			Embedded:         "OK",
-			ExportedEmbedded: &ExportedEmbedded{},
-		},
-		asymmetric: true,
 	},
 	{
 		name: "sets",

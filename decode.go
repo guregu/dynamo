@@ -78,6 +78,10 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 		}
 	}
 
+	if !rv.CanSet() {
+		return nil
+	}
+
 	if av.NULL != nil {
 		rv.Set(reflect.Zero(rv.Type()))
 		return nil
@@ -337,15 +341,14 @@ func fieldsInStruct(rv reflect.Value) map[string]reflect.Value {
 			continue
 		}
 
-		// need to protect from setting unexported pointers because it will panic
-		if !fv.CanSet() && isPtr {
-			continue
-		}
-
 		// embed anonymous structs, they could be pointers so test that too
 		if (fv.Type().Kind() == reflect.Struct || isPtr && fv.Type().Elem().Kind() == reflect.Struct) && field.Anonymous {
-			// set zero value for pointer
 			if isPtr {
+				// need to protect from setting unexported pointers because it will panic
+				if !fv.CanSet() {
+					continue
+				}
+				// set zero value for pointer
 				zero := reflect.New(fv.Type().Elem())
 				fv.Set(zero)
 				fv = zero

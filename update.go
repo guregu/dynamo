@@ -244,6 +244,12 @@ func (u *Update) ConsumedCapacity(cc *ConsumedCapacity) *Update {
 	return u
 }
 
+// ReturnType ALL_OLD ALL_NEW UPDATED_OLD UPDATED_NEW
+func (u *Update) ReturnType(rt string) *Update {
+	u.returnType = rt
+	return u
+}
+
 // Run executes this update.
 func (u *Update) Run() error {
 	ctx, cancel := defaultContext()
@@ -265,6 +271,25 @@ func (u *Update) Value(out interface{}) error {
 }
 
 func (u *Update) ValueWithContext(ctx aws.Context, out interface{}) error {
+	// Compatible with the old api
+	if u.returnType == "" {
+		u.returnType = "ALL_NEW"
+	}
+	output, err := u.run(ctx)
+	if err != nil {
+		return err
+	}
+	return unmarshalItem(output.Attributes, out)
+}
+
+// NewValue executes this update, encoding out with the new value.
+func (u *Update) NewValue(out interface{}) error {
+	ctx, cancel := defaultContext()
+	defer cancel()
+	return u.ValueWithContext(ctx, out)
+}
+
+func (u *Update) NewValueWithContext(ctx aws.Context, out interface{}) error {
 	u.returnType = "ALL_NEW"
 	output, err := u.run(ctx)
 	if err != nil {

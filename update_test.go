@@ -128,3 +128,46 @@ func TestUpdateNil(t *testing.T) {
 		t.Errorf("bad result. %+v ≠ %+v", result, expected)
 	}
 }
+
+func TestUpdateReturnType(t *testing.T) {
+	if testDB == nil {
+		t.Skip(offlineSkipMsg)
+	}
+	table := testDB.Table(testTable)
+
+	// first, add an item to make sure there is at least one
+	item := widget{
+		UserID: 42,
+		Time:   time.Now().UTC(),
+		Msg:    "hello",
+		Count:  0,
+		Meta: map[string]string{
+			"foo":  "bar",
+			"nope": "痛",
+		},
+	}
+	err := table.Put(item).Run()
+	if err != nil {
+		t.Error("unexpected error:", err)
+	}
+
+	// change it a bit and check the result
+	var result map[string]string
+	var cc ConsumedCapacity
+	err = table.Update("UserID", item.UserID).
+		Range("Time", item.Time).
+		Set("Msg", "changed").
+		ConsumedCapacity(&cc).
+		ReturnType("UPDATED_NEW").
+		Value(&result)
+	expected := map[string]string{"Msg": "changed"}
+	if err != nil {
+		t.Error("unexpected error:", err)
+	}
+	if !reflect.DeepEqual(result, expected) {
+		t.Errorf("bad result. %+v ≠ %+v", result, expected)
+	}
+	if cc.Total != 1 {
+		t.Error("bad consumed capacity", cc)
+	}
+}

@@ -170,7 +170,7 @@ func (u *Update) AddStringsToSet(path string, values ...string) *Update {
 }
 
 // AddIntsToSet adds the given values to the number set specified by path.
-func (u *Update) AddIntsToSet(path string, values ...int) *Update {
+func (u *Update) AddIntsToSet(path string, values ...int64) *Update {
 	return u.Add(path, values)
 }
 
@@ -194,7 +194,7 @@ func (u *Update) DeleteStringsFromSet(path string, values ...string) *Update {
 }
 
 // DeleteIntsFromSet deletes the given values from the number set specified by path.
-func (u *Update) DeleteIntsFromSet(path string, values ...int) *Update {
+func (u *Update) DeleteIntsFromSet(path string, values ...int64) *Update {
 	return u.delete(path, values)
 }
 

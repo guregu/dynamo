@@ -12,16 +12,28 @@ func TestUpdate(t *testing.T) {
 	}
 	table := testDB.Table(testTable)
 
+	type widget2 struct {
+		widget
+		MySet1 []string            `dynamo:",set"`
+		MySet2 map[string]struct{} `dynamo:",set"`
+		MySet3 map[int64]struct{}  `dynamo:",set"`
+	}
+
 	// first, add an item to make sure there is at least one
-	item := widget{
-		UserID: 42,
-		Time:   time.Now().UTC(),
-		Msg:    "hello",
-		Count:  0,
-		Meta: map[string]string{
-			"foo":  "bar",
-			"nope": "痛",
+	item := widget2{
+		widget: widget{
+			UserID: 42,
+			Time:   time.Now().UTC(),
+			Msg:    "hello",
+			Count:  0,
+			Meta: map[string]string{
+				"foo":  "bar",
+				"nope": "痛",
+			},
 		},
+		MySet1: []string{"one", "deleteme"},
+		MySet2: map[string]struct{}{"a": struct{}{}, "b": struct{}{}, "bad1": struct{}{}, "c": struct{}{}, "bad2": struct{}{}},
+		MySet3: map[int64]struct{}{1: struct{}{}, 999: struct{}{}, 2: struct{}{}, 3: struct{}{}, 555: struct{}{}},
 	}
 	err := table.Put(item).Run()
 	if err != nil {
@@ -29,7 +41,7 @@ func TestUpdate(t *testing.T) {
 	}
 
 	// change it a bit and check the result
-	var result widget
+	var result widget2
 	var cc ConsumedCapacity
 	err = table.Update("UserID", item.UserID).
 		Range("Time", item.Time).
@@ -40,16 +52,24 @@ func TestUpdate(t *testing.T) {
 		RemoveExpr("Meta.$", "nope").
 		If("'Count' = ?", 0).
 		If("'Msg' = ?", "hello").
+		DeleteFromSet("MySet1", "deleteme").
+		DeleteFromSet("MySet2", []string{"bad1", "bad2"}).
+		DeleteFromSet("MySet3", map[int64]struct{}{999: struct{}{}, 555: struct{}{}}).
 		ConsumedCapacity(&cc).
 		Value(&result)
-	expected := widget{
-		UserID: item.UserID,
-		Time:   item.Time,
-		Msg:    "changed",
-		Count:  1,
-		Meta: map[string]string{
-			"foo": "baz",
+	expected := widget2{
+		widget: widget{
+			UserID: item.UserID,
+			Time:   item.Time,
+			Msg:    "changed",
+			Count:  1,
+			Meta: map[string]string{
+				"foo": "baz",
+			},
 		},
+		MySet1: []string{"one"},
+		MySet2: map[string]struct{}{"a": struct{}{}, "b": struct{}{}, "c": struct{}{}},
+		MySet3: map[int64]struct{}{1: struct{}{}, 2: struct{}{}, 3: struct{}{}},
 	}
 	if err != nil {
 		t.Error("unexpected error:", err)

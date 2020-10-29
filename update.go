@@ -188,6 +188,38 @@ func (u *Update) delete(path string, value interface{}) *Update {
 	return u
 }
 
+// DeleteFromSet deletes value from the set given by path.
+// If value marshals to a set, those values will be deleted.
+// If value marshals to a number, string, or binary, that value will be deleted.
+// Delete is only for deleting values from sets. See Remove for removing entire attributes.
+func (u *Update) DeleteFromSet(path string, value interface{}) *Update {
+	v, err := marshal(value, flagSet)
+	if err != nil {
+		u.setError(err)
+		return u
+	}
+	switch {
+	// ok:
+	case v.NS != nil:
+	case v.SS != nil:
+	case v.BS != nil:
+
+	// need to box:
+	case v.N != nil:
+		v = &dynamodb.AttributeValue{NS: []*string{v.N}}
+	case v.S != nil:
+		v = &dynamodb.AttributeValue{SS: []*string{v.S}}
+	case v.B != nil:
+		v = &dynamodb.AttributeValue{BS: [][]byte{v.B}}
+
+	default:
+		u.setError(fmt.Errorf("dynamo: Update.DeleteFromSet given unsupported value: %v (%T: %s)", value, value, avTypeName(v)))
+		return u
+	}
+
+	return u.delete(path, v)
+}
+
 // DeleteStringsFromSet deletes the given values from the string set specified by path.
 func (u *Update) DeleteStringsFromSet(path string, values ...string) *Update {
 	return u.delete(path, values)

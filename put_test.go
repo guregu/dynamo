@@ -73,7 +73,7 @@ func TestPut(t *testing.T) {
 	}
 }
 
-func TestPutAWSEncoding(t *testing.T) {
+func TestPutAndQueryAWSEncoding(t *testing.T) {
 	if testDB == nil {
 		t.Skip(offlineSkipMsg)
 	}
@@ -104,11 +104,28 @@ func TestPutAWSEncoding(t *testing.T) {
 	}
 
 	var result awsWidget
-	err = table.Get("UserID", item.XUserID).Range("Time", Equal, item.XTime).One(AWSEncoding(&result))
+	err = table.Get("UserID", item.XUserID).Range("Time", Equal, item.XTime).Consistent(true).One(AWSEncoding(&result))
 	if err != nil {
 		t.Error(err)
 	}
 	if !reflect.DeepEqual(item, result) {
 		t.Errorf("bad aws put/get result. %#v ≠ %#v", item, result)
+	}
+
+	var list []awsWidget
+	err = table.Get("UserID", item.XUserID).Consistent(true).All(AWSEncoding(&list))
+	if err != nil {
+		t.Error(err)
+	}
+	found := false
+	for _, x := range list {
+		if reflect.DeepEqual(x, item) {
+			found = true
+			break
+		}
+	}
+	t.Log("awsWidget All: got", len(list), "total.", list)
+	if !found {
+		t.Error("couldn't find awsWidget in All")
 	}
 }

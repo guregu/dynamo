@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 )
 
@@ -113,5 +115,41 @@ func TestAWSItems(t *testing.T) {
 	}
 	if !reflect.DeepEqual(unmarshaled, unmarshaledOfficial) {
 		t.Error("marshal not equal.", unmarshaled, "≠", unmarshaledOfficial)
+	}
+}
+
+func TestAWSUnmarshalAppend(t *testing.T) {
+	type foo struct {
+		A string `dynamo:"wrong1" dynamodbav:"one"`
+		B int    `dynamo:"wrong2" dynamodbav:"two"`
+	}
+	var list []foo
+	expect1 := foo{
+		A: "test",
+		B: 555,
+	}
+	expect2 := foo{
+		A: "two",
+		B: 222,
+	}
+	err := unmarshalAppend(map[string]*dynamodb.AttributeValue{
+		"one": &dynamodb.AttributeValue{S: aws.String("test")},
+		"two": &dynamodb.AttributeValue{N: aws.String("555")},
+	}, AWSEncoding(&list))
+	if err != nil {
+		t.Error(err)
+	}
+	if len(list) != 1 && reflect.DeepEqual(list, []foo{expect1}) {
+		t.Error("bad AWS unmarshal append:", list)
+	}
+	err = unmarshalAppend(map[string]*dynamodb.AttributeValue{
+		"one": &dynamodb.AttributeValue{S: aws.String("two")},
+		"two": &dynamodb.AttributeValue{N: aws.String("222")},
+	}, AWSEncoding(&list))
+	if err != nil {
+		t.Error(err)
+	}
+	if len(list) != 2 && reflect.DeepEqual(list, []foo{expect1, expect2}) {
+		t.Error("bad AWS unmarshal append:", list)
 	}
 }

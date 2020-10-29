@@ -1,6 +1,9 @@
 package dynamo
 
 import (
+	"fmt"
+	"reflect"
+
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 )
@@ -27,4 +30,21 @@ func (w awsEncoder) UnmarshalDynamo(av *dynamodb.AttributeValue) error {
 // When decoding, v must be a pointer.
 func AWSEncoding(v interface{}) Coder {
 	return awsEncoder{v}
+}
+
+func unmarshalAppendAWS(item map[string]*dynamodb.AttributeValue, out interface{}) error {
+	rv := reflect.ValueOf(out)
+	if rv.Kind() != reflect.Ptr || rv.Elem().Kind() != reflect.Slice {
+		return fmt.Errorf("dynamo: unmarshal append AWS: result argument must be a slice pointer")
+	}
+
+	slicev := rv.Elem()
+	innerRV := reflect.New(slicev.Type().Elem())
+	if err := dynamodbattribute.UnmarshalMap(item, innerRV.Interface()); err != nil {
+		return err
+	}
+	slicev = reflect.Append(slicev, innerRV.Elem())
+
+	rv.Elem().Set(slicev)
+	return nil
 }

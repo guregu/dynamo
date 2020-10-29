@@ -426,6 +426,10 @@ func unmarshalItem(item map[string]*dynamodb.AttributeValue, out interface{}) er
 }
 
 func unmarshalAppend(item map[string]*dynamodb.AttributeValue, out interface{}) error {
+	if awsenc, ok := out.(awsEncoder); ok {
+		return unmarshalAppendAWS(item, awsenc.iface)
+	}
+
 	rv := reflect.ValueOf(out)
 	if rv.Kind() != reflect.Ptr || rv.Elem().Kind() != reflect.Slice {
 		return fmt.Errorf("dynamo: unmarshal append: result argument must be a slice pointer")

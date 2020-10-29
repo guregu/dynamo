@@ -81,6 +81,39 @@ func TestUpdate(t *testing.T) {
 		t.Error("bad consumed capacity", cc)
 	}
 
+	// test OnlyUpdatedValue
+	var updated widget2
+	expected2 := widget2{
+		widget: widget{
+			Msg:   "changed again",
+			Count: 2,
+		},
+	}
+	err = table.Update("UserID", item.UserID).
+		Range("Time", item.Time).
+		Set("Msg", expected2.Msg).
+		Add("Count", 1).
+		OnlyUpdatedValue(&updated)
+	if err != nil {
+		t.Error("unexpected error:", err)
+	}
+	if !reflect.DeepEqual(updated, expected2) {
+		t.Errorf("bad result. %+v ≠ %+v", updated, expected)
+	}
+
+	var updatedOld widget2
+	err = table.Update("UserID", item.UserID).
+		Range("Time", item.Time).
+		Set("Msg", "this shouldn't be seen").
+		Add("Count", 100).
+		OnlyUpdatedOldValue(&updatedOld)
+	if err != nil {
+		t.Error("unexpected error:", err)
+	}
+	if !reflect.DeepEqual(updatedOld, expected2) {
+		t.Errorf("bad result. %+v ≠ %+v", updatedOld, expected)
+	}
+
 	// send an update with a failing condition
 	err = table.Update("UserID", item.UserID).
 		Range("Time", item.Time).

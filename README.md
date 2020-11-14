@@ -24,13 +24,12 @@ type widget struct {
 	UserID int       // Hash key, a.k.a. partition key
 	Time   time.Time // Range key, a.k.a. sort key
 
-	Msg       string              `dynamo:"Message"`
-	Count     int                 `dynamo:",omitempty"`
+	Msg       string              `dynamo:"Message"`    // Change name in the database
+	Count     int                 `dynamo:",omitempty"` // Omits if zero value
+	Children  []widget            // Lists
 	Friends   []string            `dynamo:",set"` // Sets
 	Set       map[string]struct{} `dynamo:",set"` // Map sets, too!
 	SecretKey string              `dynamo:"-"`    // Ignored
-	Category  string              `dynamo:"Category"` // Global Secondary Index
-	Children  []any               // Lists
 }
 
 
@@ -41,29 +40,20 @@ func main() {
 	// put item
 	w := widget{UserID: 613, Time: time.Now(), Msg: "hello"}
 	err := table.Put(w).Run()
-	
-	// update item field
-	w.Msg = "hello again"
-	m, err := dynamo.MarshalItem(w)
-	err = table.Update("UserID", m["UserID"]).
-		Set("Msg", m["Msg"]).
-		Run()
-		
+
 	// get the same item
 	var result widget
 	err = table.Get("UserID", w.UserID).
 		Range("Time", dynamo.Equal, w.Time).
-		Filter("'Count' = ? AND $ = ?", w.Count, "Message", w.Msg). // placeholders in expressions
-		One(&result)
-
-	// get by index
-	err = table.Get("Category", "hoge").
-		Index("category-index").
 		One(&result)
 
 	// get all items
 	var results []widget
 	err = table.Scan().All(&results)
+
+	// use placeholders in filter expressions (see Expressions section below)
+	var filtered []widget
+	err = table.Scan().Filter("'Count' > ?", 10).All(&filtered)
 }
 ```
 

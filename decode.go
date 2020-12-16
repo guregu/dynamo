@@ -206,7 +206,7 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 			kv := reflect.New(rv.Type().Key()).Elem()
 			for _, n := range av.NS {
 				if err := unmarshalReflect(&dynamodb.AttributeValue{N: n}, kv); err != nil {
-					return nil
+					return err
 				}
 				rv.SetMapIndex(kv, truthy)
 			}

@@ -81,6 +81,19 @@ var encodingTests = []struct {
 		}},
 	},
 	{
+		name: "textMarshaler maps",
+		in: struct {
+			M1 map[textMarshaler]bool // dont omit
+		}{
+			M1: map[textMarshaler]bool{textMarshaler(true): true},
+		},
+		out: &dynamodb.AttributeValue{M: map[string]*dynamodb.AttributeValue{
+			"M1": &dynamodb.AttributeValue{M: map[string]*dynamodb.AttributeValue{
+				"true": &dynamodb.AttributeValue{BOOL: aws.Bool(true)},
+			}},
+		}},
+	},
+	{
 		name: "struct",
 		in: struct {
 			OK bool
@@ -312,6 +325,7 @@ var itemEncodingTests = []struct {
 		in: struct {
 			OK         string
 			EmptyStr   string
+			EmptyStr2  customString
 			EmptyB     []byte
 			EmptyL     []int
 			EmptyM     map[string]bool

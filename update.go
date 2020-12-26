@@ -63,12 +63,16 @@ func (u *Update) Range(name string, value interface{}) *Update {
 // Paths that are reserved words are automatically escaped.
 // Use single quotes to escape complex values like 'User'.'Count'.
 func (u *Update) Set(path string, value interface{}) *Update {
-	if isNil(value) {
+	v, err := marshal(value, flagNone)
+	if v == nil && err == nil {
+		// auto-omitted value
 		return u.Remove(path)
 	}
-	path, err := u.escape(path)
 	u.setError(err)
-	expr, err := u.subExpr("🝕 = ?", path, value)
+
+	path, err = u.escape(path)
+	u.setError(err)
+	expr, err := u.subExpr("🝕 = ?", path, v)
 	u.setError(err)
 	u.set = append(u.set, expr)
 	return u

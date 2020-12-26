@@ -181,3 +181,50 @@ func TestUpdateNil(t *testing.T) {
 		t.Errorf("bad result. %+v ≠ %+v", result, expected)
 	}
 }
+
+func TestUpdateSetAutoOmit(t *testing.T) {
+	if testDB == nil {
+		t.Skip(offlineSkipMsg)
+	}
+	table := testDB.Table(testTable)
+
+	type widget2 struct {
+		widget
+		CStr customString
+		SPtr *string
+	}
+
+	// first, add an item to make sure there is at least one
+	str := "delete me ptr"
+	item := widget2{
+		widget: widget{
+			UserID: 11111,
+			Time:   time.Now().UTC(),
+		},
+		CStr: customString("delete me"),
+		SPtr: &str,
+	}
+	err := table.Put(item).Run()
+	if err != nil {
+		t.Error("unexpected error:", err)
+		t.FailNow()
+	}
+
+	// update Msg with 'nil', which should delete it
+	var result widget2
+	err = table.Update("UserID", item.UserID).Range("Time", item.Time).
+		Set("CStr", customString("")).
+		Set("SPtr", nil).
+		Value(&result)
+	if err != nil {
+		t.Error("unexpected error:", err)
+	}
+	expected := widget2{
+		widget: item.widget,
+		CStr:   customString(""),
+		SPtr:   nil,
+	}
+	if !reflect.DeepEqual(result, expected) {
+		t.Errorf("bad result. %+v ≠ %+v", result, expected)
+	}
+}

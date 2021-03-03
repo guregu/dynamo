@@ -105,7 +105,7 @@ func (itr *ltIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 	}
 
 	itr.err = retry(ctx, func() error {
-		res, err := itr.lt.db.client.ListTables(itr.input())
+		res, err := itr.lt.db.client.ListTablesWithContext(ctx, itr.input())
 		if err != nil {
 			return err
 		}

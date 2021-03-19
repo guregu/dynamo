@@ -50,7 +50,7 @@ func TestUpdate(t *testing.T) {
 		Add("Count", 1).
 		Add("Test", []string{"A", "B"}).
 		RemoveExpr("Meta.$", "nope").
-		If("'Count' = ?", 0).
+		If("('Count' = ?) OR attribute_not_exists('Count')", 0).
 		If("'Msg' = ?", "hello").
 		DeleteFromSet("MySet1", "deleteme").
 		DeleteFromSet("MySet2", []string{"bad1", "bad2"}).
@@ -120,7 +120,7 @@ func TestUpdate(t *testing.T) {
 		Set("Msg", "shouldn't happen").
 		Add("Count", 1).
 		If("'Count' > ?", 100).
-		If("MeaningOfLife = ?", 42).
+		If("(MeaningOfLife = ?)", 42).
 		Value(&result)
 	if !isConditionalCheckErr(err) {
 		t.Error("expected ConditionalCheckFailedException, not", err)
@@ -210,7 +210,7 @@ func TestUpdateSetAutoOmit(t *testing.T) {
 		t.FailNow()
 	}
 
-	// update Msg with 'nil', which should delete it
+	// update CStr and SPtr with auto-omitted values, so they should be removed
 	var result widget2
 	err = table.Update("UserID", item.UserID).Range("Time", item.Time).
 		Set("CStr", customString("")).

@@ -21,6 +21,29 @@ func TestSubExpr(t *testing.T) {
 	}
 }
 
+func TestWrapExpr(t *testing.T) {
+	test := []struct {
+		in  string
+		out string
+	}{
+		{"A", "(A)"},
+		{"(A)", "(A)"},
+		{"(A) OR (B)", "((A) OR (B))"},
+		{"((A) OR (B))", "((A) OR (B))"},
+		{"(A) OR attribute_exists('FOO')", "((A) OR attribute_exists('FOO'))"},
+		{"('expires_at' >= ?) OR ('expires_at' = ?)", "(('expires_at' >= ?) OR ('expires_at' = ?))"},
+		{")", ")"},
+		{"()(", "()("},
+		{"", ""},
+	}
+	for _, tc := range test {
+		got := wrapExpr(tc.in)
+		if tc.out != got {
+			t.Errorf("wrapExpr mismatch. want: %s got: %s", tc.out, got)
+		}
+	}
+}
+
 func BenchmarkSubExpr(b *testing.B) {
 	const expr = "'User' = ? AND $ > ?"
 	for i := 0; i < b.N; i++ {

@@ -139,8 +139,40 @@ func wrapExpr(expr string) string {
 	if len(expr) == 0 {
 		return expr
 	}
-	if trim := strings.TrimSpace(expr); trim[0] == '(' && trim[len(trim)-1] == ')' {
-		return expr
+
+	wrap := "(" + expr + ")"
+
+	if !strings.ContainsAny(expr, "()") {
+		return wrap
 	}
-	return "(" + expr + ")"
+
+	stack := make([]rune, 0, len(wrap))
+	pop := func() rune {
+		if len(stack) == 0 {
+			return -1
+		}
+		popped := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		return popped
+	}
+	for _, r := range wrap {
+		if r == ')' {
+			var n int
+			for r != '(' {
+				r = pop()
+				if r == -1 {
+					// unbalanced expr
+					return expr
+				}
+				n++
+			}
+			if n <= 1 {
+				// redundant parenthesis detected
+				return expr
+			}
+			continue
+		}
+		stack = append(stack, r)
+	}
+	return wrap
 }

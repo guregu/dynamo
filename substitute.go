@@ -41,7 +41,7 @@ func (s *subber) subValue(value interface{}, flags encodeFlags) (string, error) 
 		return "", err
 	}
 	if av == nil {
-		return "", fmt.Errorf("invalid substitue value for '%s': %v", sub, av)
+		return "", fmt.Errorf("invalid substitute value for '%s': %v", sub, av)
 	}
 	s.valueExpr[sub] = av
 	return sub, nil

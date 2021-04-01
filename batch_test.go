@@ -90,3 +90,47 @@ func TestBatchGetWrite(t *testing.T) {
 		t.Error("expected 0 results, got", len(results))
 	}
 }
+
+func TestBatchGetEmptySets(t *testing.T) {
+	table := testDB.Table(testTable)
+	now := time.Now().UnixNano() / 1000000000
+	id := int(now)
+	entry := widget{UserID: id, Time: time.Now()}
+	if err := table.Put(entry).Run(); err != nil {
+		panic(err)
+	}
+	entry2 := widget{UserID: id + batchSize*2, Time: entry.Time}
+	if err := table.Put(entry2).Run(); err != nil {
+		panic(err)
+	}
+
+	keysToCheck := []Keyed{}
+	for i := entry.UserID; i <= entry2.UserID; i += 1 {
+		keysToCheck = append(keysToCheck, Keys{i, entry.Time})
+	}
+
+	results := []widget{}
+	err := table.Batch("UserID", "Time").Get(keysToCheck...).Consistent(true).All(&results)
+	if err != nil {
+		t.Error(err)
+	}
+	if len(results) != 2 {
+		t.Error("batch get empty set, unexpected length:", len(results), "want:", 2)
+	}
+
+	if err := table.Delete("UserID", entry.UserID).Range("Time", entry.Time).Run(); err != nil {
+		panic(err)
+	}
+
+	results = []widget{}
+	err = table.Batch("UserID", "Time").Get(keysToCheck...).Consistent(true).All(&results)
+	if len(results) != 1 {
+		t.Error("batch get empty set, unexpected length:", len(results), "want:", 1)
+	}
+
+	results = []widget{}
+	err = table.Batch("UserID", "Time").Get(keysToCheck[:len(keysToCheck)-1]...).Consistent(true).All(&results)
+	if len(results) != 0 {
+		t.Error("batch get empty set, unexpected length:", len(results), "want:", 0)
+	}
+}

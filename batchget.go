@@ -205,6 +205,7 @@ func (itr *bgIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 
 	tableName := itr.bg.batch.table.Name()
 
+redo:
 	// can we use results we already have?
 	if itr.output != nil && itr.idx < len(itr.output.Responses[tableName]) {
 		items := itr.output.Responses[tableName]
@@ -263,21 +264,8 @@ func (itr *bgIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 		}
 	}
 
-	items := itr.output.Responses[tableName]
-	if len(items) == 0 {
-		if len(itr.output.UnprocessedKeys) == 0 {
-			if itr.total == 0 {
-				itr.err = ErrNotFound
-			}
-			return false
-		}
-		// need to retry to get more keys
-		return itr.NextWithContext(ctx, out)
-	}
-	itr.err = itr.unmarshal(items[itr.idx], out)
-	itr.idx++
-	itr.total++
-	return itr.err == nil
+	// we've got unprocessed results, marshal one
+	goto redo
 }
 
 // Err returns the error encountered, if any.

@@ -92,7 +92,11 @@ func TestBatchGetWrite(t *testing.T) {
 }
 
 func TestBatchGetEmptySets(t *testing.T) {
+	if testDB == nil {
+		t.Skip(offlineSkipMsg)
+	}
 	table := testDB.Table(testTable)
+
 	now := time.Now().UnixNano() / 1000000000
 	id := int(now)
 	entry := widget{UserID: id, Time: time.Now()}

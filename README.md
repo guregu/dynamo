@@ -59,7 +59,7 @@ func main() {
 
 ### Expressions
 
-dynamo will help you write expressions used to filter results in queries and scans, and add conditions to puts and deletes. 
+dynamo will help you write expressions used to filter results in queries and scans, and add conditions to puts and deletes.
 
 Attribute names may be written as is if it is not a reserved word, or be escaped with single quotes (`''`). You may also use dollar signs (`$`) as placeholders for attribute names. DynamoDB has [very large amount of reserved words](http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ReservedWords.html) so it may be a good idea to just escape everything.
 
@@ -114,7 +114,7 @@ err := db.Table("Books").Get("ID", 555).One(dynamo.AWSEncoding(&someBook))
 
 ### Integration tests
 
-By default, tests are run in offline mode. Create a table called `TestDB`, with a Number Parition Key called `UserID` and a String Sort Key called `Time`. Change the table name with the environment variable `DYNAMO_TEST_TABLE`. You must specify `DYNAMO_TEST_REGION`, setting it to the AWS region where your test table is.
+By default, tests are run in offline mode. Create a table called `TestDB`, with a Number Partition Key called `UserID` and a String Sort Key called `Time`. Change the table name with the environment variable `DYNAMO_TEST_TABLE`. You must specify `DYNAMO_TEST_REGION`, setting it to the AWS region where your test table is.
 
  ```bash
 DYNAMO_TEST_REGION=us-west-2 go test github.com/guregu/dynamo/... -cover

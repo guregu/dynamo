@@ -28,6 +28,7 @@ func TestUpdate(t *testing.T) {
 			Count:  0,
 			Meta: map[string]string{
 				"foo":  "bar",
+				"keep": "untouched",
 				"nope": "痛",
 			},
 		},
@@ -65,6 +66,7 @@ func TestUpdate(t *testing.T) {
 			Count:  1,
 			Meta: map[string]string{
 				"foo": "baz",
+				"keep": "untouched",
 			},
 		},
 		MySet1: []string{"one"},

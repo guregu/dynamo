@@ -82,6 +82,9 @@ func (itr *ltIter) Next(out interface{}) bool {
 }
 
 func (itr *ltIter) NextWithContext(ctx aws.Context, out interface{}) bool {
+	if ctx.Err() != nil {
+		itr.err = ctx.Err()
+	}
 	if itr.err != nil {
 		return false
 	}

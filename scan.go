@@ -251,6 +251,9 @@ func (itr *scanIter) Next(out interface{}) bool {
 
 func (itr *scanIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 	// stop if we have an error
+	if ctx.Err() != nil {
+		itr.err = ctx.Err()
+	}
 	if itr.err != nil {
 		return false
 	}

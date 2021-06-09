@@ -325,6 +325,9 @@ func (itr *queryIter) Next(out interface{}) bool {
 
 func (itr *queryIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 	// stop if we have an error
+	if ctx.Err() != nil {
+		itr.err = ctx.Err()
+	}
 	if itr.err != nil {
 		return false
 	}

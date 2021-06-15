@@ -133,8 +133,8 @@ func TestAWSUnmarshalAppend(t *testing.T) {
 		B: 222,
 	}
 	err := unmarshalAppend(map[string]*dynamodb.AttributeValue{
-		"one": &dynamodb.AttributeValue{S: aws.String("test")},
-		"two": &dynamodb.AttributeValue{N: aws.String("555")},
+		"one": {S: aws.String("test")},
+		"two": {N: aws.String("555")},
 	}, AWSEncoding(&list))
 	if err != nil {
 		t.Error(err)
@@ -143,8 +143,8 @@ func TestAWSUnmarshalAppend(t *testing.T) {
 		t.Error("bad AWS unmarshal append:", list)
 	}
 	err = unmarshalAppend(map[string]*dynamodb.AttributeValue{
-		"one": &dynamodb.AttributeValue{S: aws.String("two")},
-		"two": &dynamodb.AttributeValue{N: aws.String("222")},
+		"one": {S: aws.String("two")},
+		"two": {N: aws.String("222")},
 	}, AWSEncoding(&list))
 	if err != nil {
 		t.Error(err)

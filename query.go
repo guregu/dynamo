@@ -498,7 +498,7 @@ func (q *Query) queryInput() *dynamodb.QueryInput {
 
 func (q *Query) keyConditions() map[string]*dynamodb.Condition {
 	conds := map[string]*dynamodb.Condition{
-		q.hashKey: &dynamodb.Condition{
+		q.hashKey: {
 			AttributeValueList: []*dynamodb.AttributeValue{q.hashValue},
 			ComparisonOperator: aws.String(string(Equal)),
 		},

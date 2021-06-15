@@ -17,14 +17,14 @@ func TestAddConsumedCapacity(t *testing.T) {
 			WriteCapacityUnits: aws.Float64(5),
 		},
 		GlobalSecondaryIndexes: map[string]*dynamodb.Capacity{
-			"TestGSI": &dynamodb.Capacity{
+			"TestGSI": {
 				CapacityUnits:      aws.Float64(3),
 				ReadCapacityUnits:  aws.Float64(1),
 				WriteCapacityUnits: aws.Float64(2),
 			},
 		},
 		LocalSecondaryIndexes: map[string]*dynamodb.Capacity{
-			"TestLSI": &dynamodb.Capacity{
+			"TestLSI": {
 				CapacityUnits:      aws.Float64(30),
 				ReadCapacityUnits:  aws.Float64(10),
 				WriteCapacityUnits: aws.Float64(20),

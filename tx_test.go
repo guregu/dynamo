@@ -1,10 +1,11 @@
 package dynamo
 
 import (
-	"github.com/gofrs/uuid"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/gofrs/uuid"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
 )

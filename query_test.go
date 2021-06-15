@@ -114,7 +114,6 @@ func TestGetAllCount(t *testing.T) {
 	if !reflect.DeepEqual(one, projected) {
 		t.Errorf("bad result for get one+project. %v ≠ %v", one, projected)
 	}
-
 }
 
 func TestQueryPaging(t *testing.T) {

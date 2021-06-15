@@ -47,7 +47,7 @@ func TestPut(t *testing.T) {
 		},
 		List: []*string{aws.String("abc"), aws.String(""), aws.String("def"), nil, aws.String("ghi")},
 		Set1: []string{"A", "B", ""},
-		Set2: map[string]struct{}{"C": struct{}{}, "D": struct{}{}, "": struct{}{}},
+		Set2: map[string]struct{}{"C": {}, "D": {}, "": {}},
 		Map1: map[string]string{"A": "hello", "B": ""},
 		Map2: map[string]*string{"C": aws.String("world"), "D": nil, "E": aws.String("")},
 	}

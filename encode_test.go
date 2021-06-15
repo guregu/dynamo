@@ -27,9 +27,9 @@ var itemEncodeOnlyTests = []struct {
 			Other: true,
 		},
 		out: map[string]*dynamodb.AttributeValue{
-			"L":     &dynamodb.AttributeValue{L: []*dynamodb.AttributeValue{}},
-			"M":     &dynamodb.AttributeValue{M: map[string]*dynamodb.AttributeValue{}},
-			"Other": &dynamodb.AttributeValue{BOOL: aws.Bool(true)},
+			"L":     {L: []*dynamodb.AttributeValue{}},
+			"M":     {M: map[string]*dynamodb.AttributeValue{}},
+			"Other": {BOOL: aws.Bool(true)},
 		},
 	},
 	{
@@ -44,7 +44,7 @@ var itemEncodeOnlyTests = []struct {
 			Other: true,
 		},
 		out: map[string]*dynamodb.AttributeValue{
-			"Other": &dynamodb.AttributeValue{BOOL: aws.Bool(true)},
+			"Other": {BOOL: aws.Bool(true)},
 		},
 	},
 	{
@@ -59,7 +59,7 @@ var itemEncodeOnlyTests = []struct {
 			private2: new(int),
 		},
 		out: map[string]*dynamodb.AttributeValue{
-			"Public": &dynamodb.AttributeValue{N: aws.String("555")},
+			"Public": {N: aws.String("555")},
 		},
 	},
 }

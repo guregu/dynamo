@@ -128,12 +128,18 @@ func TestBatchGetEmptySets(t *testing.T) {
 
 	results = []widget{}
 	err = table.Batch("UserID", "Time").Get(keysToCheck...).Consistent(true).All(&results)
+	if err != nil {
+		t.Error(err)
+	}
 	if len(results) != 1 {
 		t.Error("batch get empty set, unexpected length:", len(results), "want:", 1)
 	}
 
 	results = []widget{}
 	err = table.Batch("UserID", "Time").Get(keysToCheck[:len(keysToCheck)-1]...).Consistent(true).All(&results)
+	if err != nil {
+		t.Error(err)
+	}
 	if len(results) != 0 {
 		t.Error("batch get empty set, unexpected length:", len(results), "want:", 0)
 	}

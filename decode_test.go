@@ -17,7 +17,7 @@ var itemDecodeOnlyTests = []struct {
 		// unexported embedded pointers should be ignored
 		name: "embedded unexported pointer",
 		given: map[string]*dynamodb.AttributeValue{
-			"Embedded": &dynamodb.AttributeValue{BOOL: aws.Bool(true)},
+			"Embedded": {BOOL: aws.Bool(true)},
 		},
 		expect: struct {
 			*embedded
@@ -27,7 +27,7 @@ var itemDecodeOnlyTests = []struct {
 		// unexported fields should be ignored
 		name: "unexported fields",
 		given: map[string]*dynamodb.AttributeValue{
-			"a": &dynamodb.AttributeValue{BOOL: aws.Bool(true)},
+			"a": {BOOL: aws.Bool(true)},
 		},
 		expect: struct {
 			a bool
@@ -37,7 +37,7 @@ var itemDecodeOnlyTests = []struct {
 		// embedded pointers shouldn't clobber existing fields
 		name: "exported pointer embedded struct clobber",
 		given: map[string]*dynamodb.AttributeValue{
-			"Embedded": &dynamodb.AttributeValue{S: aws.String("OK")},
+			"Embedded": {S: aws.String("OK")},
 		},
 		expect: struct {
 			Embedded string
@@ -76,10 +76,10 @@ func TestUnmarshalAppend(t *testing.T) {
 	limit := "20"
 	null := true
 	item := map[string]*dynamodb.AttributeValue{
-		"UserID": &dynamodb.AttributeValue{N: &id},
-		"Page":   &dynamodb.AttributeValue{N: &page},
-		"Limit":  &dynamodb.AttributeValue{N: &limit},
-		"Null":   &dynamodb.AttributeValue{NULL: &null},
+		"UserID": {N: &id},
+		"Page":   {N: &page},
+		"Limit":  {N: &limit},
+		"Null":   {NULL: &null},
 	}
 
 	for range [15]struct{}{} {
@@ -144,13 +144,13 @@ func TestUnmarshalNULL(t *testing.T) {
 	arbitrary := "hello world"
 	double := new(*int)
 	item := map[string]*dynamodb.AttributeValue{
-		"String":    &dynamodb.AttributeValue{NULL: &tru},
-		"Slice":     &dynamodb.AttributeValue{NULL: &tru},
-		"Array":     &dynamodb.AttributeValue{NULL: &tru},
-		"StringPtr": &dynamodb.AttributeValue{NULL: &tru},
-		"DoublePtr": &dynamodb.AttributeValue{NULL: &tru},
-		"Map":       &dynamodb.AttributeValue{NULL: &tru},
-		"Interface": &dynamodb.AttributeValue{NULL: &tru},
+		"String":    {NULL: &tru},
+		"Slice":     {NULL: &tru},
+		"Array":     {NULL: &tru},
+		"StringPtr": {NULL: &tru},
+		"DoublePtr": {NULL: &tru},
+		"Map":       {NULL: &tru},
+		"Interface": {NULL: &tru},
 	}
 
 	type resultType struct {

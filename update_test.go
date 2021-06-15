@@ -33,8 +33,8 @@ func TestUpdate(t *testing.T) {
 			},
 		},
 		MySet1: []string{"one", "deleteme"},
-		MySet2: map[string]struct{}{"a": struct{}{}, "b": struct{}{}, "bad1": struct{}{}, "c": struct{}{}, "bad2": struct{}{}},
-		MySet3: map[int64]struct{}{1: struct{}{}, 999: struct{}{}, 2: struct{}{}, 3: struct{}{}, 555: struct{}{}},
+		MySet2: map[string]struct{}{"a": {}, "b": {}, "bad1": {}, "c": {}, "bad2": {}},
+		MySet3: map[int64]struct{}{1: {}, 999: {}, 2: {}, 3: {}, 555: {}},
 	}
 	err := table.Put(item).Run()
 	if err != nil {
@@ -55,7 +55,7 @@ func TestUpdate(t *testing.T) {
 		If("'Msg' = ?", "hello").
 		DeleteFromSet("MySet1", "deleteme").
 		DeleteFromSet("MySet2", []string{"bad1", "bad2"}).
-		DeleteFromSet("MySet3", map[int64]struct{}{999: struct{}{}, 555: struct{}{}}).
+		DeleteFromSet("MySet3", map[int64]struct{}{999: {}, 555: {}}).
 		ConsumedCapacity(&cc).
 		Value(&result)
 	expected := widget2{
@@ -65,13 +65,13 @@ func TestUpdate(t *testing.T) {
 			Msg:    "changed",
 			Count:  1,
 			Meta: map[string]string{
-				"foo": "baz",
+				"foo":  "baz",
 				"keep": "untouched",
 			},
 		},
 		MySet1: []string{"one"},
-		MySet2: map[string]struct{}{"a": struct{}{}, "b": struct{}{}, "c": struct{}{}},
-		MySet3: map[int64]struct{}{1: struct{}{}, 2: struct{}{}, 3: struct{}{}},
+		MySet2: map[string]struct{}{"a": {}, "b": {}, "c": {}},
+		MySet3: map[int64]struct{}{1: {}, 2: {}, 3: {}},
 	}
 	if err != nil {
 		t.Error("unexpected error:", err)

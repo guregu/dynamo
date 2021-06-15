@@ -142,9 +142,3 @@ type SuperComplex []struct {
 		FFF []int `dynamo:",set"`
 	}
 }
-
-func makeSuperComplex() SuperComplex {
-	sc := make(SuperComplex, 2)
-	sc[0].HelpMe.FFF = []int{1, 2, 3}
-	return sc
-}

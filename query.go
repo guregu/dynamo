@@ -68,11 +68,7 @@ const (
 	Descending       = false // ScanIndexForward = false
 )
 
-var (
-	selectAllAttributes      = aws.String("ALL_ATTRIBUTES")
-	selectCount              = aws.String("COUNT")
-	selectSpecificAttributes = aws.String("SPECIFIC_ATTRIBUTES")
-)
+var selectCount = aws.String("COUNT")
 
 // Get creates a new request to get an item.
 // Name is the name of the hash key (a.k.a. partition key).

@@ -155,3 +155,89 @@ func TestCreateTableUintUnixTime(t *testing.T) {
 		t.Error("unexpected input (unixtime tag)", input2)
 	}
 }
+
+func TestCreateTableWithAllProjection(t *testing.T) {
+	// until I do DeleteTable let's just compare the input
+	// if testDB == nil {
+	// 	t.Skip(offlineSkipMsg)
+	// }
+
+	input := testDB.CreateTable("UserActions", UserAction{}).
+		Project("ID-Seq-index", AllProjection, "UUID").
+		Provision(4, 2).
+		ProvisionIndex("Embedded-index", 1, 2).
+		Tag("Tag-Key", "old value").
+		Tag("Tag-Key", "Tag-Value").
+		input()
+
+	expected := &dynamodb.CreateTableInput{
+		AttributeDefinitions: []*dynamodb.AttributeDefinition{
+			{
+				AttributeName: aws.String("ID"),
+				AttributeType: aws.String("S"),
+			},
+			{
+				AttributeName: aws.String("Time"),
+				AttributeType: aws.String("S"),
+			},
+			{
+				AttributeName: aws.String("Seq"),
+				AttributeType: aws.String("N"),
+			},
+			{
+				AttributeName: aws.String("Embedded"),
+				AttributeType: aws.String("B"),
+			},
+		},
+		GlobalSecondaryIndexes: []*dynamodb.GlobalSecondaryIndex{{
+			IndexName: aws.String("Embedded-index"),
+			KeySchema: []*dynamodb.KeySchemaElement{{
+				AttributeName: aws.String("Embedded"),
+				KeyType:       aws.String("HASH"),
+			}},
+			Projection: &dynamodb.Projection{
+				ProjectionType: aws.String("ALL"),
+			},
+			ProvisionedThroughput: &dynamodb.ProvisionedThroughput{
+				ReadCapacityUnits:  aws.Int64(1),
+				WriteCapacityUnits: aws.Int64(2),
+			},
+		}},
+		KeySchema: []*dynamodb.KeySchemaElement{{
+			AttributeName: aws.String("ID"),
+			KeyType:       aws.String("HASH"),
+		}, {
+			AttributeName: aws.String("Time"),
+			KeyType:       aws.String("RANGE"),
+		}},
+		LocalSecondaryIndexes: []*dynamodb.LocalSecondaryIndex{{
+			IndexName: aws.String("ID-Seq-index"),
+			KeySchema: []*dynamodb.KeySchemaElement{{
+				AttributeName: aws.String("ID"),
+				KeyType:       aws.String("HASH"),
+			}, {
+				AttributeName: aws.String("Seq"),
+				KeyType:       aws.String("RANGE"),
+			}},
+			Projection: &dynamodb.Projection{
+				ProjectionType: aws.String("ALL"),
+			},
+		}},
+		ProvisionedThroughput: &dynamodb.ProvisionedThroughput{
+			ReadCapacityUnits:  aws.Int64(4),
+			WriteCapacityUnits: aws.Int64(2),
+		},
+		Tags: []*dynamodb.Tag{
+			&dynamodb.Tag{
+				Key:   aws.String("Tag-Key"),
+				Value: aws.String("Tag-Value"),
+			},
+		},
+		TableName: aws.String("UserActions"),
+	}
+
+	if !reflect.DeepEqual(input, expected) {
+		t.Error("unexpected input", input)
+	}
+
+}

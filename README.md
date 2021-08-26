@@ -205,6 +205,12 @@ By default, tests are run in offline mode. Create a table called `TestDB`, with 
 DYNAMO_TEST_REGION=us-west-2 go test github.com/guregu/dynamo/... -cover
  ```
 
+If you want to use [DynamoDB Local](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.html) to run local tests, specify `DYNAMO_TEST_ENDPOINT`.
+
+ ```bash
+DYNAMO_TEST_REGION=us-west-2 DYNAMO_TEST_ENDPOINT=http://localhost:8000 go test github.com/guregu/dynamo/... -cover
+ ```
+
 ### License
 
 BSD 2-Clause

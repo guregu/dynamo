@@ -64,6 +64,10 @@ func (tx *GetTx) RunWithContext(ctx aws.Context) error {
 	if err != nil {
 		return err
 	}
+	if len(tx.items) == 0 {
+		// no get items.
+		return nil
+	}
 	var resp *dynamodb.TransactGetItemsOutput
 	err = retry(ctx, func() error {
 		var err error
@@ -251,6 +255,10 @@ func (tx *WriteTx) Run() error {
 func (tx *WriteTx) RunWithContext(ctx aws.Context) error {
 	if tx.err != nil {
 		return tx.err
+	}
+	if len(tx.items) == 0 {
+		// no write items.
+		return nil
 	}
 	input, err := tx.input()
 	if err != nil {

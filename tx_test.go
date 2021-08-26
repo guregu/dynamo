@@ -165,10 +165,6 @@ func TestTx(t *testing.T) {
 
 	// empty commit
 	tx = testDB.WriteTx()
-	// For example, I don't want Run to be an error when I want to fetch/update based on a condition and nothing happens.
-	// if somethingCheck {
-	// 	tx.Put(table.Put(widget{UserID: 69, Time: date2}))
-	// }
 	if err = tx.Run(); err != nil {
 		t.Errorf("WtiteTx: empty commit became error: %s", err)
 	}

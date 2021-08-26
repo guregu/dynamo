@@ -1,10 +1,11 @@
 package dynamo
 
 import (
-	"github.com/gofrs/uuid"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/gofrs/uuid"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
 )
@@ -88,6 +89,7 @@ func TestTx(t *testing.T) {
 
 	// GetOne
 	getTx := testDB.GetTx()
+	getTx = testDB.GetTx()
 	var record1, record2, record3 widget
 	var cc2 ConsumedCapacity
 	getTx.GetOne(table.Get("UserID", 69).Range("Time", Equal, date1), &record1)
@@ -159,6 +161,20 @@ func TestTx(t *testing.T) {
 		if err.(awserr.Error).Code() != "TransactionCanceledException" {
 			t.Error("unexpected error:", err)
 		}
+	}
+
+	// empty commit
+	tx = testDB.WriteTx()
+	// For example, I don't want Run to be an error when I want to fetch/update based on a condition and nothing happens.
+	// if somethingCheck {
+	// 	tx.Put(table.Put(widget{UserID: 69, Time: date2}))
+	// }
+	if err = tx.Run(); err != nil {
+		t.Errorf("WtiteTx: empty commit became error: %s", err)
+	}
+	getTx = testDB.GetTx()
+	if err = getTx.Run(); err != nil {
+		t.Errorf("GetTx: empty commit became error: %s", err)
 	}
 
 	t.Logf("1: %+v 2: %+v 3: %+v", record1, record2, record3)

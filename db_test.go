@@ -23,7 +23,7 @@ func init() {
 		if dte := os.Getenv("DYNAMO_TEST_ENDPOINT"); dte != "" {
 			endpoint = aws.String(dte)
 		}
-		testDB = New(session.New(), &aws.Config{
+		testDB = New(session.Must(session.NewSession()), &aws.Config{
 			Region:   aws.String(region),
 			Endpoint: endpoint,
 			// LogLevel: aws.LogLevel(aws.LogDebugWithHTTPBody),

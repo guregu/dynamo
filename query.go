@@ -68,11 +68,7 @@ const (
 	Descending       = false // ScanIndexForward = false
 )
 
-var (
-	selectAllAttributes      = aws.String("ALL_ATTRIBUTES")
-	selectCount              = aws.String("COUNT")
-	selectSpecificAttributes = aws.String("SPECIFIC_ATTRIBUTES")
-)
+var selectCount = aws.String("COUNT")
 
 // Get creates a new request to get an item.
 // Name is the name of the hash key (a.k.a. partition key).
@@ -325,6 +321,9 @@ func (itr *queryIter) Next(out interface{}) bool {
 
 func (itr *queryIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 	// stop if we have an error
+	if ctx.Err() != nil {
+		itr.err = ctx.Err()
+	}
 	if itr.err != nil {
 		return false
 	}
@@ -495,7 +494,7 @@ func (q *Query) queryInput() *dynamodb.QueryInput {
 
 func (q *Query) keyConditions() map[string]*dynamodb.Condition {
 	conds := map[string]*dynamodb.Condition{
-		q.hashKey: &dynamodb.Condition{
+		q.hashKey: {
 			AttributeValueList: []*dynamodb.AttributeValue{q.hashValue},
 			ComparisonOperator: aws.String(string(Equal)),
 		},

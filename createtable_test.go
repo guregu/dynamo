@@ -107,7 +107,7 @@ func TestCreateTable(t *testing.T) {
 			WriteCapacityUnits: aws.Int64(2),
 		},
 		Tags: []*dynamodb.Tag{
-			&dynamodb.Tag{
+			{
 				Key:   aws.String("Tag-Key"),
 				Value: aws.String("Tag-Value"),
 			},

@@ -1,7 +1,6 @@
 package dynamo
 
 import (
-	"bytes"
 	"encoding"
 	"fmt"
 	"reflect"
@@ -687,28 +686,4 @@ func isZero(rv reflect.Value) bool {
 	// Compare other types directly:
 	z := reflect.Zero(rv.Type())
 	return rv.Interface() == z.Interface()
-}
-
-// only works for primary key types
-func isAVEqual(a, b *dynamodb.AttributeValue) bool {
-	if a.S != nil {
-		if b.S == nil {
-			return false
-		}
-		return *a.S == *b.S
-	}
-	if a.N != nil {
-		if b.N == nil {
-			return false
-		}
-		// TODO: parse numbers?
-		return *a.N == *b.N
-	}
-	if a.B != nil {
-		if b.B == nil {
-			return false
-		}
-		return bytes.Equal(a.B, b.B)
-	}
-	return false
 }

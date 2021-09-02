@@ -75,6 +75,9 @@ func (bw *BatchWrite) RunWithContext(ctx aws.Context) (wrote int, err error) {
 	if bw.err != nil {
 		return 0, bw.err
 	}
+	if len(bw.ops) == 0 {
+		return 0, ErrNoInput
+	}
 
 	// TODO: this could be made to be more efficient,
 	// by combining unprocessed items with the next request.

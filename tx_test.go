@@ -164,4 +164,15 @@ func TestTx(t *testing.T) {
 
 	t.Logf("1: %+v 2: %+v 3: %+v", record1, record2, record3)
 	t.Logf("All: %+v (len: %d)", records, len(records))
+
+	// no input
+	err = testDB.GetTx().All(nil)
+	if err != ErrNoInput {
+		t.Error("unexpected error", err)
+	}
+
+	err = testDB.WriteTx().Run()
+	if err != ErrNoInput {
+		t.Error("unexpected error", err)
+	}
 }

@@ -1,10 +1,16 @@
 package dynamo
 
 import (
+	"errors"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/gofrs/uuid"
 )
+
+// ErrNoInput is returned when APIs that can take multiple inputs are run with zero inputs.
+// For example, in a transaction with no operations.
+var ErrNoInput = errors.New("dynamo: no input items")
 
 type getTxOp interface {
 	getTxItem() (*dynamodb.TransactGetItem, error)
@@ -143,6 +149,9 @@ func (tx *GetTx) AllWithContext(ctx aws.Context, out interface{}) error {
 }
 
 func (tx *GetTx) input() (*dynamodb.TransactGetItemsInput, error) {
+	if len(tx.items) == 0 {
+		return nil, ErrNoInput
+	}
 	input := &dynamodb.TransactGetItemsInput{}
 	for _, item := range tx.items {
 		tgi, err := item.getTxItem()
@@ -269,6 +278,9 @@ func (tx *WriteTx) RunWithContext(ctx aws.Context) error {
 }
 
 func (tx *WriteTx) input() (*dynamodb.TransactWriteItemsInput, error) {
+	if len(tx.items) == 0 {
+		return nil, ErrNoInput
+	}
 	input := &dynamodb.TransactWriteItemsInput{}
 	for _, item := range tx.items {
 		wti, err := item.writeTxItem()

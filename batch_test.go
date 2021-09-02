@@ -137,10 +137,23 @@ func TestBatchGetEmptySets(t *testing.T) {
 
 	results = []widget{}
 	err = table.Batch("UserID", "Time").Get(keysToCheck[:len(keysToCheck)-1]...).Consistent(true).All(&results)
-	if err != nil {
+	if err != ErrNotFound {
 		t.Error(err)
 	}
 	if len(results) != 0 {
 		t.Error("batch get empty set, unexpected length:", len(results), "want:", 0)
+	}
+}
+
+func TestBatchEmptyInput(t *testing.T) {
+	table := testDB.Table(testTable)
+	err := table.Batch("UserID", "Time").Get().All(nil)
+	if err != ErrNoInput {
+		t.Error("unexpected error", err)
+	}
+
+	_, err = table.Batch("UserID", "Time").Write().Run()
+	if err != ErrNoInput {
+		t.Error("unexpected error", err)
 	}
 }

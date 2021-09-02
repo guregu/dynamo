@@ -179,6 +179,10 @@ type bgIter struct {
 }
 
 func newBGIter(bg *BatchGet, fn unmarshalFunc, err error) *bgIter {
+	if err == nil && len(bg.reqs) == 0 {
+		err = ErrNoInput
+	}
+
 	iter := &bgIter{
 		bg:        bg,
 		err:       err,

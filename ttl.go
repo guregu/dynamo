@@ -1,8 +1,12 @@
 package dynamo
 
 import (
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"context"
+
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 )
 
 // UpdateTTL is a request to enable or disable a table's time to live functionality.
@@ -36,11 +40,11 @@ func (ttl *UpdateTTL) Run() error {
 }
 
 // RunWithContext executes this request.
-func (ttl *UpdateTTL) RunWithContext(ctx aws.Context) error {
+func (ttl *UpdateTTL) RunWithContext(ctx context.Context) error {
 	input := ttl.input()
 
 	err := retry(ctx, func() error {
-		_, err := ttl.table.db.client.UpdateTimeToLiveWithContext(ctx, input)
+		_, err := ttl.table.db.client.UpdateTimeToLive(ctx, input)
 		return err
 	})
 	return err
@@ -49,7 +53,7 @@ func (ttl *UpdateTTL) RunWithContext(ctx aws.Context) error {
 func (ttl *UpdateTTL) input() *dynamodb.UpdateTimeToLiveInput {
 	return &dynamodb.UpdateTimeToLiveInput{
 		TableName: aws.String(ttl.table.Name()),
-		TimeToLiveSpecification: &dynamodb.TimeToLiveSpecification{
+		TimeToLiveSpecification: &types.TimeToLiveSpecification{
 			Enabled:       aws.Bool(ttl.enabled),
 			AttributeName: aws.String(ttl.attrib),
 		},
@@ -74,13 +78,13 @@ func (d *DescribeTTL) Run() (TTLDescription, error) {
 }
 
 // RunWithContext executes this request and returns details about time to live, or an error.
-func (d *DescribeTTL) RunWithContext(ctx aws.Context) (TTLDescription, error) {
+func (d *DescribeTTL) RunWithContext(ctx context.Context) (TTLDescription, error) {
 	input := d.input()
 
 	var result *dynamodb.DescribeTimeToLiveOutput
 	err := retry(ctx, func() error {
 		var err error
-		result, err = d.table.db.client.DescribeTimeToLiveWithContext(ctx, input)
+		result, err = d.table.db.client.DescribeTimeToLive(ctx, input)
 		return err
 	})
 	if err != nil {
@@ -90,8 +94,8 @@ func (d *DescribeTTL) RunWithContext(ctx aws.Context) (TTLDescription, error) {
 	desc := TTLDescription{
 		Status: TTLDisabled,
 	}
-	if result.TimeToLiveDescription.TimeToLiveStatus != nil {
-		desc.Status = TTLStatus(*result.TimeToLiveDescription.TimeToLiveStatus)
+	if result.TimeToLiveDescription.TimeToLiveStatus != "" {
+		desc.Status = TTLStatus(result.TimeToLiveDescription.TimeToLiveStatus)
 	}
 	if result.TimeToLiveDescription.AttributeName != nil {
 		desc.Attribute = *result.TimeToLiveDescription.AttributeName

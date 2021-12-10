@@ -1,11 +1,15 @@
 package dynamo
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/smithy-go/time"
+
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/cenkalti/backoff/v4"
 )
 
@@ -106,7 +110,7 @@ func (bg *BatchGet) All(out interface{}) error {
 }
 
 // AllWithContext executes this request and unmarshals all results to out, which must be a pointer to a slice.
-func (bg *BatchGet) AllWithContext(ctx aws.Context, out interface{}) error {
+func (bg *BatchGet) AllWithContext(ctx context.Context, out interface{}) error {
 	iter := newBGIter(bg, unmarshalAppend, bg.err)
 	for iter.NextWithContext(ctx, out) {
 	}
@@ -128,7 +132,7 @@ func (bg *BatchGet) input(start int) *dynamodb.BatchGetItemInput {
 	}
 
 	in := &dynamodb.BatchGetItemInput{
-		RequestItems: make(map[string]*dynamodb.KeysAndAttributes, 1),
+		RequestItems: make(map[string]types.KeysAndAttributes, 1),
 	}
 
 	if bg.projection != "" {
@@ -138,10 +142,10 @@ func (bg *BatchGet) input(start int) *dynamodb.BatchGetItemInput {
 		}
 	}
 	if bg.cc != nil {
-		in.ReturnConsumedCapacity = aws.String(dynamodb.ReturnConsumedCapacityIndexes)
+		in.ReturnConsumedCapacity = types.ReturnConsumedCapacityIndexes
 	}
 
-	var kas *dynamodb.KeysAndAttributes
+	var kas *types.KeysAndAttributes
 	for _, get := range bg.reqs[start:end] {
 		if kas == nil {
 			kas = get.keysAndAttribs()
@@ -155,7 +159,7 @@ func (bg *BatchGet) input(start int) *dynamodb.BatchGetItemInput {
 	if bg.consistent {
 		kas.ConsistentRead = &bg.consistent
 	}
-	in.RequestItems[bg.batch.table.Name()] = kas
+	in.RequestItems[bg.batch.table.Name()] = *kas
 	return in
 }
 
@@ -201,7 +205,7 @@ func (itr *bgIter) Next(out interface{}) bool {
 	return itr.NextWithContext(ctx, out)
 }
 
-func (itr *bgIter) NextWithContext(ctx aws.Context, out interface{}) bool {
+func (itr *bgIter) NextWithContext(ctx context.Context, out interface{}) bool {
 	// stop if we have an error
 	if ctx.Err() != nil {
 		itr.err = ctx.Err()
@@ -230,8 +234,12 @@ redo:
 
 	if itr.output != nil && itr.idx >= len(itr.output.Responses[tableName]) {
 		var unprocessed int
-		if itr.output.UnprocessedKeys != nil && itr.output.UnprocessedKeys[tableName] != nil {
-			unprocessed = len(itr.output.UnprocessedKeys[tableName].Keys)
+
+		if itr.output.UnprocessedKeys != nil {
+			_, ok := itr.output.UnprocessedKeys[tableName]
+			if ok {
+				unprocessed = len(itr.output.UnprocessedKeys[tableName].Keys)
+			}
 		}
 		itr.processed += len(itr.input.RequestItems[tableName].Keys) - unprocessed
 		// have we exhausted all results?
@@ -248,7 +256,7 @@ redo:
 			// no, prepare a new request with the remaining keys
 			itr.input.RequestItems = itr.output.UnprocessedKeys
 			// we need to sleep here a bit as per the official docs
-			if err := aws.SleepWithContext(ctx, itr.backoff.NextBackOff()); err != nil {
+			if err := time.SleepWithContext(ctx, itr.backoff.NextBackOff()); err != nil {
 				// timed out
 				itr.err = err
 				return false
@@ -259,7 +267,7 @@ redo:
 
 	itr.err = retry(ctx, func() error {
 		var err error
-		itr.output, err = itr.bg.batch.table.db.client.BatchGetItemWithContext(ctx, itr.input)
+		itr.output, err = itr.bg.batch.table.db.client.BatchGetItem(ctx, itr.input)
 		return err
 	})
 	if itr.err != nil {
@@ -267,7 +275,8 @@ redo:
 	}
 	if itr.bg.cc != nil {
 		for _, cc := range itr.output.ConsumedCapacity {
-			addConsumedCapacity(itr.bg.cc, cc)
+
+			addConsumedCapacity(itr.bg.cc, &cc)
 		}
 	}
 

@@ -2,31 +2,34 @@
 package dynamo
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"os"
 
-	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/client"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/smithy-go/logging"
+	"github.com/niltonkummer/dynamo/dynamodbiface"
 )
 
 // DB is a DynamoDB client.
 type DB struct {
 	client dynamodbiface.DynamoDBAPI
-	logger aws.Logger
+	logger logging.Logger
 }
 
 // New creates a new client with the given configuration.
-func New(p client.ConfigProvider, cfgs ...*aws.Config) *DB {
-	cfg := p.ClientConfig(dynamodb.EndpointsID, cfgs...)
+func New(cfg aws.Config) *DB {
 	db := &DB{
-		client: dynamodb.New(p, cfgs...),
-		logger: cfg.Config.Logger,
+		client: dynamodb.NewFromConfig(cfg),
+		logger: cfg.Logger,
 	}
 	if db.logger == nil {
-		db.logger = aws.NewDefaultLogger()
+		db.logger = logging.NewStandardLogger(os.Stdout)
 	}
 	return db
 }
@@ -35,7 +38,7 @@ func New(p client.ConfigProvider, cfgs ...*aws.Config) *DB {
 func NewFromIface(client dynamodbiface.DynamoDBAPI) *DB {
 	return &DB{
 		client: client,
-		logger: aws.NewDefaultLogger(),
+		logger: logging.NewStandardLogger(os.Stdout),
 	}
 }
 
@@ -44,8 +47,8 @@ func (db *DB) Client() dynamodbiface.DynamoDBAPI {
 	return db.client
 }
 
-func (db *DB) log(v ...interface{}) {
-	db.logger.Log(v...)
+func (db *DB) log(format string, v ...interface{}) {
+	db.logger.Logf(logging.Debug, format, v...)
 }
 
 // ListTables is a request to list tables.
@@ -67,7 +70,7 @@ func (lt *ListTables) All() ([]string, error) {
 }
 
 // AllWithContext returns every table or an error.
-func (lt *ListTables) AllWithContext(ctx aws.Context) ([]string, error) {
+func (lt *ListTables) AllWithContext(ctx context.Context) ([]string, error) {
 	var tables []string
 	itr := lt.Iter()
 	var name string
@@ -96,7 +99,7 @@ func (itr *ltIter) Next(out interface{}) bool {
 	return itr.NextWithContext(ctx, out)
 }
 
-func (itr *ltIter) NextWithContext(ctx aws.Context, out interface{}) bool {
+func (itr *ltIter) NextWithContext(ctx context.Context, out interface{}) bool {
 	if ctx.Err() != nil {
 		itr.err = ctx.Err()
 	}
@@ -111,7 +114,7 @@ func (itr *ltIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 
 	if itr.result != nil {
 		if itr.idx < len(itr.result.TableNames) {
-			*out.(*string) = *itr.result.TableNames[itr.idx]
+			*out.(*string) = itr.result.TableNames[itr.idx]
 			itr.idx++
 			return true
 		}
@@ -123,7 +126,7 @@ func (itr *ltIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 	}
 
 	itr.err = retry(ctx, func() error {
-		res, err := itr.lt.db.client.ListTablesWithContext(ctx, itr.input())
+		res, err := itr.lt.db.client.ListTables(ctx, itr.input())
 		if err != nil {
 			return err
 		}
@@ -138,7 +141,7 @@ func (itr *ltIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 		return false
 	}
 
-	*out.(*string) = *itr.result.TableNames[0]
+	*out.(*string) = itr.result.TableNames[0]
 	itr.idx = 1
 	return true
 }
@@ -162,7 +165,7 @@ type Iter interface {
 	Next(out interface{}) bool
 	// NextWithContext tries to unmarshal the next result into out.
 	// Returns false when it is complete or if it runs into an error.
-	NextWithContext(ctx aws.Context, out interface{}) bool
+	NextWithContext(ctx context.Context, out interface{}) bool
 	// Err returns the error encountered, if any.
 	// You should check this after Next is finished.
 	Err() error
@@ -179,13 +182,13 @@ type PagingIter interface {
 
 // PagingKey is a key used for splitting up partial results.
 // Get a PagingKey from a PagingIter and pass it to StartFrom in Query or Scan.
-type PagingKey map[string]*dynamodb.AttributeValue
+type PagingKey map[string]types.AttributeValue
 
 // IsCondCheckFailed returns true if the given error is a "conditional check failed" error.
 // This corresponds with a ConditionalCheckFailedException in most APIs,
 // or a TransactionCanceledException with a ConditionalCheckFailed cancellation reason in transactions.
 func IsCondCheckFailed(err error) bool {
-	var txe *dynamodb.TransactionCanceledException
+	var txe *types.TransactionCanceledException
 	if errors.As(err, &txe) {
 		for _, cr := range txe.CancellationReasons {
 			if cr.Code != nil && *cr.Code == "ConditionalCheckFailed" {

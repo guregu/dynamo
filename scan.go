@@ -1,24 +1,26 @@
 package dynamo
 
 import (
+	"context"
 	"strings"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 )
 
 // Scan is a request to scan all the data in a table.
 // See: http://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_Scan.html
 type Scan struct {
 	table    Table
-	startKey map[string]*dynamodb.AttributeValue
+	startKey map[string]types.AttributeValue
 	index    string
 
 	projection  string
 	filters     []string
 	consistent  bool
-	limit       int64
-	searchLimit int64
+	limit       int32
+	searchLimit int32
 
 	subber
 
@@ -76,7 +78,7 @@ func (s *Scan) Consistent(on bool) *Scan {
 
 // Limit specifies the maximum amount of results to return.
 func (s *Scan) Limit(limit int64) *Scan {
-	s.limit = limit
+	s.limit = int32(limit)
 	return s
 }
 
@@ -84,7 +86,7 @@ func (s *Scan) Limit(limit int64) *Scan {
 // Use this along with StartFrom and Iter's LastEvaluatedKey to split up results.
 // Note that DynamoDB limits result sets to 1MB.
 func (s *Scan) SearchLimit(limit int64) *Scan {
-	s.searchLimit = limit
+	s.searchLimit = int32(limit)
 	return s
 }
 
@@ -112,7 +114,7 @@ func (s *Scan) All(out interface{}) error {
 }
 
 // AllWithContext executes this request and unmarshals all results to out, which must be a pointer to a slice.
-func (s *Scan) AllWithContext(ctx aws.Context, out interface{}) error {
+func (s *Scan) AllWithContext(ctx context.Context, out interface{}) error {
 	itr := &scanIter{
 		scan:      s,
 		unmarshal: unmarshalAppend,
@@ -133,7 +135,7 @@ func (s *Scan) AllWithLastEvaluatedKey(out interface{}) (PagingKey, error) {
 
 // AllWithLastEvaluatedKeyContext executes this request and unmarshals all results to out, which must be a pointer to a slice.
 // It returns a key you can use with StartWith to continue this query.
-func (s *Scan) AllWithLastEvaluatedKeyContext(ctx aws.Context, out interface{}) (PagingKey, error) {
+func (s *Scan) AllWithLastEvaluatedKeyContext(ctx context.Context, out interface{}) (PagingKey, error) {
 	itr := &scanIter{
 		scan:      s,
 		unmarshal: unmarshalAppend,
@@ -156,35 +158,35 @@ func (s *Scan) Count() (int64, error) {
 // CountWithContext executes this request and returns the number of items matching the scan.
 // It takes into account the filter, limit, search limit, and all other parameters given.
 // It may return a higher count than the limits.
-func (s *Scan) CountWithContext(ctx aws.Context) (int64, error) {
+func (s *Scan) CountWithContext(ctx context.Context) (int64, error) {
 	if s.err != nil {
 		return 0, s.err
 	}
 	var count, scanned int64
 	input := s.scanInput()
-	input.Select = aws.String(dynamodb.SelectCount)
+	input.Select = types.SelectCount
 	for {
 		var out *dynamodb.ScanOutput
 		err := retry(ctx, func() error {
 			var err error
-			out, err = s.table.db.client.ScanWithContext(ctx, input)
+			out, err = s.table.db.client.Scan(ctx, input)
 			return err
 		})
 		if err != nil {
 			return count, err
 		}
 
-		count += *out.Count
-		scanned += *out.ScannedCount
+		count += int64(out.Count)
+		scanned += int64(out.ScannedCount)
 
 		if s.cc != nil {
 			addConsumedCapacity(s.cc, out.ConsumedCapacity)
 		}
 
-		if s.limit > 0 && count >= s.limit {
+		if s.limit > 0 && count >= int64(s.limit) {
 			break
 		}
-		if s.searchLimit > 0 && scanned >= s.searchLimit {
+		if s.searchLimit > 0 && scanned >= int64(s.searchLimit) {
 			break
 		}
 		if out.LastEvaluatedKey == nil {
@@ -223,7 +225,7 @@ func (s *Scan) scanInput() *dynamodb.ScanInput {
 		input.FilterExpression = &filter
 	}
 	if s.cc != nil {
-		input.ReturnConsumedCapacity = aws.String(dynamodb.ReturnConsumedCapacityIndexes)
+		input.ReturnConsumedCapacity = types.ReturnConsumedCapacityIndexes
 	}
 	return input
 }
@@ -244,12 +246,12 @@ type scanIter struct {
 	n      int64
 
 	// last item evaluated
-	last map[string]*dynamodb.AttributeValue
+	last map[string]types.AttributeValue
 	// cache of primary keys, used for generating LEKs
 	keys map[string]struct{}
 	// example LastEvaluatedKey and ExclusiveStartKey, used to lazily evaluate the primary keys if possible
-	exLEK  map[string]*dynamodb.AttributeValue
-	exESK  map[string]*dynamodb.AttributeValue
+	exLEK  map[string]types.AttributeValue
+	exESK  map[string]types.AttributeValue
 	keyErr error
 
 	unmarshal unmarshalFunc
@@ -263,7 +265,7 @@ func (itr *scanIter) Next(out interface{}) bool {
 	return itr.NextWithContext(ctx, out)
 }
 
-func (itr *scanIter) NextWithContext(ctx aws.Context, out interface{}) bool {
+func (itr *scanIter) NextWithContext(ctx context.Context, out interface{}) bool {
 	// stop if we have an error
 	if ctx.Err() != nil {
 		itr.err = ctx.Err()
@@ -273,7 +275,7 @@ func (itr *scanIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 	}
 
 	// stop if exceed limit
-	if itr.scan.limit > 0 && itr.n == itr.scan.limit {
+	if itr.scan.limit > 0 && itr.n == int64(itr.scan.limit) {
 		// proactively grab the keys for LEK inferral, but don't count it as a real error yet to keep backwards compat
 		itr.keys, itr.keyErr = itr.scan.table.primaryKeys(ctx, itr.exLEK, itr.exESK, itr.scan.index)
 		return false
@@ -309,7 +311,7 @@ func (itr *scanIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 
 	itr.err = retry(ctx, func() error {
 		var err error
-		itr.output, err = itr.scan.table.db.client.ScanWithContext(ctx, itr.input)
+		itr.output, err = itr.scan.table.db.client.Scan(ctx, itr.input)
 		return err
 	})
 

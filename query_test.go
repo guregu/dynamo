@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
 func TestGetAllCount(t *testing.T) {
@@ -37,8 +37,8 @@ func TestGetAllCount(t *testing.T) {
 			"#meta": "Meta",
 			"#foo":  "foo",
 		}),
-		AttributeValues: map[string]*dynamodb.AttributeValue{
-			":bar": {S: aws.String("bar")},
+		AttributeValues: map[string]types.AttributeValue{
+			":bar": &types.AttributeValueMemberS{Value: "bar"},
 		},
 	}
 

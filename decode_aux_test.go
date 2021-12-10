@@ -5,10 +5,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
-
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/guregu/dynamo"
 )
 
@@ -21,9 +19,9 @@ func TestEncodingAux(t *testing.T) {
 	// using the "aux" unmarshaling trick.
 	// See: https://github.com/guregu/dynamo/issues/181
 
-	in := map[string]*dynamodb.AttributeValue{
-		"ID":   {S: aws.String("intenso")},
-		"Name": {S: aws.String("Intenso 12")},
+	in := map[string]types.AttributeValue{
+		"ID":   &types.AttributeValueMemberS{Value: "intenso"},
+		"Name": &types.AttributeValueMemberS{Value: "Intenso 12"},
 	}
 
 	type coffeeItemDefault struct {
@@ -62,7 +60,7 @@ type coffeeItemFlat struct {
 	Name string
 }
 
-func (c *coffeeItemFlat) UnmarshalDynamoItem(item map[string]*dynamodb.AttributeValue) error {
+func (c *coffeeItemFlat) UnmarshalDynamoItem(item map[string]types.AttributeValue) error {
 	type alias coffeeItemFlat
 	aux := struct {
 		*alias
@@ -80,7 +78,7 @@ type coffeeItemInvalid struct {
 	Name string
 }
 
-func (c *coffeeItemInvalid) UnmarshalDynamoItem(item map[string]*dynamodb.AttributeValue) error {
+func (c *coffeeItemInvalid) UnmarshalDynamoItem(item map[string]types.AttributeValue) error {
 	type alias coffeeItemInvalid
 	aux := struct {
 		*alias
@@ -98,7 +96,7 @@ type coffeeItemEmbedded struct {
 	Coffee
 }
 
-func (c *coffeeItemEmbedded) UnmarshalDynamoItem(item map[string]*dynamodb.AttributeValue) error {
+func (c *coffeeItemEmbedded) UnmarshalDynamoItem(item map[string]types.AttributeValue) error {
 	type alias coffeeItemEmbedded
 	aux := struct {
 		*alias
@@ -116,7 +114,7 @@ type coffeeItemEmbeddedPointer struct {
 	*Coffee
 }
 
-func (c *coffeeItemEmbeddedPointer) UnmarshalDynamoItem(item map[string]*dynamodb.AttributeValue) error {
+func (c *coffeeItemEmbeddedPointer) UnmarshalDynamoItem(item map[string]types.AttributeValue) error {
 	type alias coffeeItemEmbeddedPointer
 	aux := struct {
 		*alias
@@ -147,14 +145,14 @@ type coffeeItemSDKEmbeddedPointer struct {
 	*Coffee
 }
 
-func (c *coffeeItemSDKEmbeddedPointer) UnmarshalDynamoItem(item map[string]*dynamodb.AttributeValue) error {
+func (c *coffeeItemSDKEmbeddedPointer) UnmarshalDynamoItem(item map[string]types.AttributeValue) error {
 	type alias coffeeItemEmbeddedPointer
 	aux := struct {
 		*alias
 	}{
 		alias: (*alias)(c),
 	}
-	if err := dynamodbattribute.UnmarshalMap(item, &aux); err != nil {
+	if err := attributevalue.UnmarshalMap(item, &aux); err != nil {
 		return err
 	}
 	return nil

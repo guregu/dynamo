@@ -5,9 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 type awsTestWidget struct {
@@ -33,7 +32,7 @@ func TestAWSEncoding(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	official, err := dynamodbattribute.Marshal(w)
+	official, err := attributevalue.Marshal(w)
 	if err != nil {
 		t.Error(err)
 	}
@@ -56,12 +55,12 @@ func TestAWSEncoding(t *testing.T) {
 }
 
 func TestAWSIfaces(t *testing.T) {
-	unix := dynamodbattribute.UnixTime(time.Now())
+	unix := attributevalue.UnixTime(time.Now())
 	av, err := Marshal(unix)
 	if err != nil {
 		t.Error(err)
 	}
-	official, err := dynamodbattribute.Marshal(unix)
+	official, err := attributevalue.Marshal(unix)
 	if err != nil {
 		t.Error(err)
 	}
@@ -69,12 +68,12 @@ func TestAWSIfaces(t *testing.T) {
 		t.Error("marshal not equal.", av, "≠", official)
 	}
 
-	var result, officialResult dynamodbattribute.UnixTime
+	var result, officialResult attributevalue.UnixTime
 	err = Unmarshal(official, &result)
 	if err != nil {
 		t.Error(err)
 	}
-	err = dynamodbattribute.Unmarshal(official, &officialResult)
+	err = attributevalue.Unmarshal(official, &officialResult)
 	if err != nil {
 		t.Error(err)
 	}
@@ -96,7 +95,7 @@ func TestAWSItems(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	official, err := dynamodbattribute.MarshalMap(item)
+	official, err := attributevalue.MarshalMap(item)
 	if err != nil {
 		t.Error(err)
 	}
@@ -109,7 +108,7 @@ func TestAWSItems(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	err = dynamodbattribute.UnmarshalMap(official, &unmarshaledOfficial)
+	err = attributevalue.UnmarshalMap(official, &unmarshaledOfficial)
 	if err != nil {
 		t.Error(err)
 	}
@@ -132,20 +131,20 @@ func TestAWSUnmarshalAppend(t *testing.T) {
 		A: "two",
 		B: 222,
 	}
-	err := unmarshalAppend(map[string]*dynamodb.AttributeValue{
-		"one": {S: aws.String("test")},
-		"two": {N: aws.String("555")},
-	}, AWSEncoding(&list))
+	err := unmarshalAppend(map[string]types.AttributeValue{
+		"one": &types.AttributeValueMemberS{Value: "test"},
+		"two": &types.AttributeValueMemberN{Value: "555"},
+	}, &list)
 	if err != nil {
 		t.Error(err)
 	}
 	if len(list) != 1 && reflect.DeepEqual(list, []foo{expect1}) {
 		t.Error("bad AWS unmarshal append:", list)
 	}
-	err = unmarshalAppend(map[string]*dynamodb.AttributeValue{
-		"one": {S: aws.String("two")},
-		"two": {N: aws.String("222")},
-	}, AWSEncoding(&list))
+	err = unmarshalAppend(map[string]types.AttributeValue{
+		"one": &types.AttributeValueMemberS{Value: ("two")},
+		"two": &types.AttributeValueMemberN{Value: ("222")},
+	}, &list)
 	if err != nil {
 		t.Error(err)
 	}

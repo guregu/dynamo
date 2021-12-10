@@ -1,10 +1,12 @@
 package dynamo
 
 import (
+	"context"
 	"errors"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 // UpdateTable is a request to change a table's settings.
@@ -13,7 +15,7 @@ type UpdateTable struct {
 	table Table
 	r, w  int64 // throughput
 
-	billingMode *string
+	billingMode types.BillingMode
 
 	disableStream bool
 	streamView    StreamView
@@ -21,7 +23,7 @@ type UpdateTable struct {
 	updateIdx map[string]Throughput
 	createIdx []Index
 	deleteIdx []string
-	ads       []*dynamodb.AttributeDefinition
+	ads       []types.AttributeDefinition
 
 	err error
 }
@@ -38,9 +40,9 @@ func (table Table) UpdateTable() *UpdateTable {
 // If enabled is false, this table will be changed to provisioned billing mode.
 func (ut *UpdateTable) OnDemand(enabled bool) *UpdateTable {
 	if enabled {
-		ut.billingMode = aws.String(dynamodb.BillingModePayPerRequest)
+		ut.billingMode = types.BillingModePayPerRequest
 	} else {
-		ut.billingMode = aws.String(dynamodb.BillingModeProvisioned)
+		ut.billingMode = types.BillingModeProvisioned
 	}
 	return ut
 }
@@ -111,7 +113,7 @@ func (ut *UpdateTable) Run() (Description, error) {
 	return ut.RunWithContext(ctx)
 }
 
-func (ut *UpdateTable) RunWithContext(ctx aws.Context) (Description, error) {
+func (ut *UpdateTable) RunWithContext(ctx context.Context) (Description, error) {
 	if ut.err != nil {
 		return Description{}, ut.err
 	}
@@ -121,7 +123,7 @@ func (ut *UpdateTable) RunWithContext(ctx aws.Context) (Description, error) {
 	var result *dynamodb.UpdateTableOutput
 	err := retry(ctx, func() error {
 		var err error
-		result, err = ut.table.db.client.UpdateTableWithContext(ctx, input)
+		result, err = ut.table.db.client.UpdateTable(ctx, input)
 		return err
 	})
 	if err != nil {
@@ -139,27 +141,27 @@ func (ut *UpdateTable) input() *dynamodb.UpdateTableInput {
 	}
 
 	if ut.r != 0 || ut.w != 0 {
-		input.ProvisionedThroughput = &dynamodb.ProvisionedThroughput{
+		input.ProvisionedThroughput = &types.ProvisionedThroughput{
 			ReadCapacityUnits:  &ut.r,
 			WriteCapacityUnits: &ut.w,
 		}
 	}
 
 	if ut.disableStream {
-		input.StreamSpecification = &dynamodb.StreamSpecification{
+		input.StreamSpecification = &types.StreamSpecification{
 			StreamEnabled: aws.Bool(false),
 		}
 	} else if ut.streamView != "" {
-		input.StreamSpecification = &dynamodb.StreamSpecification{
+		input.StreamSpecification = &types.StreamSpecification{
 			StreamEnabled:  aws.Bool(true),
-			StreamViewType: aws.String((string)(ut.streamView)),
+			StreamViewType: types.StreamViewType(ut.streamView),
 		}
 	}
 
 	for index, thru := range ut.updateIdx {
-		up := &dynamodb.GlobalSecondaryIndexUpdate{Update: &dynamodb.UpdateGlobalSecondaryIndexAction{
+		up := types.GlobalSecondaryIndexUpdate{Update: &types.UpdateGlobalSecondaryIndexAction{
 			IndexName: aws.String(index),
-			ProvisionedThroughput: &dynamodb.ProvisionedThroughput{
+			ProvisionedThroughput: &types.ProvisionedThroughput{
 				ReadCapacityUnits:  aws.Int64(thru.Read),
 				WriteCapacityUnits: aws.Int64(thru.Write),
 			},
@@ -167,11 +169,11 @@ func (ut *UpdateTable) input() *dynamodb.UpdateTableInput {
 		input.GlobalSecondaryIndexUpdates = append(input.GlobalSecondaryIndexUpdates, up)
 	}
 	for _, index := range ut.createIdx {
-		up := &dynamodb.GlobalSecondaryIndexUpdate{Create: createIndexAction(index)}
+		up := types.GlobalSecondaryIndexUpdate{Create: createIndexAction(index)}
 		input.GlobalSecondaryIndexUpdates = append(input.GlobalSecondaryIndexUpdates, up)
 	}
 	for _, del := range ut.deleteIdx {
-		up := &dynamodb.GlobalSecondaryIndexUpdate{Delete: &dynamodb.DeleteGlobalSecondaryIndexAction{
+		up := types.GlobalSecondaryIndexUpdate{Delete: &types.DeleteGlobalSecondaryIndexAction{
 			IndexName: aws.String(del),
 		}}
 		input.GlobalSecondaryIndexUpdates = append(input.GlobalSecondaryIndexUpdates, up)
@@ -186,40 +188,40 @@ func (ut *UpdateTable) addAD(name string, typ KeyType) {
 		}
 	}
 
-	ut.ads = append(ut.ads, &dynamodb.AttributeDefinition{
+	ut.ads = append(ut.ads, types.AttributeDefinition{
 		AttributeName: &name,
-		AttributeType: aws.String((string)(typ)),
+		AttributeType: types.ScalarAttributeType(typ),
 	})
 }
 
-func createIndexAction(index Index) *dynamodb.CreateGlobalSecondaryIndexAction {
-	ks := []*dynamodb.KeySchemaElement{
+func createIndexAction(index Index) *types.CreateGlobalSecondaryIndexAction {
+	ks := []types.KeySchemaElement{
 		{
 			AttributeName: &index.HashKey,
-			KeyType:       aws.String(dynamodb.KeyTypeHash),
+			KeyType:       types.KeyTypeHash,
 		},
 	}
 	if index.RangeKey != "" {
-		ks = append(ks, &dynamodb.KeySchemaElement{
+		ks = append(ks, types.KeySchemaElement{
 			AttributeName: &index.RangeKey,
-			KeyType:       aws.String(dynamodb.KeyTypeRange),
+			KeyType:       types.KeyTypeRange,
 		})
 	}
-	add := &dynamodb.CreateGlobalSecondaryIndexAction{
+	add := &types.CreateGlobalSecondaryIndexAction{
 		IndexName: &index.Name,
 		KeySchema: ks,
-		Projection: &dynamodb.Projection{
-			ProjectionType: aws.String((string)(index.ProjectionType)),
+		Projection: &types.Projection{
+			ProjectionType: types.ProjectionType(index.ProjectionType),
 		},
 	}
 	if index.Throughput.Read > 0 && index.Throughput.Write > 0 {
-		add.ProvisionedThroughput = &dynamodb.ProvisionedThroughput{
+		add.ProvisionedThroughput = &types.ProvisionedThroughput{
 			ReadCapacityUnits:  aws.Int64(index.Throughput.Read),
 			WriteCapacityUnits: aws.Int64(index.Throughput.Write),
 		}
 	}
 	if index.ProjectionType == IncludeProjection {
-		add.Projection.NonKeyAttributes = aws.StringSlice(index.ProjectionAttribs)
+		add.Projection.NonKeyAttributes = index.ProjectionAttribs
 	}
 	return add
 }

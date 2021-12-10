@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
 func TestUpdate(t *testing.T) {
@@ -51,8 +51,8 @@ func TestUpdate(t *testing.T) {
 			"#meta": "Meta",
 			"#pet":  "pet",
 		}),
-		AttributeValues: map[string]*dynamodb.AttributeValue{
-			":cat": {S: aws.String("猫")},
+		AttributeValues: map[string]types.AttributeValue{
+			":cat": &types.AttributeValueMemberS{Value: "猫"},
 		},
 	}
 	rmLit := ExpressionLiteral{
@@ -67,8 +67,8 @@ func TestUpdate(t *testing.T) {
 		AttributeNames: aws.StringMap(map[string]string{
 			"#msg": "Msg",
 		}),
-		AttributeValues: map[string]*dynamodb.AttributeValue{
-			":hi": {S: aws.String("hello")},
+		AttributeValues: map[string]types.AttributeValue{
+			":hi": &types.AttributeValueMemberS{Value: "hello"},
 		},
 	}
 

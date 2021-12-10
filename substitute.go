@@ -8,31 +8,30 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
 	"github.com/guregu/dynamo/internal/exprs"
 )
 
 // subber is a "mixin" for operators for keep track of subtituted keys and values
 type subber struct {
-	nameExpr  map[string]*string
-	valueExpr map[string]*dynamodb.AttributeValue
+	nameExpr  map[string]string
+	valueExpr map[string]types.AttributeValue
 }
 
 func (s *subber) subName(name string) string {
 	if s.nameExpr == nil {
-		s.nameExpr = make(map[string]*string)
+		s.nameExpr = make(map[string]string)
 	}
 
 	sub := "#s" + encodeName(name)
-	s.nameExpr[sub] = aws.String(name)
+	s.nameExpr[sub] = name
 	return sub
 }
 
 func (s *subber) subValue(value interface{}, flags encodeFlags) (string, error) {
 	if s.valueExpr == nil {
-		s.valueExpr = make(map[string]*dynamodb.AttributeValue)
+		s.valueExpr = make(map[string]types.AttributeValue)
 	}
 
 	if lit, ok := value.(ExpressionLiteral); ok {
@@ -132,7 +131,7 @@ type ExpressionLiteral struct {
 	// AttributeNames is a map of placeholders (such as #foo) to attribute names.
 	AttributeNames map[string]*string
 	// AttributeValues is a map of placeholders (such as :bar) to attribute values.
-	AttributeValues map[string]*dynamodb.AttributeValue
+	AttributeValues map[string]types.AttributeValue
 }
 
 // we don't want people to accidentally refer to our placeholders, so just slap an x_ in front of theirs
@@ -146,15 +145,15 @@ func (s *subber) merge(lit ExpressionLiteral) string {
 	}
 
 	if len(lit.AttributeNames) > 0 && s.nameExpr == nil {
-		s.nameExpr = make(map[string]*string)
+		s.nameExpr = make(map[string]string)
 	}
 	for k, v := range lit.AttributeNames {
 		safe := prefix(k)
-		s.nameExpr[safe] = v
+		s.nameExpr[safe] = *v
 	}
 
 	if len(lit.AttributeValues) > 0 && s.valueExpr == nil {
-		s.valueExpr = make(map[string]*dynamodb.AttributeValue)
+		s.valueExpr = make(map[string]types.AttributeValue)
 	}
 	for k, v := range lit.AttributeValues {
 		safe := prefix(k)

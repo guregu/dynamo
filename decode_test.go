@@ -3,6 +3,7 @@ package dynamo
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
@@ -182,5 +183,69 @@ func TestUnmarshalNULL(t *testing.T) {
 
 	if (!reflect.DeepEqual(result, resultType{})) {
 		t.Error("unmarshal null: bad result:", result, "≠", resultType{})
+	}
+}
+
+func TestUnmarshalMissing(t *testing.T) {
+	// This test makes sure we're zeroing out fields of structs even if the given data doesn't contain them
+
+	type widget2 struct {
+		widget
+		Inner struct {
+			Blarg string
+		}
+		Foo *struct {
+			Bar int
+		}
+	}
+
+	w := widget2{
+		widget: widget{
+			UserID: 111,
+			Time:   time.Now().UTC(),
+			Msg:    "hello",
+		},
+	}
+	w.Inner.Blarg = "AHH"
+	w.Foo = &struct{ Bar int }{Bar: 1337}
+
+	want := widget2{
+		widget: widget{
+			UserID: 112,
+		},
+	}
+
+	replace := map[string]*dynamodb.AttributeValue{
+		"UserID": {N: aws.String("112")},
+	}
+
+	if err := UnmarshalItem(replace, &w); err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(want, w) {
+		t.Error("bad unmarshal missing. want:", want, "got:", w)
+	}
+
+	replace2 := map[string]*dynamodb.AttributeValue{
+		"UserID": {N: aws.String("113")},
+		"Foo": {M: map[string]*dynamodb.AttributeValue{
+			"Bar": {N: aws.String("1338")},
+		}},
+	}
+
+	want = widget2{
+		widget: widget{
+			UserID: 113,
+		},
+		Foo: &struct{ Bar int }{Bar: 1338},
+	}
+
+	if err := UnmarshalItem(replace2, &w); err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(want, w) {
+		t.Error("bad unmarshal missing. want:", want, "got:", w)
 	}
 }

@@ -46,7 +46,7 @@ func TestDelete(t *testing.T) {
 	if !reflect.DeepEqual(old, item) {
 		t.Errorf("bad old value. %#v ≠ %#v", old, item)
 	}
-	if cc.Total != 1 {
+	if cc.Total < 1 {
 		t.Error("invalid ConsumedCapacity", cc)
 	}
 }

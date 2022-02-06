@@ -62,7 +62,7 @@ func TestPut(t *testing.T) {
 		t.Errorf("bad old value. %#v ≠ %#v", oldValue, item)
 	}
 
-	if cc.Total != 1 || cc.Table != 1 || cc.TableName != testTable {
+	if cc.Total < 1 || cc.Table < 1 || cc.TableName != testTable {
 		t.Errorf("bad consumed capacity: %#v", cc)
 	}
 

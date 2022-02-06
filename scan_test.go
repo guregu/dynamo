@@ -4,6 +4,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/aws/aws-sdk-go/aws"
 )
 
 func TestScan(t *testing.T) {
@@ -86,4 +88,73 @@ func TestScanPaging(t *testing.T) {
 		}
 		itr = table.Scan().StartFrom(itr.LastEvaluatedKey()).SearchLimit(1).Iter()
 	}
+}
+
+func TestScanMagicLEK(t *testing.T) {
+	if testDB == nil {
+		t.Skip(offlineSkipMsg)
+	}
+	table := testDB.Table(testTable)
+
+	widgets := []interface{}{
+		widget{
+			UserID: 2069,
+			Time:   time.Date(2069, 4, 00, 0, 0, 0, 0, time.UTC),
+			Msg:    "TestScanMagicLEK",
+		},
+		widget{
+			UserID: 2069,
+			Time:   time.Date(2069, 4, 10, 0, 0, 0, 0, time.UTC),
+			Msg:    "TestScanMagicLEK",
+		},
+		widget{
+			UserID: 2069,
+			Time:   time.Date(2069, 4, 20, 0, 0, 0, 0, time.UTC),
+			Msg:    "TestScanMagicLEK",
+		},
+	}
+
+	t.Run("prepare data", func(t *testing.T) {
+		if _, err := table.Batch().Write().Put(widgets...).Run(); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("having to use DescribeTable", func(t *testing.T) {
+		itr := table.Scan().Filter("'Msg' = ?", "TestScanMagicLEK").Limit(2).Iter()
+		for i := 0; i < len(widgets); i++ {
+			var w widget
+			itr.Next(&w)
+			if itr.Err() != nil {
+				t.Error("unexpected error", itr.Err())
+			}
+			itr = table.Scan().Filter("'Msg' = ?", "TestScanMagicLEK").StartFrom(itr.LastEvaluatedKey()).Limit(2).Iter()
+		}
+	})
+
+	t.Run("via index", func(t *testing.T) {
+		itr := table.Scan().Index("Msg-Time-index").Filter("UserID = ?", 2069).Limit(2).Iter()
+		for i := 0; i < len(widgets); i++ {
+			var w widget
+			itr.Next(&w)
+			if itr.Err() != nil {
+				t.Error("unexpected error", itr.Err())
+			}
+			itr = table.Scan().Index("Msg-Time-index").Filter("UserID = ?", 2069).StartFrom(itr.LastEvaluatedKey()).Limit(2).Iter()
+		}
+	})
+
+	t.Run("table cache", func(t *testing.T) {
+		pk, err := table.primaryKeys(aws.BackgroundContext(), nil, nil, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		expect := map[string]struct{}{
+			"UserID": {},
+			"Time":   {},
+		}
+		if !reflect.DeepEqual(pk, expect) {
+			t.Error("unexpected key cache. want:", expect, "got:", pk)
+		}
+	})
 }

@@ -188,6 +188,36 @@ func newDescription(table *dynamodb.TableDescription) Description {
 	return desc
 }
 
+func (desc Description) keys(index string) map[string]struct{} {
+	keys := make(map[string]struct{})
+	keys[desc.HashKey] = struct{}{}
+	if desc.RangeKey != "" {
+		keys[desc.RangeKey] = struct{}{}
+	}
+	if index != "" {
+		for _, gsi := range desc.GSI {
+			if gsi.Name == index {
+				keys[gsi.HashKey] = struct{}{}
+				if gsi.RangeKey != "" {
+					keys[gsi.RangeKey] = struct{}{}
+				}
+				return keys
+			}
+		}
+		for _, lsi := range desc.LSI {
+			if lsi.Name == index {
+				keys[lsi.HashKey] = struct{}{}
+				if lsi.RangeKey != "" {
+					keys[lsi.RangeKey] = struct{}{}
+				}
+				return keys
+			}
+		}
+		return nil
+	}
+	return keys
+}
+
 // DescribeTable is a request for information about a table and its indexes.
 // See: http://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_DescribeTable.html
 type DescribeTable struct {
@@ -219,7 +249,9 @@ func (dt *DescribeTable) RunWithContext(ctx aws.Context) (Description, error) {
 		return Description{}, err
 	}
 
-	return newDescription(result.Table), nil
+	desc := newDescription(result.Table)
+	dt.table.desc.Store(desc)
+	return desc, nil
 }
 
 func (dt *DescribeTable) input() *dynamodb.DescribeTableInput {

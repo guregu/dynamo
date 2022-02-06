@@ -344,14 +344,19 @@ func fieldsInStruct(rv reflect.Value) map[string]reflect.Value {
 		// embed anonymous structs, they could be pointers so test that too
 		if (fv.Type().Kind() == reflect.Struct || isPtr && fv.Type().Elem().Kind() == reflect.Struct) && field.Anonymous {
 			if isPtr {
-				// need to protect from setting unexported pointers because it will panic
-				if !fv.CanSet() {
-					continue
+				if fv.CanSet() {
+					// set zero value for pointer
+					zero := reflect.New(fv.Type().Elem())
+					fv.Set(zero)
+					fv = zero
+				} else {
+					fv = reflect.Indirect(fv)
 				}
-				// set zero value for pointer
-				zero := reflect.New(fv.Type().Elem())
-				fv.Set(zero)
-				fv = zero
+			}
+
+			if !fv.IsValid() {
+				// inaccessible
+				continue
 			}
 
 			innerFields := fieldsInStruct(fv)
@@ -394,13 +399,16 @@ func unmarshalItem(item map[string]*dynamodb.AttributeValue, out interface{}) er
 		return unmarshalItem(item, rv.Elem().Interface())
 	case reflect.Struct:
 		var err error
-		rv.Elem().Set(reflect.Zero(rv.Type().Elem()))
 		fields := fieldsInStruct(rv.Elem())
 		for name, fv := range fields {
 			if av, ok := item[name]; ok {
 				if innerErr := unmarshalReflect(av, fv); innerErr != nil {
 					err = innerErr
 				}
+			} else {
+				// we need to zero-out omitted fields to avoid weird data sticking around
+				// when iterating by unmarshaling to the same object over and over
+				fv.Set(reflect.Zero(fv.Type()))
 			}
 		}
 		return err

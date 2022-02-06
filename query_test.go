@@ -4,6 +4,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/aws/aws-sdk-go/aws"
 )
 
 func TestGetAllCount(t *testing.T) {
@@ -161,4 +163,87 @@ func TestQueryPaging(t *testing.T) {
 		}
 		itr = table.Get("UserID", 1969).StartFrom(itr.LastEvaluatedKey()).SearchLimit(1).Iter()
 	}
+}
+
+func TestQueryMagicLEK(t *testing.T) {
+	if testDB == nil {
+		t.Skip(offlineSkipMsg)
+	}
+	table := testDB.Table(testTable)
+
+	widgets := []interface{}{
+		widget{
+			UserID: 1970,
+			Time:   time.Date(1970, 4, 00, 0, 0, 0, 0, time.UTC),
+			Msg:    "TestQueryMagicLEK",
+		},
+		widget{
+			UserID: 1970,
+			Time:   time.Date(1970, 4, 10, 0, 0, 0, 0, time.UTC),
+			Msg:    "TestQueryMagicLEK",
+		},
+		widget{
+			UserID: 1970,
+			Time:   time.Date(1970, 4, 20, 0, 0, 0, 0, time.UTC),
+			Msg:    "TestQueryMagicLEK",
+		},
+	}
+
+	t.Run("prepare data", func(t *testing.T) {
+		if _, err := table.Batch().Write().Put(widgets...).Run(); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("having to use DescribeTable", func(t *testing.T) {
+		itr := table.Get("UserID", 1970).Filter("attribute_exists('Msg')").Limit(1).Iter()
+		for i := 0; i < len(widgets); i++ {
+			var w widget
+			itr.Next(&w)
+			if !reflect.DeepEqual(w, widgets[i]) {
+				t.Error("bad result:", w, "≠", widgets[i])
+			}
+			if itr.Err() != nil {
+				t.Error("unexpected error", itr.Err())
+			}
+			more := itr.Next(&w)
+			if more {
+				t.Error("unexpected more", more)
+			}
+			itr = table.Get("UserID", 1970).StartFrom(itr.LastEvaluatedKey()).Limit(1).Iter()
+		}
+	})
+
+	t.Run("table cache", func(t *testing.T) {
+		pk, err := table.primaryKeys(aws.BackgroundContext(), nil, nil, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		expect := map[string]struct{}{
+			"UserID": {},
+			"Time":   {},
+		}
+		if !reflect.DeepEqual(pk, expect) {
+			t.Error("unexpected key cache. want:", expect, "got:", pk)
+		}
+	})
+
+	t.Run("via index", func(t *testing.T) {
+		itr := table.Get("Msg", "TestQueryMagicLEK").Index("Msg-Time-index").Filter("UserID = ?", 1970).Limit(1).Iter()
+		for i := 0; i < len(widgets); i++ {
+			var w widget
+			itr.Next(&w)
+			if !reflect.DeepEqual(w, widgets[i]) {
+				t.Error("bad result:", w, "≠", widgets[i])
+			}
+			if itr.Err() != nil {
+				t.Error("unexpected error", itr.Err())
+			}
+			more := itr.Next(&w)
+			if more {
+				t.Error("unexpected more", more)
+			}
+			itr = table.Get("Msg", "TestQueryMagicLEK").Index("Msg-Time-index").Filter("UserID = ?", 1970).StartFrom(itr.LastEvaluatedKey()).Limit(1).Iter()
+		}
+	})
 }

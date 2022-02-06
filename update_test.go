@@ -79,7 +79,7 @@ func TestUpdate(t *testing.T) {
 	if !reflect.DeepEqual(result, expected) {
 		t.Errorf("bad result. %+v ≠ %+v", result, expected)
 	}
-	if cc.Total != 1 {
+	if cc.Total < 1 {
 		t.Error("bad consumed capacity", cc)
 	}
 

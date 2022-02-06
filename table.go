@@ -1,6 +1,9 @@
 package dynamo
 
 import (
+	"fmt"
+	"sync/atomic"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
@@ -23,6 +26,8 @@ const (
 type Table struct {
 	name string
 	db   *DB
+	// desc is this table's cached description, used for inferring keys
+	desc *atomic.Value // Description
 }
 
 // Table returns a Table handle specified by name.
@@ -30,12 +35,84 @@ func (db *DB) Table(name string) Table {
 	return Table{
 		name: name,
 		db:   db,
+		desc: new(atomic.Value),
 	}
 }
 
 // Name returns this table's name.
 func (table Table) Name() string {
 	return table.name
+}
+
+// primaryKeys attempts to determine this table's primary keys.
+// It will try:
+// - output LastEvaluatedKey
+// - input ExclusiveStartKey
+// - DescribeTable as a last resort (cached inside table)
+func (table Table) primaryKeys(ctx aws.Context, lek, esk map[string]*dynamodb.AttributeValue, index string) (map[string]struct{}, error) {
+	extract := func(item map[string]*dynamodb.AttributeValue) map[string]struct{} {
+		keys := make(map[string]struct{}, len(item))
+		for k := range item {
+			keys[k] = struct{}{}
+		}
+		return keys
+	}
+
+	// do we have canonical keys to use?
+	switch {
+	case lek != nil:
+		return extract(lek), nil
+	case esk != nil:
+		return extract(esk), nil
+	}
+
+	// now we're forced to call DescribeTable
+
+	// do we have a description cached?
+	if desc, ok := table.desc.Load().(Description); ok {
+		keys := desc.keys(index)
+		if keys != nil {
+			return keys, nil
+		}
+		// nil keys mean the table has changed since we cached it (index added), or something has gone horribly wrong
+		// so let's continue...
+	}
+
+	keys := make(map[string]struct{})
+	err := retry(ctx, func() error {
+		desc, err := table.Describe().RunWithContext(ctx)
+		if err != nil {
+			return err
+		}
+		keys = desc.keys(index)
+		if keys == nil {
+			return fmt.Errorf("dynamo: unknown index %s on table %s", index, table.Name())
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return keys, nil
+}
+
+func lekify(item map[string]*dynamodb.AttributeValue, keys map[string]struct{}) (map[string]*dynamodb.AttributeValue, error) {
+	if item == nil {
+		// this shouldn't happen because in queries without results, a LastEvaluatedKey should be given to us by AWS
+		return nil, fmt.Errorf("dynamo: can't determine LastEvaluatedKey: no keys or results")
+	}
+	if keys == nil {
+		return nil, fmt.Errorf("dynamo: can't determine LastEvaluatedKey: failed to infer primary keys")
+	}
+	lek := make(map[string]*dynamodb.AttributeValue, len(keys))
+	for k := range keys {
+		v, ok := item[k]
+		if !ok {
+			return nil, fmt.Errorf("dynamo: can't determine LastEvaluatedKey: primary key attribute is missing from result: %s; add it to your projection or use SearchLimit instead of Limit", k)
+		}
+		lek[k] = v
+	}
+	return lek, nil
 }
 
 // DeleteTable is a request to delete a table.

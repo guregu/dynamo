@@ -1,6 +1,7 @@
 package dynamo
 
 import (
+	"log"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -114,8 +115,15 @@ func (s *Scan) All(out interface{}) error {
 
 // AllWithContext executes this request and unmarshals all results to out, which must be a pointer to a slice.
 func (s *Scan) AllWithContext(ctx aws.Context, out interface{}) error {
-	_, err := s.AllWithLastEvaluatedKeyContext(ctx, out)
-	return err
+	itr := &scanIter{
+		scan:      s,
+		unmarshal: unmarshalAppend,
+		err:       s.err,
+		skipLEK:   true,
+	}
+	for itr.NextWithContext(ctx, out) {
+	}
+	return itr.Err()
 }
 
 // AllWithLastEvaluatedKey executes this request and unmarshals all results to out, which must be a pointer to a slice.
@@ -238,6 +246,13 @@ type scanIter struct {
 	idx    int
 	n      int64
 
+	// last item evaluated
+	last map[string]*dynamodb.AttributeValue
+	// cache of primary keys, used for generating LEKs
+	keys map[string]struct{}
+	// we don't need to worry about inferring the LEK if users can't access it
+	skipLEK bool
+
 	unmarshal unmarshalFunc
 }
 
@@ -266,6 +281,7 @@ func (itr *scanIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 	// can we use results we already have?
 	if itr.output != nil && itr.idx < len(itr.output.Items) {
 		item := itr.output.Items[itr.idx]
+		itr.last = item
 		itr.err = itr.unmarshal(item, out)
 		itr.idx++
 		itr.n++
@@ -301,6 +317,13 @@ func (itr *scanIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 		addConsumedCapacity(itr.scan.cc, itr.output.ConsumedCapacity)
 	}
 
+	if !itr.skipLEK && itr.keys == nil {
+		itr.keys, itr.err = itr.scan.table.primaryKeys(ctx, itr.output.LastEvaluatedKey, itr.input.ExclusiveStartKey, itr.scan.index)
+		if itr.err != nil {
+			return false
+		}
+	}
+
 	if len(itr.output.Items) == 0 {
 		if itr.output.LastEvaluatedKey != nil {
 			return itr.NextWithContext(ctx, out)
@@ -308,7 +331,9 @@ func (itr *scanIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 		return false
 	}
 
-	itr.err = itr.unmarshal(itr.output.Items[itr.idx], out)
+	item := itr.output.Items[itr.idx]
+	itr.last = item
+	itr.err = itr.unmarshal(item, out)
 	itr.idx++
 	itr.n++
 	return itr.err == nil
@@ -324,7 +349,20 @@ func (itr *scanIter) Err() error {
 // Use with SearchLimit for best results.
 func (itr *scanIter) LastEvaluatedKey() PagingKey {
 	if itr.output != nil {
-		return itr.output.LastEvaluatedKey
+		// if we've hit the end of our results, we can use the real LEK
+		if itr.idx == len(itr.output.Items) {
+			return itr.output.LastEvaluatedKey
+		}
+		// otherwise, we need to infer the LEK from the last item we saw
+		lek, err := lekify(itr.last, itr.keys)
+		// unfortunately, this API can't return an error so a warning is the best we can do...
+		// this matches old behavior before the LEK was automatically generated
+		// TODO(v2): fix this.
+		if err != nil {
+			log.Println("Warning:", err, "Returning a later LastEvaluatedKey.")
+			return itr.output.LastEvaluatedKey
+		}
+		return lek
 	}
 	return nil
 }

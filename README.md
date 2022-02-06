@@ -200,13 +200,22 @@ err := db.Table("Books").Get("ID", 555).One(dynamo.AWSEncoding(&someBook))
 
 ### Integration tests
 
-By default, tests are run in offline mode. Create a table called `TestDB`, with a Number Partition Key called `UserID` and a String Sort Key called `Time`. Change the table name with the environment variable `DYNAMO_TEST_TABLE`. You must specify `DYNAMO_TEST_REGION`, setting it to the AWS region where your test table is.
+By default, tests are run in offline mode. Create a table called `TestDB`, with a number partition key called `UserID` and a string sort key called `Time`. It also needs a Global Secondary Index called `Msg-Time-index` with a string partition key called `Msg` and a string sort key called `Time`.
+
+Change the table name with the environment variable `DYNAMO_TEST_TABLE`. You must specify `DYNAMO_TEST_REGION`, setting it to the AWS region where your test table is.
+
 
  ```bash
 DYNAMO_TEST_REGION=us-west-2 go test github.com/guregu/dynamo/... -cover
  ```
 
-Example of using [aws-cli](https://docs.aws.amazon.com/ja_jp/amazondynamodb/latest/developerguide/Tools.CLI.html) to create a table for testing.
+If you want to use [DynamoDB Local](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.html) to run local tests, specify `DYNAMO_TEST_ENDPOINT`.
+
+ ```bash
+DYNAMO_TEST_REGION=us-west-2 DYNAMO_TEST_ENDPOINT=http://localhost:8000 go test github.com/guregu/dynamo/... -cover
+ ```
+
+Example of using [aws-cli](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Tools.CLI.html) to create a table for testing.
 
 ```bash
 aws dynamodb create-table \
@@ -214,19 +223,16 @@ aws dynamodb create-table \
     --attribute-definitions \
         AttributeName=UserID,AttributeType=N \
         AttributeName=Time,AttributeType=S \
+        AttributeName=Msg,AttributeType=S \
     --key-schema \
         AttributeName=UserID,KeyType=HASH \
         AttributeName=Time,KeyType=RANGE \
-    --provisioned-throughput ReadCapacityUnits=1,WriteCapacityUnits=1 \
+    --global-secondary-indexes \
+        IndexName=Msg-Time-index,KeySchema=[{'AttributeName=Msg,KeyType=HASH'},{'AttributeName=Time,KeyType=RANGE'}],Projection={'ProjectionType=ALL'} \
+    --billing-mode PAY_PER_REQUEST \
     --region us-west-2 \
-    --endpoint-url http://localhost:8000
+    --endpoint-url http://localhost:8000 # using DynamoDB local
 ```
-
-If you want to use [DynamoDB Local](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.html) to run local tests, specify `DYNAMO_TEST_ENDPOINT`.
-
- ```bash
-DYNAMO_TEST_REGION=us-west-2 DYNAMO_TEST_ENDPOINT=http://localhost:8000 go test github.com/guregu/dynamo/... -cover
- ```
 
 ### License
 

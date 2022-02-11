@@ -46,6 +46,7 @@ func TestCreateTable(t *testing.T) {
 		ProvisionIndex("Embedded-index", 1, 2).
 		Tag("Tag-Key", "old value").
 		Tag("Tag-Key", "Tag-Value").
+		SSEEncryption(true, "alias/key", "KMS").
 		input()
 
 	expected := &dynamodb.CreateTableInput{
@@ -111,6 +112,11 @@ func TestCreateTable(t *testing.T) {
 				Key:   aws.String("Tag-Key"),
 				Value: aws.String("Tag-Value"),
 			},
+		},
+		SSESpecification: &dynamodb.SSESpecification{
+			Enabled:        aws.Bool(true),
+			KMSMasterKeyId: aws.String("alias/key"),
+			SSEType:        aws.String("KMS"),
 		},
 		TableName: aws.String("UserActions"),
 	}

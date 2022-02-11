@@ -41,18 +41,19 @@ var (
 // CreateTable is a request to create a new table.
 // See: http://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_CreateTable.html
 type CreateTable struct {
-	db            *DB
-	tableName     string
-	attribs       []*dynamodb.AttributeDefinition
-	schema        []*dynamodb.KeySchemaElement
-	globalIndices map[string]dynamodb.GlobalSecondaryIndex
-	localIndices  map[string]dynamodb.LocalSecondaryIndex
-	readUnits     int64
-	writeUnits    int64
-	streamView    StreamView
-	ondemand      bool
-	tags          []*dynamodb.Tag
-	err           error
+	db                      *DB
+	tableName               string
+	attribs                 []*dynamodb.AttributeDefinition
+	schema                  []*dynamodb.KeySchemaElement
+	globalIndices           map[string]dynamodb.GlobalSecondaryIndex
+	localIndices            map[string]dynamodb.LocalSecondaryIndex
+	readUnits               int64
+	writeUnits              int64
+	streamView              StreamView
+	ondemand                bool
+	tags                    []*dynamodb.Tag
+	encryptionSpecification *dynamodb.SSESpecification
+	err                     error
 }
 
 // CreateTable begins a new operation to create a table with the given name.
@@ -216,6 +217,18 @@ func (ct *CreateTable) Tag(key, value string) *CreateTable {
 	return ct
 }
 
+// SSEEncryption specifies the server side encryption for this table.
+// Encryption is disabled by default. The valid values for sseType are {AES256, KMS}.
+func (ct *CreateTable) SSEEncryption(enabled bool, keyID, sseType string) *CreateTable {
+	encryption := &dynamodb.SSESpecification{
+		Enabled:        aws.Bool(enabled),
+		KMSMasterKeyId: aws.String(keyID),
+		SSEType:        aws.String(sseType),
+	}
+	ct.encryptionSpecification = encryption
+	return ct
+}
+
 // Run creates this table or returns and error.
 func (ct *CreateTable) Run() error {
 	ctx, cancel := defaultContext()
@@ -310,6 +323,7 @@ func (ct *CreateTable) input() *dynamodb.CreateTableInput {
 		TableName:            &ct.tableName,
 		AttributeDefinitions: ct.attribs,
 		KeySchema:            ct.schema,
+		SSESpecification:     ct.encryptionSpecification,
 	}
 	if ct.ondemand {
 		input.BillingMode = aws.String(dynamodb.BillingModePayPerRequest)

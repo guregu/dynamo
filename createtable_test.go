@@ -46,7 +46,7 @@ func TestCreateTable(t *testing.T) {
 		ProvisionIndex("Embedded-index", 1, 2).
 		Tag("Tag-Key", "old value").
 		Tag("Tag-Key", "Tag-Value").
-		SSEEncryption(true, "alias/key", "KMS").
+		SSEEncryption(true, "alias/key", SSETypeKMS).
 		input()
 
 	expected := &dynamodb.CreateTableInput{

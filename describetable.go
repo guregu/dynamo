@@ -40,6 +40,8 @@ type Description struct {
 	StreamView        StreamView
 	LatestStreamARN   string
 	LatestStreamLabel string
+
+	SSEDescription SSEDescription
 }
 
 func (d Description) Active() bool {
@@ -183,6 +185,23 @@ func newDescription(table *dynamodb.TableDescription) Description {
 	}
 	if table.LatestStreamLabel != nil {
 		desc.LatestStreamLabel = *table.LatestStreamLabel
+	}
+
+	if table.SSEDescription != nil {
+		sseDesc := SSEDescription{}
+		if table.SSEDescription.InaccessibleEncryptionDateTime != nil {
+			sseDesc.InaccessibleEncryptionDateTime = *table.SSEDescription.InaccessibleEncryptionDateTime
+		}
+		if table.SSEDescription.KMSMasterKeyArn != nil {
+			sseDesc.KMSMasterKeyArn = *table.SSEDescription.KMSMasterKeyArn
+		}
+		if table.SSEDescription.SSEType != nil {
+			sseDesc.SSEType = lookupSSEType(*table.SSEDescription.SSEType)
+		}
+		if table.SSEDescription.Status != nil {
+			sseDesc.Status = *table.SSEDescription.Status
+		}
+		desc.SSEDescription = sseDesc
 	}
 
 	return desc

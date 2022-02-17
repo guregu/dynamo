@@ -218,12 +218,12 @@ func (ct *CreateTable) Tag(key, value string) *CreateTable {
 }
 
 // SSEEncryption specifies the server side encryption for this table.
-// Encryption is disabled by default. The valid values for sseType are {AES256, KMS}.
-func (ct *CreateTable) SSEEncryption(enabled bool, keyID, sseType string) *CreateTable {
+// Encryption is disabled by default.
+func (ct *CreateTable) SSEEncryption(enabled bool, keyID string, sseType SSEType) *CreateTable {
 	encryption := &dynamodb.SSESpecification{
 		Enabled:        aws.Bool(enabled),
 		KMSMasterKeyId: aws.String(keyID),
-		SSEType:        aws.String(sseType),
+		SSEType:        aws.String(string(sseType)),
 	}
 	ct.encryptionSpecification = encryption
 	return ct

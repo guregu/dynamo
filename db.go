@@ -13,24 +13,37 @@ import (
 // DB is a DynamoDB client.
 type DB struct {
 	client dynamodbiface.DynamoDBAPI
+	logger aws.Logger
 }
 
 // New creates a new client with the given configuration.
 func New(p client.ConfigProvider, cfgs ...*aws.Config) *DB {
+	cfg := p.ClientConfig(dynamodb.EndpointsID, cfgs...)
 	db := &DB{
-		dynamodb.New(p, cfgs...),
+		client: dynamodb.New(p, cfgs...),
+		logger: cfg.Config.Logger,
+	}
+	if db.logger == nil {
+		db.logger = aws.NewDefaultLogger()
 	}
 	return db
 }
 
 // NewFromIface creates a new client with the given interface.
 func NewFromIface(client dynamodbiface.DynamoDBAPI) *DB {
-	return &DB{client}
+	return &DB{
+		client: client,
+		logger: aws.NewDefaultLogger(),
+	}
 }
 
 // Client returns this DB's internal client used to make API requests.
 func (db *DB) Client() dynamodbiface.DynamoDBAPI {
 	return db.client
+}
+
+func (db *DB) log(v ...interface{}) {
+	db.logger.Log(v...)
 }
 
 // ListTables is a request to list tables.

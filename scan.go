@@ -1,7 +1,6 @@
 package dynamo
 
 import (
-	"log"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -119,7 +118,6 @@ func (s *Scan) AllWithContext(ctx aws.Context, out interface{}) error {
 		scan:      s,
 		unmarshal: unmarshalAppend,
 		err:       s.err,
-		skipLEK:   true,
 	}
 	for itr.NextWithContext(ctx, out) {
 	}
@@ -250,8 +248,10 @@ type scanIter struct {
 	last map[string]*dynamodb.AttributeValue
 	// cache of primary keys, used for generating LEKs
 	keys map[string]struct{}
-	// we don't need to worry about inferring the LEK if users can't access it
-	skipLEK bool
+	// example LastEvaluatedKey and ExclusiveStartKey, used to lazily evaluate the primary keys if possible
+	exLEK  map[string]*dynamodb.AttributeValue
+	exESK  map[string]*dynamodb.AttributeValue
+	keyErr error
 
 	unmarshal unmarshalFunc
 }
@@ -275,6 +275,8 @@ func (itr *scanIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 
 	// stop if exceed limit
 	if itr.scan.limit > 0 && itr.n == itr.scan.limit {
+		// proactively grab the keys for LEK inferral, but don't count it as a real error yet to keep backwards compat
+		itr.keys, itr.keyErr = itr.scan.table.primaryKeys(ctx, itr.exLEK, itr.exESK, itr.scan.index)
 		return false
 	}
 
@@ -291,6 +293,9 @@ func (itr *scanIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 	// new scan
 	if itr.input == nil {
 		itr.input = itr.scan.scanInput()
+	}
+	if len(itr.input.ExclusiveStartKey) > len(itr.exESK) {
+		itr.exESK = itr.input.ExclusiveStartKey
 	}
 	if itr.output != nil && itr.idx >= len(itr.output.Items) {
 		// have we exhausted all results?
@@ -312,16 +317,11 @@ func (itr *scanIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 	if itr.err != nil {
 		return false
 	}
-
 	if itr.scan.cc != nil {
 		addConsumedCapacity(itr.scan.cc, itr.output.ConsumedCapacity)
 	}
-
-	if !itr.skipLEK && itr.keys == nil {
-		itr.keys, itr.err = itr.scan.table.primaryKeys(ctx, itr.output.LastEvaluatedKey, itr.input.ExclusiveStartKey, itr.scan.index)
-		if itr.err != nil {
-			return false
-		}
+	if len(itr.output.LastEvaluatedKey) > len(itr.exLEK) {
+		itr.exLEK = itr.output.LastEvaluatedKey
 	}
 
 	if len(itr.output.Items) == 0 {
@@ -353,13 +353,28 @@ func (itr *scanIter) LastEvaluatedKey() PagingKey {
 		if itr.idx == len(itr.output.Items) {
 			return itr.output.LastEvaluatedKey
 		}
-		// otherwise, we need to infer the LEK from the last item we saw
+
+		// figure out the primary keys if needed
+		if itr.keys == nil && itr.keyErr == nil {
+			ctx, _ := defaultContext() // TODO(v2): take context instead of using the default
+			itr.keys, itr.keyErr = itr.scan.table.primaryKeys(ctx, itr.exLEK, itr.exESK, itr.scan.index)
+		}
+		if itr.keyErr != nil {
+			// primaryKeys can fail if the credentials lack DescribeTable permissions
+			// in order to preserve backwards compatibility, we fall back to the old behavior and warn
+			// see: https://github.com/guregu/dynamo/pull/187#issuecomment-1045183901
+			// TODO(v2): rejigger this API.
+			itr.scan.table.db.log("dynamo: Warning:", itr.keyErr, "Returning a later LastEvaluatedKey.")
+			return itr.output.LastEvaluatedKey
+		}
+
+		// we can't use the real LEK, so we need to infer the LEK from the last item we saw
 		lek, err := lekify(itr.last, itr.keys)
 		// unfortunately, this API can't return an error so a warning is the best we can do...
 		// this matches old behavior before the LEK was automatically generated
 		// TODO(v2): fix this.
 		if err != nil {
-			log.Println("Warning:", err, "Returning a later LastEvaluatedKey.")
+			itr.scan.table.db.log("Warning:", err, "Returning a later LastEvaluatedKey.")
 			return itr.output.LastEvaluatedKey
 		}
 		return lek

@@ -4,6 +4,9 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
 func TestUpdate(t *testing.T) {
@@ -30,6 +33,7 @@ func TestUpdate(t *testing.T) {
 				"foo":  "bar",
 				"keep": "untouched",
 				"nope": "痛",
+				"haha": "555 no jam",
 			},
 		},
 		MySet1: []string{"one", "deleteme"},
@@ -41,6 +45,33 @@ func TestUpdate(t *testing.T) {
 		t.Error("unexpected error:", err)
 	}
 
+	setLit := ExpressionLiteral{
+		Expression: "#meta.#pet = :cat",
+		AttributeNames: aws.StringMap(map[string]string{
+			"#meta": "Meta",
+			"#pet":  "pet",
+		}),
+		AttributeValues: map[string]*dynamodb.AttributeValue{
+			":cat": {S: aws.String("猫")},
+		},
+	}
+	rmLit := ExpressionLiteral{
+		Expression: "#meta.#haha",
+		AttributeNames: aws.StringMap(map[string]string{
+			"#meta": "Meta",
+			"#haha": "haha",
+		}),
+	}
+	ifLit := ExpressionLiteral{
+		Expression: "#msg = :hi",
+		AttributeNames: aws.StringMap(map[string]string{
+			"#msg": "Msg",
+		}),
+		AttributeValues: map[string]*dynamodb.AttributeValue{
+			":hi": {S: aws.String("hello")},
+		},
+	}
+
 	// change it a bit and check the result
 	var result widget2
 	var cc ConsumedCapacity
@@ -48,16 +79,19 @@ func TestUpdate(t *testing.T) {
 		Range("Time", item.Time).
 		Set("Msg", "changed").
 		SetExpr("Meta.$ = ?", "foo", "baz").
+		SetExpr("$", setLit).
 		Add("Count", 1).
 		Add("Test", []string{"A", "B"}).
 		RemoveExpr("Meta.$", "nope").
+		RemoveExpr("$", rmLit).
 		If("('Count' = ?) OR attribute_not_exists('Count')", 0).
-		If("'Msg' = ?", "hello").
+		If("?", ifLit).
 		DeleteFromSet("MySet1", "deleteme").
 		DeleteFromSet("MySet2", []string{"bad1", "bad2"}).
 		DeleteFromSet("MySet3", map[int64]struct{}{999: {}, 555: {}}).
 		ConsumedCapacity(&cc).
 		Value(&result)
+
 	expected := widget2{
 		widget: widget{
 			UserID: item.UserID,
@@ -67,6 +101,7 @@ func TestUpdate(t *testing.T) {
 			Meta: map[string]string{
 				"foo":  "baz",
 				"keep": "untouched",
+				"pet":  "猫",
 			},
 		},
 		MySet1: []string{"one"},

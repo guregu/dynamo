@@ -92,19 +92,6 @@ func TestSubMerge(t *testing.T) {
 			t.Error("merged value mismatch. want:", v, "got:", got)
 		}
 	}
-
-	t.Run("wrap", func(t *testing.T) {
-		s := subber{}
-		lit := lit.Wrap()
-		rewrite, err := s.subExpr("$", lit)
-		if err != nil {
-			t.Fatal(err)
-		}
-		want := "(contains(#x_a, :x_v) AND (#x_abc.#x_abcdef = :x_v0))"
-		if rewrite != want {
-			t.Error("bad rewrite. want:", want, "got:", rewrite)
-		}
-	})
 }
 
 func BenchmarkSubExpr(b *testing.B) {

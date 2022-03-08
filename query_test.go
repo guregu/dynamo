@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
 func TestGetAllCount(t *testing.T) {
@@ -30,15 +31,38 @@ func TestGetAllCount(t *testing.T) {
 		t.Error("unexpected error:", err)
 	}
 
+	lit := ExpressionLiteral{
+		Expression: "#meta.#foo = :bar",
+		AttributeNames: aws.StringMap(map[string]string{
+			"#meta": "Meta",
+			"#foo":  "foo",
+		}),
+		AttributeValues: map[string]*dynamodb.AttributeValue{
+			":bar": {S: aws.String("bar")},
+		},
+	}
+
 	// now check if get all and count return the same amount of items
 	var result []widget
 	var cc1, cc2 ConsumedCapacity
-	err = table.Get("UserID", 42).Consistent(true).Filter("Msg = ?", item.Msg).Filter("StrPtr = ?", "").ConsumedCapacity(&cc1).All(&result)
+	err = table.Get("UserID", 42).
+		Consistent(true).
+		Filter("Msg = ?", item.Msg).
+		Filter("StrPtr = ?", "").
+		Filter("?", lit).
+		ConsumedCapacity(&cc1).
+		All(&result)
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
 
-	ct, err := table.Get("UserID", 42).Consistent(true).Filter("Msg = ?", item.Msg).Filter("StrPtr = ?", "").ConsumedCapacity(&cc2).Count()
+	ct, err := table.Get("UserID", 42).
+		Consistent(true).
+		Filter("Msg = ?", item.Msg).
+		Filter("StrPtr = ?", "").
+		Filter("$", lit). // both $ and ? are OK for literals
+		ConsumedCapacity(&cc2).
+		Count()
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}

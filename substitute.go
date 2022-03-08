@@ -123,7 +123,6 @@ func (s *subber) subExprFlags(flags encodeFlags, expr string, args ...interface{
 // Its fields are equivalent to FilterExpression (and similar), ExpressionAttributeNames, and ExpressionAttributeValues in the DynamoDB API.
 // This can be passed to any function that takes an expression, as either $ or ?.
 // Your placeholders will be automatically prefixed to avoid clobbering regular placeholder substitution.
-// It is the caller's responsibility to parenthesize their expression if you want this to play nicely with the rest of the library.
 //
 // dynamo provides many convenience functions around expressions to avoid having to use this.
 // However, this can be useful when you need to handle complex dynamic expressions.
@@ -134,15 +133,6 @@ type ExpressionLiteral struct {
 	AttributeNames map[string]*string
 	// AttributeValues is a map of placeholders (such as :bar) to attribute values.
 	AttributeValues map[string]*dynamodb.AttributeValue
-}
-
-// Wrap returns a shallow copy of lit with Expression parenthesized.
-func (lit ExpressionLiteral) Wrap() ExpressionLiteral {
-	return ExpressionLiteral{
-		Expression:      wrapExpr(lit.Expression),
-		AttributeNames:  lit.AttributeNames,
-		AttributeValues: lit.AttributeValues,
-	}
 }
 
 // we don't want people to accidentally refer to our placeholders, so just slap an x_ in front of theirs

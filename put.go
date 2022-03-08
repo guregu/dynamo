@@ -35,13 +35,12 @@ func (table Table) Put(item interface{}) *Put {
 // You need to use quoted or placeholder names when the name is a reserved word in DynamoDB.
 // Multiple calls to If will be combined with AND.
 func (p *Put) If(expr string, args ...interface{}) *Put {
-	expr = wrapExpr(expr)
 	expr, err := p.subExprN(expr, args...)
 	p.setError(err)
 	if p.condition != "" {
 		p.condition += " AND "
 	}
-	p.condition += expr
+	p.condition += wrapExpr(expr)
 	return p
 }
 

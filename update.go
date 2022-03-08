@@ -264,13 +264,12 @@ func (u *Update) RemoveExpr(expr string, args ...interface{}) *Update {
 // You need to use quoted or placeholder names when the name is a reserved word in DynamoDB.
 // Multiple calls to Update will be combined with AND.
 func (u *Update) If(expr string, args ...interface{}) *Update {
-	expr = wrapExpr(expr)
 	cond, err := u.subExprN(expr, args...)
 	u.setError(err)
 	if u.condition != "" {
 		u.condition += " AND "
 	}
-	u.condition += cond
+	u.condition += wrapExpr(cond)
 	return u
 }
 

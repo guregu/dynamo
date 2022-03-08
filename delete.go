@@ -53,13 +53,12 @@ func (d *Delete) Range(name string, value interface{}) *Delete {
 // You need to use quoted or placeholder names when the name is a reserved word in DynamoDB.
 // Multiple calls to If will be combined with AND.
 func (d *Delete) If(expr string, args ...interface{}) *Delete {
-	expr = wrapExpr(expr)
 	expr, err := d.subExprN(expr, args...)
 	d.setError(err)
 	if d.condition != "" {
 		d.condition += " AND "
 	}
-	d.condition += expr
+	d.condition += wrapExpr(expr)
 	return d
 }
 

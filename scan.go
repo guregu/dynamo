@@ -60,10 +60,9 @@ func (s *Scan) Project(paths ...string) *Scan {
 // You need to use quoted or placeholder names when the name is a reserved word in DynamoDB.
 // Multiple calls to Filter will be combined with AND.
 func (s *Scan) Filter(expr string, args ...interface{}) *Scan {
-	expr = wrapExpr(expr)
 	expr, err := s.subExprN(expr, args...)
 	s.setError(err)
-	s.filters = append(s.filters, expr)
+	s.filters = append(s.filters, wrapExpr(expr))
 	return s
 }
 

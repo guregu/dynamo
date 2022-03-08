@@ -47,13 +47,12 @@ func (check *ConditionCheck) Range(rangeKey string, value interface{}) *Conditio
 // You need to use quoted or placeholder names when the name is a reserved word in DynamoDB.
 // Multiple calls to If will be combined with AND.
 func (check *ConditionCheck) If(expr string, args ...interface{}) *ConditionCheck {
-	expr = wrapExpr(expr)
 	cond, err := check.subExprN(expr, args...)
 	check.setError(err)
 	if check.condition != "" {
 		check.condition += " AND "
 	}
-	check.condition += cond
+	check.condition += wrapExpr(cond)
 	return check
 }
 

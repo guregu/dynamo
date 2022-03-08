@@ -35,6 +35,10 @@ func (s *subber) subValue(value interface{}, flags encodeFlags) (string, error) 
 		s.valueExpr = make(map[string]*dynamodb.AttributeValue)
 	}
 
+	if lit, ok := value.(ExpressionLiteral); ok {
+		return s.merge(lit), nil
+	}
+
 	sub := fmt.Sprintf(":v%d", len(s.valueExpr))
 	av, err := marshal(value, flags)
 	if err != nil {
@@ -77,6 +81,8 @@ func (s *subber) subExprFlags(flags encodeFlags, expr string, args ...interface{
 			_, err = buf.WriteString(sub)
 		case exprs.ItemNamePlaceholder:
 			switch x := args[idx].(type) {
+			case ExpressionLiteral:
+				_, err = buf.WriteString(s.merge(x))
 			case encoding.TextMarshaler:
 				var txt []byte
 				txt, err = x.MarshalText()
@@ -92,7 +98,7 @@ func (s *subber) subExprFlags(flags encodeFlags, expr string, args ...interface{
 			case int64:
 				_, err = buf.WriteString(strconv.FormatInt(x, 10))
 			default:
-				err = fmt.Errorf("dynamo: type of argument for $ must be string, int, or int64 (got %T)", x)
+				err = fmt.Errorf("dynamo: type of argument for $ must be string, int, int64, encoding.TextMarshaler or dynamo.ExpressionLiteral (got %T)", x)
 			}
 			idx++
 		case exprs.ItemValuePlaceholder:
@@ -113,11 +119,68 @@ func (s *subber) subExprFlags(flags encodeFlags, expr string, args ...interface{
 	return buf.String(), nil
 }
 
+// ExpressionLiteral is a raw DynamoDB expression.
+// Its fields are equivalent to FilterExpression (and similar), ExpressionAttributeNames, and ExpressionAttributeValues in the DynamoDB API.
+// This can be passed to any function that takes an expression, as either $ or ?.
+// Your placeholders will be automatically prefixed to avoid clobbering regular placeholder substitution.
+// It is the caller's responsibility to parenthesize their expression if you want this to play nicely with the rest of the library.
+//
+// dynamo provides many convenience functions around expressions to avoid having to use this.
+// However, this can be useful when you need to handle complex dynamic expressions.
+type ExpressionLiteral struct {
+	// Expression is a raw DynamoDB expression.
+	Expression string
+	// AttributeNames is a map of placeholders (such as #foo) to attribute names.
+	AttributeNames map[string]*string
+	// AttributeValues is a map of placeholders (such as :bar) to attribute values.
+	AttributeValues map[string]*dynamodb.AttributeValue
+}
+
+// Wrap returns a shallow copy of lit with Expression parenthesized.
+func (lit ExpressionLiteral) Wrap() ExpressionLiteral {
+	return ExpressionLiteral{
+		Expression:      wrapExpr(lit.Expression),
+		AttributeNames:  lit.AttributeNames,
+		AttributeValues: lit.AttributeValues,
+	}
+}
+
+// we don't want people to accidentally refer to our placeholders, so just slap an x_ in front of theirs
+var foreignPlaceholder = strings.NewReplacer("#", "#x_", ":", ":x_")
+
+// merge in a foreign expression literal
+// returns a rewritten expression with prefixed placeholders
+func (s *subber) merge(lit ExpressionLiteral) string {
+	prefix := func(key string) string {
+		return string(key[0]) + "x_" + key[1:]
+	}
+
+	if len(lit.AttributeNames) > 0 && s.nameExpr == nil {
+		s.nameExpr = make(map[string]*string)
+	}
+	for k, v := range lit.AttributeNames {
+		safe := prefix(k)
+		s.nameExpr[safe] = v
+	}
+
+	if len(lit.AttributeValues) > 0 && s.valueExpr == nil {
+		s.valueExpr = make(map[string]*dynamodb.AttributeValue)
+	}
+	for k, v := range lit.AttributeValues {
+		safe := prefix(k)
+		s.valueExpr[safe] = v
+	}
+
+	expr := foreignPlaceholder.Replace(lit.Expression)
+	return expr
+}
+
+var nameEncoder = base32.StdEncoding.WithPadding(base32.NoPadding)
+
 // encodeName consistently encodes a name.
 // The consistency is important.
 func encodeName(name string) string {
-	name = base32.StdEncoding.EncodeToString([]byte(name))
-	return strings.TrimRight(name, "=")
+	return nameEncoder.EncodeToString([]byte(name))
 }
 
 // escape takes a name and evaluates and substitutes it if needed.

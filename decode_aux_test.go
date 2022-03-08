@@ -35,7 +35,7 @@ func TestEncodingAux(t *testing.T) {
 		name string
 		out  interface{}
 	}{
-		{name: "no custom unmrashalling", out: coffeeItemDefault{ID: "intenso", Coffee: Coffee{Name: "Intenso 12"}}},
+		{name: "no custom unmarshalling", out: coffeeItemDefault{ID: "intenso", Coffee: Coffee{Name: "Intenso 12"}}},
 		{name: "AWS SDK pointer", out: coffeeItemSDKEmbeddedPointer{ID: "intenso", Coffee: &Coffee{Name: "Intenso 12"}}},
 		{name: "flat", out: coffeeItemFlat{ID: "intenso", Name: "Intenso 12"}},
 		{name: "flat (invalid)", out: coffeeItemInvalid{}}, // want to make sure this doesn't panic

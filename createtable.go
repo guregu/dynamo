@@ -229,14 +229,14 @@ func (ct *CreateTable) SSEEncryption(enabled bool, keyID string, sseType SSEType
 	return ct
 }
 
-// Run creates this table or returns and error.
+// Run creates this table or returns an error.
 func (ct *CreateTable) Run() error {
 	ctx, cancel := defaultContext()
 	defer cancel()
 	return ct.RunWithContext(ctx)
 }
 
-// RunWithContext creates this table or returns and error.
+// RunWithContext creates this table or returns an error.
 func (ct *CreateTable) RunWithContext(ctx aws.Context) error {
 	if ct.err != nil {
 		return ct.err

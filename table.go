@@ -1,16 +1,20 @@
 package dynamo
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"sync/atomic"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
 // Status is an enumeration of table and index statuses.
 type Status string
 
+// Table and index statuses.
 const (
 	// The table or index is ready for use.
 	ActiveStatus Status = "ACTIVE"
@@ -20,6 +24,10 @@ const (
 	UpdatingStatus Status = "UPDATING"
 	// The table or index is being deleted.
 	DeletingStatus Status = "DELETING"
+
+	// NotExistsStatus is a special status you can pass to table.Wait() to wait until a table doesn't exist.
+	// DescribeTable will return a ResourceNotFound AWS error instead of this.
+	NotExistsStatus Status = "_gone"
 )
 
 // Table is a DynamoDB table.
@@ -42,6 +50,52 @@ func (db *DB) Table(name string) Table {
 // Name returns this table's name.
 func (table Table) Name() string {
 	return table.name
+}
+
+// Wait blocks until this table's status matches any status provided by want.
+// If no statuses are specified, the active status is used.
+func (table Table) Wait(want ...Status) error {
+	ctx, cancel := defaultContext()
+	defer cancel()
+	return table.WaitWithContext(ctx, want...)
+}
+
+// Wait blocks until this table's status matches any status provided by want.
+// If no statuses are specified, the active status is used.
+func (table Table) WaitWithContext(ctx aws.Context, want ...Status) error {
+	if len(want) == 0 {
+		want = []Status{ActiveStatus}
+	}
+	wantGone := false
+	for _, status := range want {
+		if status == NotExistsStatus {
+			wantGone = true
+		}
+	}
+
+	err := retry(ctx, func() error {
+		desc, err := table.Describe().RunWithContext(ctx)
+		var aerr awserr.RequestFailure
+		if errors.As(err, &aerr) {
+			if aerr.Code() == "ResourceNotFoundException" {
+				if wantGone {
+					return nil
+				}
+				return errRetry
+			}
+		}
+		if err != nil {
+			return err
+		}
+
+		for _, status := range want {
+			if status == desc.Status {
+				return nil
+			}
+		}
+		return errRetry
+	})
+	return err
 }
 
 // primaryKeys attempts to determine this table's primary keys.
@@ -140,6 +194,21 @@ func (dt *DeleteTable) RunWithContext(ctx aws.Context) error {
 		_, err := dt.table.db.client.DeleteTableWithContext(ctx, input)
 		return err
 	})
+}
+
+// Wait executes this request and blocks until the table is finished deleting.
+func (dt *DeleteTable) Wait() error {
+	ctx, cancel := defaultContext()
+	defer cancel()
+	return dt.WaitWithContext(ctx)
+}
+
+// WaitWithContext executes this request and blocks until the table is finished deleting.
+func (dt *DeleteTable) WaitWithContext(ctx context.Context) error {
+	if err := dt.RunWithContext(ctx); err != nil {
+		return err
+	}
+	return dt.table.WaitWithContext(ctx, NotExistsStatus)
 }
 
 func (dt *DeleteTable) input() *dynamodb.DeleteTableInput {

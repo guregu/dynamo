@@ -1,6 +1,7 @@
 package dynamo
 
 import (
+	"errors"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -46,7 +47,14 @@ func retry(ctx aws.Context, f func() error) error {
 	}
 }
 
+// errRetry is a sentinel error to retry, should never be returned to user
+var errRetry = errors.New("dynamo: retry")
+
 func canRetry(err error) bool {
+	if errors.Is(err, errRetry) {
+		return true
+	}
+
 	if ae, ok := err.(awserr.RequestFailure); ok {
 		switch ae.StatusCode() {
 		case 500, 503:

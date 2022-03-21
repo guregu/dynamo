@@ -1,12 +1,47 @@
 package dynamo
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
+
+func TestTableLifecycle(t *testing.T) {
+	if testDB == nil {
+		t.Skip(offlineSkipMsg)
+	}
+
+	now := time.Now().UTC()
+	name := fmt.Sprintf("TestDB-%d", now.UnixNano())
+
+	// example from the docs
+	type UserAction struct {
+		UserID string    `dynamo:"ID,hash" index:"Seq-ID-index,range"`
+		Time   time.Time `dynamo:",range"`
+		Seq    int64     `localIndex:"ID-Seq-index,range" index:"Seq-ID-index,hash"`
+		UUID   string    `index:"UUID-index,hash"`
+	}
+
+	// create & wait
+	if err := testDB.CreateTable(name, UserAction{}).Wait(); err != nil {
+		t.Fatal(err)
+	}
+
+	// make sure it really works
+	table := testDB.Table(name)
+	if err := table.Put(UserAction{UserID: "test", Time: now, Seq: 1, UUID: "42"}).Run(); err != nil {
+		t.Fatal(err)
+	}
+
+	// delete & wait
+	if err := testDB.Table(name).DeleteTable().Wait(); err != nil {
+		t.Fatal(err)
+	}
+}
 
 func TestAddConsumedCapacity(t *testing.T) {
 	raw := &dynamodb.ConsumedCapacity{

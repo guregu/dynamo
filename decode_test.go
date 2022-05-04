@@ -249,3 +249,33 @@ func TestUnmarshalMissing(t *testing.T) {
 		t.Error("bad unmarshal missing. want:", want, "got:", w)
 	}
 }
+
+func TestUnmarshalClearFields(t *testing.T) {
+	// tests against a regression from v1.12.0 in which map fields were not properly getting reset
+
+	type Foo struct {
+		Map map[string]bool
+	}
+
+	items := []Foo{
+		{Map: map[string]bool{"a": true}},
+		{Map: map[string]bool{"b": true}}, // before fix: {a: true, b: true}
+		{Map: map[string]bool{"c": true}}, // before fix: {a: true, b: true, c: true}
+	}
+
+	var foo Foo
+	for _, item := range items {
+		raw, err := MarshalItem(item)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := UnmarshalItem(raw, &foo); err != nil {
+			t.Fatal(err)
+		}
+
+		if !reflect.DeepEqual(item, foo) {
+			t.Error("bad result. want:", item, "got:", foo)
+		}
+	}
+}

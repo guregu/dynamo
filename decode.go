@@ -401,14 +401,16 @@ func unmarshalItem(item map[string]*dynamodb.AttributeValue, out interface{}) er
 		var err error
 		fields := fieldsInStruct(rv.Elem())
 		for name, fv := range fields {
+			// we need to zero-out all fields to avoid weird data sticking around
+			// when iterating by unmarshaling to the same object over and over
+			if fv.CanSet() {
+				fv.Set(reflect.Zero(fv.Type()))
+			}
+
 			if av, ok := item[name]; ok {
 				if innerErr := unmarshalReflect(av, fv); innerErr != nil {
 					err = innerErr
 				}
-			} else {
-				// we need to zero-out omitted fields to avoid weird data sticking around
-				// when iterating by unmarshaling to the same object over and over
-				fv.Set(reflect.Zero(fv.Type()))
 			}
 		}
 		return err

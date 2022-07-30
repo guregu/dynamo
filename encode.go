@@ -285,7 +285,10 @@ func marshalReflect(rv reflect.Value, flags encodeFlags) (*dynamodb.AttributeVal
 		avs := make(map[string]*dynamodb.AttributeValue)
 		subflags := flagNone
 		if flags&flagAllowEmptyElem != 0 {
-			subflags |= flagAllowEmpty | flagNull | flagAllowEmptyElem
+			subflags |= flagAllowEmpty | flagNull
+			// child containers of a map also have the allowEmptyElem behavior
+			// i.e. lists inside a map or maps inside a map
+			subflags |= flagAllowEmptyElem
 		} else if flags&flagOmitEmptyElem != 0 {
 			subflags |= flagOmitEmpty
 		}
@@ -356,6 +359,8 @@ func marshalReflect(rv reflect.Value, flags encodeFlags) (*dynamodb.AttributeVal
 			subflags |= flagAllowEmpty | flagNull
 		}
 		if flags&flagAllowEmptyElem != 0 {
+			// child containers of a list also have the allowEmptyElem behavior
+			// e.g. maps inside a list
 			subflags |= flagAllowEmptyElem
 		}
 		for i := 0; i < rv.Len(); i++ {

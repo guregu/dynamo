@@ -48,6 +48,31 @@ var itemEncodeOnlyTests = []struct {
 		},
 	},
 	{
+		name: "allowemptyelem flag on map with a struct element that has a map field",
+		in: struct {
+			M map[string]interface{} `dynamo:",allowemptyelem"`
+		}{
+			M: map[string]interface{}{
+				"struct": struct {
+					InnerMap map[string]interface{} // no struct tags, empty elems not encoded
+				}{
+					InnerMap: map[string]interface{}{
+						"empty": "",
+					},
+				},
+			},
+		},
+		out: map[string]*dynamodb.AttributeValue{
+			"M": {M: map[string]*dynamodb.AttributeValue{
+				"struct": {M: map[string]*dynamodb.AttributeValue{
+					"InnerMap": {M: map[string]*dynamodb.AttributeValue{
+						// expected empty inside
+					}},
+				}},
+			}},
+		},
+	},
+	{
 		name: "unexported field",
 		in: struct {
 			Public   int

@@ -373,6 +373,68 @@ var itemEncodingTests = []struct {
 		},
 	},
 	{
+		name: "allowemptyelem flag on map with map element",
+		in: struct {
+			M map[string]interface{} `dynamo:",allowemptyelem"`
+		}{
+			M: map[string]interface{}{
+				"nestedmap": map[string]interface{}{
+					"empty": "",
+				},
+			},
+		},
+		out: map[string]*dynamodb.AttributeValue{
+			"M": {M: map[string]*dynamodb.AttributeValue{
+				"nestedmap": {M: map[string]*dynamodb.AttributeValue{
+					"empty": {S: aws.String("")},
+				}},
+			}},
+		},
+	},
+	{
+		name: "allowemptyelem flag on map with slice element, which has a map element",
+		in: struct {
+			M map[string]interface{} `dynamo:",allowemptyelem"`
+		}{
+			M: map[string]interface{}{
+				"slice": []interface{}{
+					map[string]interface{}{"empty": ""},
+				},
+			},
+		},
+		out: map[string]*dynamodb.AttributeValue{
+			"M": {M: map[string]*dynamodb.AttributeValue{
+				"slice": {L: []*dynamodb.AttributeValue{
+					{M: map[string]*dynamodb.AttributeValue{
+						"empty": {S: aws.String("")},
+					}},
+				}},
+			}},
+		},
+	},
+	{
+		name: "allowemptyelem flag on slice with map element",
+		in: struct {
+			L []interface{} `dynamo:",allowemptyelem"`
+		}{
+			L: []interface{}{
+				map[string]interface{}{
+					"empty": "",
+				},
+			},
+		},
+		out: map[string]*dynamodb.AttributeValue{
+			"L": {L: []*dynamodb.AttributeValue{
+				{
+					M: map[string]*dynamodb.AttributeValue{
+						"empty": {S: aws.String("")},
+					},
+				},
+			},
+			},
+		},
+	},
+	{
 		name: "null flag",
 		in: struct {
 			S       string             `dynamo:",null"`

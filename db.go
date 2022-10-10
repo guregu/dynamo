@@ -2,9 +2,11 @@
 package dynamo
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
@@ -178,3 +180,25 @@ type PagingIter interface {
 // PagingKey is a key used for splitting up partial results.
 // Get a PagingKey from a PagingIter and pass it to StartFrom in Query or Scan.
 type PagingKey map[string]*dynamodb.AttributeValue
+
+// IsCondCheckFailed returns true if the given error is a "conditional check failed" error.
+// This corresponds with a ConditionalCheckFailedException in most APIs,
+// or a TransactionCanceledException with a ConditionalCheckFailed cancellation reason in transactions.
+func IsCondCheckFailed(err error) bool {
+	var txe *dynamodb.TransactionCanceledException
+	if errors.As(err, &txe) {
+		for _, cr := range txe.CancellationReasons {
+			if cr.Code != nil && *cr.Code == "ConditionalCheckFailed" {
+				return true
+			}
+		}
+		return false
+	}
+
+	var ae awserr.Error
+	if errors.As(err, &ae) && ae.Code() == "ConditionalCheckFailedException" {
+		return true
+	}
+
+	return false
+}

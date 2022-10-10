@@ -32,7 +32,7 @@ func TestDelete(t *testing.T) {
 		If("Meta.'color' = ?", "octarine").
 		If("Msg = ?", "wrong msg").
 		Run()
-	if !isConditionalCheckErr(err) {
+	if !IsCondCheckFailed(err) {
 		t.Error("expected ConditionalCheckFailedException, not", err)
 	}
 

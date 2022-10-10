@@ -159,7 +159,7 @@ func TestUpdate(t *testing.T) {
 		If("'Count' > ?", 100).
 		If("(MeaningOfLife = ?)", 42).
 		Value(&result)
-	if !isConditionalCheckErr(err) {
+	if !IsCondCheckFailed(err) {
 		t.Error("expected ConditionalCheckFailedException, not", err)
 	}
 }

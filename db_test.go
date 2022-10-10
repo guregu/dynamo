@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 )
 
@@ -42,13 +41,6 @@ type widget struct {
 	Count  int
 	Meta   map[string]string
 	StrPtr *string `dynamo:",allowempty"`
-}
-
-func isConditionalCheckErr(err error) bool {
-	if ae, ok := err.(awserr.RequestFailure); ok {
-		return ae.Code() == "ConditionalCheckFailedException"
-	}
-	return false
 }
 
 func TestListTables(t *testing.T) {

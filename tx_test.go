@@ -224,7 +224,7 @@ func TestTxRetry(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		tx := testDB.WriteTx()
-		tx.Update(table.Update("UserID", "").Set("Foo", ""))
+		tx.Update(table.Update("UserID", "\u0002").Set("Foo", ""))
 		_ = tx.Run()
 	}()
 

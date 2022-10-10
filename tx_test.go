@@ -2,6 +2,7 @@ package dynamo
 
 import (
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 
@@ -174,5 +175,43 @@ func TestTx(t *testing.T) {
 	err = testDB.WriteTx().Run()
 	if err != ErrNoInput {
 		t.Error("unexpected error", err)
+	}
+}
+
+func TestTxRetry(t *testing.T) {
+	date1 := time.Date(1999, 1, 1, 1, 1, 1, 0, time.UTC)
+	widget1 := widget{UserID: 69, Time: date1, Msg: "dog", Count: 0}
+
+	table := testDB.Table(testTable)
+	if err := table.Put(widget1).Run(); err != nil {
+		t.Fatal(err)
+	}
+
+	const count = 25
+
+	// run 25 transactions against the same item at once
+	// this should eventually resolve...
+
+	var wg sync.WaitGroup
+	for i := 0; i < count; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			tx := testDB.WriteTx()
+			tx.Update(table.Update("UserID", widget1.UserID).Range("Time", widget1.Time).Add("Count", 1))
+			if err := tx.Run(); err != nil {
+				panic(err)
+			}
+		}()
+	}
+	wg.Wait()
+
+	var got widget
+	if err := table.Get("UserID", widget1.UserID).Range("Time", Equal, widget1.Time).One(&got); err != nil {
+		t.Fatal(err)
+	}
+
+	if got.Count != count {
+		t.Error("unexpected count. want:", count, "got:", got.Count)
 	}
 }

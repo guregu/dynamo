@@ -68,7 +68,7 @@ func TestPut(t *testing.T) {
 
 	// putting the same item: this should fail
 	err = table.Put(newItem).If("attribute_not_exists(UserID)").If("attribute_not_exists('Time')").Run()
-	if !isConditionalCheckErr(err) {
+	if !IsCondCheckFailed(err) {
 		t.Error("expected ConditionalCheckFailedException, not", err)
 	}
 }

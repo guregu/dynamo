@@ -3,6 +3,7 @@ package dynamo
 import (
 	"fmt"
 	"reflect"
+	"sort"
 	"testing"
 	"time"
 
@@ -27,8 +28,85 @@ func TestTableLifecycle(t *testing.T) {
 	}
 
 	// create & wait
-	if err := testDB.CreateTable(name, UserAction{}).Wait(); err != nil {
+	if err := testDB.CreateTable(name, UserAction{}).Index(Index{
+		Name:         "Foo-Bar-index",
+		HashKey:      "Foo",
+		HashKeyType:  StringType,
+		RangeKey:     "Bar",
+		RangeKeyType: NumberType,
+	}).Wait(); err != nil {
 		t.Fatal(err)
+	}
+
+	desc, err := testDB.Table(name).Describe().Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := Description{
+		Name: name,
+		// ARN:    "arn:aws:dynamodb:ddblocal:000000000000:table/TestDB-1665411117776473700",
+		Status:       ActiveStatus,
+		HashKey:      "ID",
+		HashKeyType:  StringType,
+		RangeKey:     "Time",
+		RangeKeyType: StringType,
+		Throughput:   Throughput{Read: 1, Write: 1},
+		GSI: []Index{
+			{
+				Name: "Foo-Bar-index",
+				// ARN: "arn:aws:dynamodb:ddblocal:000000000000:table/TestDB-1665411117776473700/index/Foo-Bar-index",
+				Status:            ActiveStatus,
+				HashKey:           "Foo",
+				HashKeyType:       StringType,
+				RangeKey:          "Bar",
+				RangeKeyType:      NumberType,
+				Throughput:        Throughput{Read: 1, Write: 1},
+				ProjectionType:    AllProjection,
+				ProjectionAttribs: []string{},
+			},
+			{
+				Name: "Seq-ID-index",
+				// ARN: "arn:aws:dynamodb:ddblocal:000000000000:table/TestDB-1665411117776473700/index/Seq-ID-index",
+				Status:            ActiveStatus,
+				HashKey:           "Seq",
+				HashKeyType:       NumberType,
+				RangeKey:          "ID",
+				RangeKeyType:      StringType,
+				Throughput:        Throughput{Read: 1, Write: 1},
+				ProjectionType:    AllProjection,
+				ProjectionAttribs: []string{},
+			},
+			{
+				Name: "UUID-index",
+				// ARN: "arn:aws:dynamodb:ddblocal:000000000000:table/TestDB-1665411117776473700/index/UUID-index",
+				Status:            ActiveStatus,
+				HashKey:           "UUID",
+				HashKeyType:       StringType,
+				Throughput:        Throughput{Read: 1, Write: 1},
+				ProjectionType:    AllProjection,
+				ProjectionAttribs: []string{},
+			},
+		},
+		LSI: []Index{
+			{
+				Name: "ID-Seq-index",
+				// ARN: "arn:aws:dynamodb:ddblocal:000000000000:table/TestDB-1665411117776473700/index/ID-Seq-index",
+				Status:            ActiveStatus,
+				Backfilling:       false,
+				Local:             true,
+				HashKey:           "ID",
+				HashKeyType:       StringType,
+				RangeKey:          "Seq",
+				RangeKeyType:      NumberType,
+				Throughput:        Throughput{Read: 1, Write: 1},
+				ProjectionType:    AllProjection,
+				ProjectionAttribs: []string{},
+			},
+		},
+	}
+	normalizeDesc(&desc)
+	if !reflect.DeepEqual(want, desc) {
+		t.Errorf("unexpected table description. want:\n%#v\ngot:\n%#v\n", want, desc)
 	}
 
 	// make sure it really works
@@ -91,4 +169,29 @@ func TestAddConsumedCapacity(t *testing.T) {
 	if !reflect.DeepEqual(cc, expected) {
 		t.Error("bad ConsumedCapacity:", cc, "≠", expected)
 	}
+}
+
+func normalizeDesc(desc *Description) {
+	desc.ARN = ""
+	desc.Created = time.Time{}
+	desc.Throughput.LastInc = time.Time{}
+	desc.Throughput.LastDec = time.Time{}
+	for i, idx := range desc.GSI {
+		idx.ARN = ""
+		idx.Throughput.LastInc = time.Time{}
+		idx.Throughput.LastDec = time.Time{}
+		desc.GSI[i] = idx
+	}
+	sort.Slice(desc.GSI, func(i, j int) bool {
+		return desc.GSI[i].Name < desc.GSI[j].Name
+	})
+	for i, idx := range desc.LSI {
+		idx.ARN = ""
+		idx.Throughput.LastInc = time.Time{}
+		idx.Throughput.LastDec = time.Time{}
+		desc.LSI[i] = idx
+	}
+	sort.Slice(desc.LSI, func(i, j int) bool {
+		return desc.LSI[i].Name < desc.LSI[j].Name
+	})
 }

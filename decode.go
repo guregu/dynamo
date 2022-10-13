@@ -86,8 +86,8 @@ func unmarshalReflect(av types.AttributeValue, rv reflect.Value) error {
 				*x.(*types.AttributeValueMemberL) = *res
 				return nil
 			case *types.AttributeValueMemberM:
-				res := av.(*types.AttributeValueMemberL)
-				*x.(*types.AttributeValueMemberL) = *res
+				res := av.(*types.AttributeValueMemberM)
+				*x.(*types.AttributeValueMemberM) = *res
 				return nil
 			case *types.AttributeValueMemberN:
 				res := av.(*types.AttributeValueMemberN)

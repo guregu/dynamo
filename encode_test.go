@@ -29,7 +29,7 @@ var itemEncodeOnlyTests = []struct {
 		out: map[string]types.AttributeValue{
 			"L":     &types.AttributeValueMemberL{Value: []types.AttributeValue{}},
 			"M":     &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{}},
-			"Other": &types.AttributeValueMemberBOOL{Value: (true)},
+			"Other": &types.AttributeValueMemberBOOL{Value: true},
 		},
 	},
 	{

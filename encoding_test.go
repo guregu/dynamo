@@ -195,11 +195,11 @@ var encodingTests = []struct {
 		name: "array with empty string",
 		in:   [...]string{"", "hello", "", "world", ""},
 		out: &types.AttributeValueMemberL{Value: []types.AttributeValue{
-			&types.AttributeValueMemberS{Value: ("")},
-			&types.AttributeValueMemberS{Value: ("hello")},
-			&types.AttributeValueMemberS{Value: ("")},
-			&types.AttributeValueMemberS{Value: ("world")},
-			&types.AttributeValueMemberS{Value: ("")},
+			&types.AttributeValueMemberS{Value: ""},
+			&types.AttributeValueMemberS{Value: "hello"},
+			&types.AttributeValueMemberS{Value: ""},
+			&types.AttributeValueMemberS{Value: "world"},
+			&types.AttributeValueMemberS{Value: ""},
 		}},
 	},
 	{
@@ -207,10 +207,10 @@ var encodingTests = []struct {
 		in:   []*string{nil, aws.String("hello"), aws.String(""), aws.String("world"), nil},
 		out: &types.AttributeValueMemberL{Value: []types.AttributeValue{
 			&types.AttributeValueMemberNULL{Value: true},
-			&types.AttributeValueMemberS{Value: ("hello")},
-			&types.AttributeValueMemberS{Value: ("")},
-			&types.AttributeValueMemberS{Value: ("world")},
-			&types.AttributeValueMemberNULL{Value: (true)},
+			&types.AttributeValueMemberS{Value: "hello"},
+			&types.AttributeValueMemberS{Value: ""},
+			&types.AttributeValueMemberS{Value: "world"},
+			&types.AttributeValueMemberNULL{Value: true},
 		}},
 	},
 	{
@@ -241,7 +241,7 @@ var encodingTests = []struct {
 		out: &types.AttributeValueMemberL{Value: []types.AttributeValue{
 			&types.AttributeValueMemberB{Value: []byte{}},
 			&types.AttributeValueMemberB{Value: []byte{'h', 'e', 'l', 'l', 'o'}},
-			&types.AttributeValueMemberNULL{Value: (true)},
+			&types.AttributeValueMemberNULL{Value: true},
 			&types.AttributeValueMemberB{Value: []byte{'w', 'o', 'r', 'l', 'd'}},
 			&types.AttributeValueMemberB{Value: []byte{}},
 		}},
@@ -261,7 +261,7 @@ var itemEncodingTests = []struct {
 			A: "hello",
 		},
 		out: map[string]types.AttributeValue{
-			"A": &types.AttributeValueMemberS{Value: ("hello")},
+			"A": &types.AttributeValueMemberS{Value: "hello"},
 		},
 	},
 	{
@@ -272,7 +272,7 @@ var itemEncodingTests = []struct {
 			A: "hello",
 		},
 		out: map[string]types.AttributeValue{
-			"A": &types.AttributeValueMemberS{Value: ("hello")},
+			"A": &types.AttributeValueMemberS{Value: "hello"},
 		},
 	},
 	{
@@ -294,7 +294,7 @@ var itemEncodingTests = []struct {
 			A: "hello",
 		},
 		out: map[string]types.AttributeValue{
-			"renamed": &types.AttributeValueMemberS{Value: ("hello")},
+			"renamed": &types.AttributeValueMemberS{Value: "hello"},
 		},
 	},
 	{
@@ -307,7 +307,7 @@ var itemEncodingTests = []struct {
 			Other: true,
 		},
 		out: map[string]types.AttributeValue{
-			"Other": &types.AttributeValueMemberBOOL{Value: (true)},
+			"Other": &types.AttributeValueMemberBOOL{Value: true},
 		},
 	},
 	{
@@ -322,7 +322,7 @@ var itemEncodingTests = []struct {
 			Other: true,
 		},
 		out: map[string]types.AttributeValue{
-			"Other": &types.AttributeValueMemberBOOL{Value: (true)},
+			"Other": &types.AttributeValueMemberBOOL{Value: true},
 		},
 	},
 	{
@@ -586,23 +586,23 @@ var itemEncodingTests = []struct {
 			NS5:  map[uint]bool{maxUint: true},
 		},
 		out: map[string]types.AttributeValue{
-			"SS1":  &types.AttributeValueMemberSS{Value: []string{("A"), ("B")}},
-			"SS2":  &types.AttributeValueMemberSS{Value: []string{("true"), ("false")}},
-			"SS3":  &types.AttributeValueMemberSS{Value: []string{("A")}},
-			"SS4":  &types.AttributeValueMemberSS{Value: []string{("A")}},
-			"SS5":  &types.AttributeValueMemberSS{Value: []string{("A")}},
-			"SS6":  &types.AttributeValueMemberSS{Value: []string{("A"), ("B")}},
-			"SS7":  &types.AttributeValueMemberSS{Value: []string{("true")}},
-			"SS8":  &types.AttributeValueMemberSS{Value: []string{("false")}},
-			"SS9":  &types.AttributeValueMemberSS{Value: []string{("A"), ("B"), ("")}},
-			"SS10": &types.AttributeValueMemberSS{Value: []string{("A")}},
+			"SS1":  &types.AttributeValueMemberSS{Value: []string{"A", "B"}},
+			"SS2":  &types.AttributeValueMemberSS{Value: []string{"true", "false"}},
+			"SS3":  &types.AttributeValueMemberSS{Value: []string{"A"}},
+			"SS4":  &types.AttributeValueMemberSS{Value: []string{"A"}},
+			"SS5":  &types.AttributeValueMemberSS{Value: []string{"A"}},
+			"SS6":  &types.AttributeValueMemberSS{Value: []string{"A", "B"}},
+			"SS7":  &types.AttributeValueMemberSS{Value: []string{"true"}},
+			"SS8":  &types.AttributeValueMemberSS{Value: []string{"false"}},
+			"SS9":  &types.AttributeValueMemberSS{Value: []string{"A", "B", ""}},
+			"SS10": &types.AttributeValueMemberSS{Value: []string{"A"}},
 			"BS1":  &types.AttributeValueMemberBS{Value: [][]byte{{'A'}, {'B'}}},
 			"BS2":  &types.AttributeValueMemberBS{Value: [][]byte{{'A'}}},
 			"BS3":  &types.AttributeValueMemberBS{Value: [][]byte{{'A'}}},
 			"BS4":  &types.AttributeValueMemberBS{Value: [][]byte{{'A'}, {'B'}, {}}},
-			"NS1":  &types.AttributeValueMemberNS{Value: []string{("1"), ("2")}},
-			"NS2":  &types.AttributeValueMemberNS{Value: []string{("1"), ("2")}},
-			"NS3":  &types.AttributeValueMemberNS{Value: []string{("1"), ("2")}},
+			"NS1":  &types.AttributeValueMemberNS{Value: []string{"1", "2"}},
+			"NS2":  &types.AttributeValueMemberNS{Value: []string{"1", "2"}},
+			"NS3":  &types.AttributeValueMemberNS{Value: []string{"1", "2"}},
 			"NS4":  &types.AttributeValueMemberNS{Value: []string{maxIntStr}},
 			"NS5":  &types.AttributeValueMemberNS{Value: []string{maxUintStr}},
 		},
@@ -700,14 +700,14 @@ var itemEncodingTests = []struct {
 	},
 	{
 		name: "dynamodb.ItemUnmarshaler",
-		in:   customItemMarshaler{Thing: (52)},
+		in:   customItemMarshaler{Thing: 52},
 		out: map[string]types.AttributeValue{
 			"thing": &types.AttributeValueMemberN{Value: "52"},
 		},
 	},
 	{
 		name: "*dynamodb.ItemUnmarshaler",
-		in:   &customItemMarshaler{Thing: (52)},
+		in:   &customItemMarshaler{Thing: 52},
 		out: map[string]types.AttributeValue{
 			"thing": &types.AttributeValueMemberN{Value: "52"},
 		},

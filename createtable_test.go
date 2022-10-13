@@ -102,7 +102,7 @@ func TestCreateTable(t *testing.T) {
 			}},
 			Projection: &types.Projection{
 				ProjectionType:   types.ProjectionTypeInclude,
-				NonKeyAttributes: []string{("UUID")},
+				NonKeyAttributes: []string{"UUID"},
 			},
 		}},
 		ProvisionedThroughput: &types.ProvisionedThroughput{

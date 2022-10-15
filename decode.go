@@ -213,9 +213,6 @@ func unmarshalReflect(av types.AttributeValue, rv reflect.Value) error {
 		default:
 			_, valueIsM := av.(*types.AttributeValueMemberM)
 			if !valueIsM {
-				return fmt.Errorf("dynamo: cannot unmarshal %s data into struct", avTypeName(av))
-			}
-			if !valueIsM {
 				return fmt.Errorf("dynamo: unmarshal map set: value type must be struct{} or bool, got %v", rv.Type())
 			}
 		}

@@ -275,7 +275,6 @@ redo:
 	}
 	if itr.bg.cc != nil {
 		for _, cc := range itr.output.ConsumedCapacity {
-
 			addConsumedCapacity(itr.bg.cc, &cc)
 		}
 	}

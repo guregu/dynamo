@@ -1,6 +1,7 @@
 package dynamo
 
 import (
+	"errors"
 	"reflect"
 	"sync"
 	"testing"
@@ -8,7 +9,7 @@ import (
 
 	"github.com/gofrs/uuid"
 
-	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/smithy-go"
 )
 
 func TestTx(t *testing.T) {
@@ -158,7 +159,8 @@ func TestTx(t *testing.T) {
 	if err == nil {
 		t.Error("expected error")
 	} else {
-		if err.(awserr.Error).Code() != "TransactionCanceledException" {
+		var apiErr smithy.APIError
+		if errors.As(err, &apiErr) && apiErr.ErrorCode() != "TransactionCanceledException" {
 			t.Error("unexpected error:", err)
 		}
 	}

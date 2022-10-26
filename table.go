@@ -8,7 +8,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/smithy-go"
 )
 
 // Status is an enumeration of table and index statuses.
@@ -75,9 +75,9 @@ func (table Table) WaitWithContext(ctx context.Context, want ...Status) error {
 
 	err := retry(ctx, func() error {
 		desc, err := table.Describe().RunWithContext(ctx)
-		var aerr awserr.RequestFailure
+		var aerr smithy.APIError
 		if errors.As(err, &aerr) {
-			if aerr.Code() == "ResourceNotFoundException" {
+			if aerr.ErrorCode() == "ResourceNotFoundException" {
 				if wantGone {
 					return nil
 				}

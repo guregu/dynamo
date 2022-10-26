@@ -8,7 +8,7 @@ import (
 	"os"
 
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/smithy-go"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -198,8 +198,8 @@ func IsCondCheckFailed(err error) bool {
 		return false
 	}
 
-	var ae awserr.Error
-	if errors.As(err, &ae) && ae.Code() == "ConditionalCheckFailedException" {
+	var ae smithy.APIError
+	if errors.As(err, &ae) && ae.ErrorCode() == "ConditionalCheckFailedException" {
 		return true
 	}
 

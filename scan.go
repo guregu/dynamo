@@ -77,16 +77,16 @@ func (s *Scan) Consistent(on bool) *Scan {
 }
 
 // Limit specifies the maximum amount of results to return.
-func (s *Scan) Limit(limit int64) *Scan {
-	s.limit = int32(limit)
+func (s *Scan) Limit(limit int32) *Scan {
+	s.limit = limit
 	return s
 }
 
 // SearchLimit specifies a maximum amount of results to evaluate.
 // Use this along with StartFrom and Iter's LastEvaluatedKey to split up results.
 // Note that DynamoDB limits result sets to 1MB.
-func (s *Scan) SearchLimit(limit int64) *Scan {
-	s.searchLimit = int32(limit)
+func (s *Scan) SearchLimit(limit int32) *Scan {
+	s.searchLimit = limit
 	return s
 }
 
@@ -149,7 +149,7 @@ func (s *Scan) AllWithLastEvaluatedKeyContext(ctx context.Context, out interface
 // Count executes this request and returns the number of items matching the scan.
 // It takes into account the filter, limit, search limit, and all other parameters given.
 // It may return a higher count than the limits.
-func (s *Scan) Count() (int64, error) {
+func (s *Scan) Count() (int32, error) {
 	ctx, cancel := defaultContext()
 	defer cancel()
 	return s.CountWithContext(ctx)
@@ -158,11 +158,11 @@ func (s *Scan) Count() (int64, error) {
 // CountWithContext executes this request and returns the number of items matching the scan.
 // It takes into account the filter, limit, search limit, and all other parameters given.
 // It may return a higher count than the limits.
-func (s *Scan) CountWithContext(ctx context.Context) (int64, error) {
+func (s *Scan) CountWithContext(ctx context.Context) (int32, error) {
 	if s.err != nil {
 		return 0, s.err
 	}
-	var count, scanned int64
+	var count, scanned int32
 	input := s.scanInput()
 	input.Select = types.SelectCount
 	for {
@@ -176,17 +176,17 @@ func (s *Scan) CountWithContext(ctx context.Context) (int64, error) {
 			return count, err
 		}
 
-		count += int64(out.Count)
-		scanned += int64(out.ScannedCount)
+		count += out.Count
+		scanned += out.ScannedCount
 
 		if s.cc != nil {
 			addConsumedCapacity(s.cc, out.ConsumedCapacity)
 		}
 
-		if s.limit > 0 && count >= int64(s.limit) {
+		if s.limit > 0 && count >= s.limit {
 			break
 		}
-		if s.searchLimit > 0 && scanned >= int64(s.searchLimit) {
+		if s.searchLimit > 0 && scanned >= s.searchLimit {
 			break
 		}
 		if out.LastEvaluatedKey == nil {
@@ -243,7 +243,7 @@ type scanIter struct {
 	output *dynamodb.ScanOutput
 	err    error
 	idx    int
-	n      int64
+	n      int32
 
 	// last item evaluated
 	last map[string]types.AttributeValue
@@ -275,7 +275,7 @@ func (itr *scanIter) NextWithContext(ctx context.Context, out interface{}) bool 
 	}
 
 	// stop if exceed limit
-	if itr.scan.limit > 0 && itr.n == int64(itr.scan.limit) {
+	if itr.scan.limit > 0 && itr.n == itr.scan.limit {
 		// proactively grab the keys for LEK inferral, but don't count it as a real error yet to keep backwards compat
 		itr.keys, itr.keyErr = itr.scan.table.primaryKeys(ctx, itr.exLEK, itr.exESK, itr.scan.index)
 		return false

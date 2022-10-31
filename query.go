@@ -157,16 +157,16 @@ func (q *Query) Consistent(on bool) *Query {
 }
 
 // Limit specifies the maximum amount of results to return.
-func (q *Query) Limit(limit int64) *Query {
-	q.limit = int32(limit)
+func (q *Query) Limit(limit int32) *Query {
+	q.limit = limit
 	return q
 }
 
 // SearchLimit specifies the maximum amount of results to examine.
 // If a filter is not specified, the number of results will be limited.
 // If a filter is specified, the number of results to consider for filtering will be limited.
-func (q *Query) SearchLimit(limit int64) *Query {
-	q.searchLimit = int32(limit)
+func (q *Query) SearchLimit(limit int32) *Query {
+	q.searchLimit = limit
 	return q
 }
 
@@ -255,18 +255,18 @@ func (q *Query) OneWithContext(ctx context.Context, out interface{}) error {
 }
 
 // Count executes this request, returning the number of results.
-func (q *Query) Count() (int64, error) {
+func (q *Query) Count() (int32, error) {
 	ctx, cancel := defaultContext()
 	defer cancel()
 	return q.CountWithContext(ctx)
 }
 
-func (q *Query) CountWithContext(ctx context.Context) (int64, error) {
+func (q *Query) CountWithContext(ctx context.Context) (int32, error) {
 	if q.err != nil {
 		return 0, q.err
 	}
 
-	var count int64
+	var count int32
 	var res *dynamodb.QueryOutput
 	for {
 		req := q.queryInput()
@@ -281,7 +281,7 @@ func (q *Query) CountWithContext(ctx context.Context) (int64, error) {
 			if res.Count == 0 {
 				return errors.New("nil count")
 			}
-			count += int64(res.Count)
+			count += res.Count
 			return nil
 		})
 		if err != nil {

@@ -1,12 +1,12 @@
 package dynamo
 
 import (
+	"context"
 	"errors"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/cenkalti/backoff/v4"
-	"golang.org/x/net/context"
 )
 
 // RetryTimeout defines the maximum amount of time that requests will

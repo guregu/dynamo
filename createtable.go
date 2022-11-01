@@ -1,6 +1,7 @@
 package dynamo
 
 import (
+	"context"
 	"encoding"
 	"fmt"
 	"reflect"
@@ -10,7 +11,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	"golang.org/x/net/context"
 
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 

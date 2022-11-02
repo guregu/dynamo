@@ -5,11 +5,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/aws/smithy-go/time"
-
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/aws/smithy-go/time"
 	"github.com/cenkalti/backoff/v4"
 )
 

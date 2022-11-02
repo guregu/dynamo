@@ -11,7 +11,7 @@ require (
 	github.com/gofrs/uuid v3.2.0+incompatible
 	github.com/google/go-cmp v0.5.6
 	github.com/niltonkummer/dynamo v1.12.0
-	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
+	golang.org/x/net v0.1.0 // indirect
 )
 
 go 1.13

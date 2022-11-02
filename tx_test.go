@@ -7,9 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gofrs/uuid"
-
 	"github.com/aws/smithy-go"
+	"github.com/gofrs/uuid"
 )
 
 func TestTx(t *testing.T) {

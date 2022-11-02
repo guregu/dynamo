@@ -4,9 +4,8 @@ import (
 	"context"
 	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 // Scan is a request to scan all the data in a table.

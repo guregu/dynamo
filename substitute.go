@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-
 	"github.com/guregu/dynamo/internal/exprs"
 )
 

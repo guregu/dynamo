@@ -3,10 +3,9 @@ package dynamo
 import (
 	"context"
 
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 // UpdateTTL is a request to enable or disable a table's time to live functionality.

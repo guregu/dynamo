@@ -62,7 +62,7 @@ func TestTableLifecycle(t *testing.T) {
 				RangeKeyType:      NumberType,
 				Throughput:        Throughput{Read: 1, Write: 1},
 				ProjectionType:    AllProjection,
-				ProjectionAttribs: []string{},
+				ProjectionAttribs: []string(nil),
 			},
 			{
 				Name: "Seq-ID-index",
@@ -74,7 +74,7 @@ func TestTableLifecycle(t *testing.T) {
 				RangeKeyType:      StringType,
 				Throughput:        Throughput{Read: 1, Write: 1},
 				ProjectionType:    AllProjection,
-				ProjectionAttribs: []string{},
+				ProjectionAttribs: []string(nil),
 			},
 			{
 				Name: "UUID-index",
@@ -84,7 +84,7 @@ func TestTableLifecycle(t *testing.T) {
 				HashKeyType:       StringType,
 				Throughput:        Throughput{Read: 1, Write: 1},
 				ProjectionType:    AllProjection,
-				ProjectionAttribs: []string{},
+				ProjectionAttribs: []string(nil),
 			},
 		},
 		LSI: []Index{
@@ -100,7 +100,7 @@ func TestTableLifecycle(t *testing.T) {
 				RangeKeyType:      NumberType,
 				Throughput:        Throughput{Read: 1, Write: 1},
 				ProjectionType:    AllProjection,
-				ProjectionAttribs: []string{},
+				ProjectionAttribs: []string(nil),
 			},
 		},
 	}

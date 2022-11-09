@@ -10,7 +10,6 @@ require (
 	github.com/cenkalti/backoff/v4 v4.1.2
 	github.com/gofrs/uuid v3.2.0+incompatible
 	github.com/google/go-cmp v0.5.6
-	github.com/niltonkummer/dynamo v1.12.0
 	golang.org/x/net v0.1.0 // indirect
 )
 

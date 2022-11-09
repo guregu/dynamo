@@ -1,8 +1,8 @@
 package dynamo
 
 import (
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 // ConditionCheck represents a condition for a write transaction to succeed.
@@ -10,9 +10,9 @@ import (
 type ConditionCheck struct {
 	table      Table
 	hashKey    string
-	hashValue  *dynamodb.AttributeValue
+	hashValue  types.AttributeValue
 	rangeKey   string
-	rangeValue *dynamodb.AttributeValue
+	rangeValue types.AttributeValue
 
 	condition string
 	subber
@@ -66,11 +66,11 @@ func (check *ConditionCheck) IfNotExists() *ConditionCheck {
 	return check.If("attribute_not_exists($)", check.hashKey)
 }
 
-func (check *ConditionCheck) writeTxItem() (*dynamodb.TransactWriteItem, error) {
+func (check *ConditionCheck) writeTxItem() (*types.TransactWriteItem, error) {
 	if check.err != nil {
 		return nil, check.err
 	}
-	item := &dynamodb.ConditionCheck{
+	item := &types.ConditionCheck{
 		TableName:                 aws.String(check.table.name),
 		Key:                       check.keys(),
 		ExpressionAttributeNames:  check.nameExpr,
@@ -79,13 +79,13 @@ func (check *ConditionCheck) writeTxItem() (*dynamodb.TransactWriteItem, error) 
 	if check.condition != "" {
 		item.ConditionExpression = aws.String(check.condition)
 	}
-	return &dynamodb.TransactWriteItem{
+	return &types.TransactWriteItem{
 		ConditionCheck: item,
 	}, nil
 }
 
-func (check *ConditionCheck) keys() map[string]*dynamodb.AttributeValue {
-	keys := map[string]*dynamodb.AttributeValue{check.hashKey: check.hashValue}
+func (check *ConditionCheck) keys() map[string]types.AttributeValue {
+	keys := map[string]types.AttributeValue{check.hashKey: check.hashValue}
 	if check.rangeKey != "" {
 		keys[check.rangeKey] = check.rangeValue
 	}

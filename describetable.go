@@ -1,10 +1,11 @@
 package dynamo
 
 import (
+	"context"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 // Description contains information about a table.
@@ -89,7 +90,7 @@ type Index struct {
 	ProjectionAttribs []string
 }
 
-func newDescription(table *dynamodb.TableDescription) Description {
+func newDescription(table *types.TableDescription) Description {
 	desc := Description{
 		Name: *table.TableName,
 	}
@@ -97,8 +98,8 @@ func newDescription(table *dynamodb.TableDescription) Description {
 	if table.TableArn != nil {
 		desc.ARN = *table.TableArn
 	}
-	if table.TableStatus != nil {
-		desc.Status = Status(*table.TableStatus)
+	if table.TableStatus != "" {
+		desc.Status = Status(table.TableStatus)
 	}
 	if table.CreationDateTime != nil {
 		desc.Created = *table.CreationDateTime
@@ -108,31 +109,31 @@ func newDescription(table *dynamodb.TableDescription) Description {
 	desc.HashKeyType = lookupADType(table.AttributeDefinitions, desc.HashKey)
 	desc.RangeKeyType = lookupADType(table.AttributeDefinitions, desc.RangeKey)
 
-	if table.BillingModeSummary != nil && table.BillingModeSummary.BillingMode != nil {
-		desc.OnDemand = *table.BillingModeSummary.BillingMode == dynamodb.BillingModePayPerRequest
+	if table.BillingModeSummary != nil && table.BillingModeSummary.BillingMode != "" {
+		desc.OnDemand = table.BillingModeSummary.BillingMode == types.BillingModePayPerRequest
 	}
 
 	if table.ProvisionedThroughput != nil {
 		desc.Throughput = newThroughput(table.ProvisionedThroughput)
 	}
 
-	if table.ItemCount != nil {
-		desc.Items = *table.ItemCount
+	if table.ItemCount != 0 {
+		desc.Items = table.ItemCount
 	}
-	if table.TableSizeBytes != nil {
-		desc.Size = *table.TableSizeBytes
+	if table.TableSizeBytes != 0 {
+		desc.Size = table.TableSizeBytes
 	}
 
 	for _, index := range table.GlobalSecondaryIndexes {
 		idx := Index{
 			Name:       *index.IndexName,
 			ARN:        *index.IndexArn,
-			Status:     Status(*index.IndexStatus),
+			Status:     Status(index.IndexStatus),
 			Throughput: newThroughput(index.ProvisionedThroughput),
 		}
-		if index.Projection != nil && index.Projection.ProjectionType != nil {
-			idx.ProjectionType = IndexProjection(*index.Projection.ProjectionType)
-			idx.ProjectionAttribs = aws.StringValueSlice(index.Projection.NonKeyAttributes)
+		if index.Projection != nil && index.Projection.ProjectionType != "" {
+			idx.ProjectionType = IndexProjection(index.Projection.ProjectionType)
+			idx.ProjectionAttribs = index.Projection.NonKeyAttributes
 		}
 		if index.Backfilling != nil {
 			idx.Backfilling = *index.Backfilling
@@ -140,11 +141,11 @@ func newDescription(table *dynamodb.TableDescription) Description {
 		idx.HashKey, idx.RangeKey = schemaKeys(index.KeySchema)
 		idx.HashKeyType = lookupADType(table.AttributeDefinitions, idx.HashKey)
 		idx.RangeKeyType = lookupADType(table.AttributeDefinitions, idx.RangeKey)
-		if index.ItemCount != nil {
-			idx.Items = *index.ItemCount
+		if index.ItemCount != 0 {
+			idx.Items = index.ItemCount
 		}
-		if index.IndexSizeBytes != nil {
-			idx.Size = *index.IndexSizeBytes
+		if index.IndexSizeBytes != 0 {
+			idx.Size = index.IndexSizeBytes
 		}
 		desc.GSI = append(desc.GSI, idx)
 	}
@@ -156,18 +157,18 @@ func newDescription(table *dynamodb.TableDescription) Description {
 			Local:      true,
 			Throughput: desc.Throughput, // has the same throughput as the table
 		}
-		if index.Projection != nil && index.Projection.ProjectionType != nil {
-			idx.ProjectionType = IndexProjection(*index.Projection.ProjectionType)
-			idx.ProjectionAttribs = aws.StringValueSlice(index.Projection.NonKeyAttributes)
+		if index.Projection != nil && index.Projection.ProjectionType != "" {
+			idx.ProjectionType = IndexProjection(index.Projection.ProjectionType)
+			idx.ProjectionAttribs = index.Projection.NonKeyAttributes
 		}
 		idx.HashKey, idx.RangeKey = schemaKeys(index.KeySchema)
 		idx.HashKeyType = lookupADType(table.AttributeDefinitions, idx.HashKey)
 		idx.RangeKeyType = lookupADType(table.AttributeDefinitions, idx.RangeKey)
-		if index.ItemCount != nil {
-			idx.Items = *index.ItemCount
+		if index.ItemCount != 0 {
+			idx.Items = index.ItemCount
 		}
-		if index.IndexSizeBytes != nil {
-			idx.Size = *index.IndexSizeBytes
+		if index.IndexSizeBytes != 0 {
+			idx.Size = index.IndexSizeBytes
 		}
 		desc.LSI = append(desc.LSI, idx)
 	}
@@ -176,8 +177,8 @@ func newDescription(table *dynamodb.TableDescription) Description {
 		if table.StreamSpecification.StreamEnabled != nil {
 			desc.StreamEnabled = *table.StreamSpecification.StreamEnabled
 		}
-		if table.StreamSpecification.StreamViewType != nil {
-			desc.StreamView = StreamView(*table.StreamSpecification.StreamViewType)
+		if table.StreamSpecification.StreamViewType != "" {
+			desc.StreamView = StreamView(table.StreamSpecification.StreamViewType)
 		}
 	}
 	if table.LatestStreamArn != nil {
@@ -195,11 +196,11 @@ func newDescription(table *dynamodb.TableDescription) Description {
 		if table.SSEDescription.KMSMasterKeyArn != nil {
 			sseDesc.KMSMasterKeyArn = *table.SSEDescription.KMSMasterKeyArn
 		}
-		if table.SSEDescription.SSEType != nil {
-			sseDesc.SSEType = lookupSSEType(*table.SSEDescription.SSEType)
+		if table.SSEDescription.SSEType != "" {
+			sseDesc.SSEType = table.SSEDescription.SSEType
 		}
-		if table.SSEDescription.Status != nil {
-			sseDesc.Status = *table.SSEDescription.Status
+		if table.SSEDescription.Status != "" {
+			sseDesc.Status = table.SSEDescription.Status
 		}
 		desc.SSEDescription = sseDesc
 	}
@@ -255,13 +256,13 @@ func (dt *DescribeTable) Run() (Description, error) {
 	return dt.RunWithContext(ctx)
 }
 
-func (dt *DescribeTable) RunWithContext(ctx aws.Context) (Description, error) {
+func (dt *DescribeTable) RunWithContext(ctx context.Context) (Description, error) {
 	input := dt.input()
 
 	var result *dynamodb.DescribeTableOutput
 	err := retry(ctx, func() error {
 		var err error
-		result, err = dt.table.db.client.DescribeTableWithContext(ctx, input)
+		result, err = dt.table.db.client.DescribeTable(ctx, input)
 		return err
 	})
 	if err != nil {
@@ -280,7 +281,7 @@ func (dt *DescribeTable) input() *dynamodb.DescribeTableInput {
 	}
 }
 
-func newThroughput(td *dynamodb.ProvisionedThroughputDescription) Throughput {
+func newThroughput(td *types.ProvisionedThroughputDescription) Throughput {
 	if td == nil {
 		return Throughput{}
 	}
@@ -301,25 +302,25 @@ func newThroughput(td *dynamodb.ProvisionedThroughputDescription) Throughput {
 	return thru
 }
 
-func schemaKeys(schema []*dynamodb.KeySchemaElement) (hashKey, rangeKey string) {
+func schemaKeys(schema []types.KeySchemaElement) (hashKey, rangeKey string) {
 	for _, ks := range schema {
-		switch *ks.KeyType {
-		case dynamodb.KeyTypeHash:
+		switch ks.KeyType {
+		case types.KeyTypeHash:
 			hashKey = *ks.AttributeName
-		case dynamodb.KeyTypeRange:
+		case types.KeyTypeRange:
 			rangeKey = *ks.AttributeName
 		}
 	}
 	return
 }
 
-func lookupADType(ads []*dynamodb.AttributeDefinition, name string) KeyType {
+func lookupADType(ads []types.AttributeDefinition, name string) KeyType {
 	if name == "" {
 		return ""
 	}
 	for _, ad := range ads {
 		if *ad.AttributeName == name {
-			return KeyType(*ad.AttributeType)
+			return KeyType(ad.AttributeType)
 		}
 	}
 	return ""

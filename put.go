@@ -1,8 +1,10 @@
 package dynamo
 
 import (
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"context"
+
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 // Put is a request to create or replace an item.
@@ -11,7 +13,7 @@ type Put struct {
 	table      Table
 	returnType string
 
-	item map[string]*dynamodb.AttributeValue
+	item map[string]types.AttributeValue
 	subber
 	condition string
 
@@ -58,7 +60,7 @@ func (p *Put) Run() error {
 }
 
 // Run executes this put.
-func (p *Put) RunWithContext(ctx aws.Context) error {
+func (p *Put) RunWithContext(ctx context.Context) error {
 	p.returnType = "NONE"
 	_, err := p.run(ctx)
 	return err
@@ -74,7 +76,7 @@ func (p *Put) OldValue(out interface{}) error {
 
 // OldValueWithContext executes this put, unmarshaling the previous value into out.
 // Returns ErrNotFound is there was no previous value.
-func (p *Put) OldValueWithContext(ctx aws.Context, out interface{}) error {
+func (p *Put) OldValueWithContext(ctx context.Context, out interface{}) error {
 	p.returnType = "ALL_OLD"
 	output, err := p.run(ctx)
 	switch {
@@ -86,14 +88,14 @@ func (p *Put) OldValueWithContext(ctx aws.Context, out interface{}) error {
 	return unmarshalItem(output.Attributes, out)
 }
 
-func (p *Put) run(ctx aws.Context) (output *dynamodb.PutItemOutput, err error) {
+func (p *Put) run(ctx context.Context) (output *dynamodb.PutItemOutput, err error) {
 	if p.err != nil {
 		return nil, p.err
 	}
 
 	req := p.input()
 	retry(ctx, func() error {
-		output, err = p.table.db.client.PutItemWithContext(ctx, req)
+		output, err = p.table.db.client.PutItem(ctx, req)
 		return err
 	})
 	if p.cc != nil {
@@ -106,7 +108,7 @@ func (p *Put) input() *dynamodb.PutItemInput {
 	input := &dynamodb.PutItemInput{
 		TableName:                 &p.table.name,
 		Item:                      p.item,
-		ReturnValues:              &p.returnType,
+		ReturnValues:              types.ReturnValue(p.returnType),
 		ExpressionAttributeNames:  p.nameExpr,
 		ExpressionAttributeValues: p.valueExpr,
 	}
@@ -114,18 +116,18 @@ func (p *Put) input() *dynamodb.PutItemInput {
 		input.ConditionExpression = &p.condition
 	}
 	if p.cc != nil {
-		input.ReturnConsumedCapacity = aws.String(dynamodb.ReturnConsumedCapacityIndexes)
+		input.ReturnConsumedCapacity = types.ReturnConsumedCapacityIndexes
 	}
 	return input
 }
 
-func (p *Put) writeTxItem() (*dynamodb.TransactWriteItem, error) {
+func (p *Put) writeTxItem() (*types.TransactWriteItem, error) {
 	if p.err != nil {
 		return nil, p.err
 	}
 	input := p.input()
-	item := &dynamodb.TransactWriteItem{
-		Put: &dynamodb.Put{
+	item := &types.TransactWriteItem{
+		Put: &types.Put{
 			TableName:                 input.TableName,
 			Item:                      input.Item,
 			ExpressionAttributeNames:  input.ExpressionAttributeNames,

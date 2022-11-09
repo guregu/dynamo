@@ -1,24 +1,27 @@
 package dynamo
 
 import (
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
 var itemDecodeOnlyTests = []struct {
 	name   string
-	given  map[string]*dynamodb.AttributeValue
+	given  map[string]types.AttributeValue
 	expect interface{}
 }{
 	{
 		// unexported embedded pointers should be ignored
 		name: "embedded unexported pointer",
-		given: map[string]*dynamodb.AttributeValue{
-			"Embedded": {BOOL: aws.Bool(true)},
+		given: map[string]types.AttributeValue{
+			"Embedded": &types.AttributeValueMemberBOOL{Value: true},
 		},
 		expect: struct {
 			*embedded
@@ -27,8 +30,8 @@ var itemDecodeOnlyTests = []struct {
 	{
 		// unexported fields should be ignored
 		name: "unexported fields",
-		given: map[string]*dynamodb.AttributeValue{
-			"a": {BOOL: aws.Bool(true)},
+		given: map[string]types.AttributeValue{
+			"a": &types.AttributeValueMemberBOOL{Value: true},
 		},
 		expect: struct {
 			a bool
@@ -37,8 +40,8 @@ var itemDecodeOnlyTests = []struct {
 	{
 		// embedded pointers shouldn't clobber existing fields
 		name: "exported pointer embedded struct clobber",
-		given: map[string]*dynamodb.AttributeValue{
-			"Embedded": {S: aws.String("OK")},
+		given: map[string]types.AttributeValue{
+			"Embedded": &types.AttributeValueMemberS{Value: "OK"},
 		},
 		expect: struct {
 			Embedded string
@@ -76,11 +79,11 @@ func TestUnmarshalAppend(t *testing.T) {
 	page := "5"
 	limit := "20"
 	null := true
-	item := map[string]*dynamodb.AttributeValue{
-		"UserID": {N: &id},
-		"Page":   {N: &page},
-		"Limit":  {N: &limit},
-		"Null":   {NULL: &null},
+	item := map[string]types.AttributeValue{
+		"UserID": &types.AttributeValueMemberN{Value: id},
+		"Page":   &types.AttributeValueMemberN{Value: page},
+		"Limit":  &types.AttributeValueMemberN{Value: limit},
+		"Null":   &types.AttributeValueMemberNULL{Value: null},
 	}
 
 	for range [15]struct{}{} {
@@ -112,20 +115,6 @@ func TestUnmarshalAppend(t *testing.T) {
 	}
 }
 
-func TestUnmarshal(t *testing.T) {
-	for _, tc := range encodingTests {
-		rv := reflect.New(reflect.TypeOf(tc.in))
-		err := unmarshalReflect(tc.out, rv.Elem())
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", tc.name, err)
-		}
-
-		if !reflect.DeepEqual(rv.Elem().Interface(), tc.in) {
-			t.Errorf("%s: bad result: %#v ≠ %#v", tc.name, rv.Elem().Interface(), tc.out)
-		}
-	}
-}
-
 func TestUnmarshalItem(t *testing.T) {
 	for _, tc := range itemEncodingTests {
 		rv := reflect.New(reflect.TypeOf(tc.in))
@@ -135,54 +124,19 @@ func TestUnmarshalItem(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(rv.Elem().Interface(), tc.in) {
-			t.Errorf("%s: bad result: %#v ≠ %#v", tc.name, rv.Elem().Interface(), tc.in)
+			var opts []cmp.Option
+			if rv.Elem().Kind() == reflect.Struct {
+				opts = append(opts, cmpopts.IgnoreUnexported(rv.Elem().Interface()))
+			}
+
+			diff := cmp.Diff(rv.Elem().Interface(), tc.in, opts...)
+			fmt.Println(diff)
+
+			if strings.TrimSpace(diff) != "" {
+				t.Errorf("%s: bad result: %#v ≠ %#v", tc.name, rv.Elem().Interface(), tc.in)
+			}
 		}
-	}
-}
 
-func TestUnmarshalNULL(t *testing.T) {
-	tru := true
-	arbitrary := "hello world"
-	double := new(*int)
-	item := map[string]*dynamodb.AttributeValue{
-		"String":    {NULL: &tru},
-		"Slice":     {NULL: &tru},
-		"Array":     {NULL: &tru},
-		"StringPtr": {NULL: &tru},
-		"DoublePtr": {NULL: &tru},
-		"Map":       {NULL: &tru},
-		"Interface": {NULL: &tru},
-	}
-
-	type resultType struct {
-		String    string
-		Slice     []string
-		Array     [2]byte
-		StringPtr *string
-		DoublePtr **int
-		Map       map[string]int
-		Interface interface{}
-	}
-
-	// dirty result, we want this to be reset
-	result := resultType{
-		String:    "ABC",
-		Slice:     []string{"A", "B"},
-		Array:     [2]byte{'A', 'B'},
-		StringPtr: &arbitrary,
-		DoublePtr: double,
-		Map: map[string]int{
-			"A": 1,
-		},
-		Interface: "interface{}",
-	}
-
-	if err := UnmarshalItem(item, &result); err != nil {
-		t.Error(err)
-	}
-
-	if (!reflect.DeepEqual(result, resultType{})) {
-		t.Error("unmarshal null: bad result:", result, "≠", resultType{})
 	}
 }
 
@@ -215,8 +169,8 @@ func TestUnmarshalMissing(t *testing.T) {
 		},
 	}
 
-	replace := map[string]*dynamodb.AttributeValue{
-		"UserID": {N: aws.String("112")},
+	replace := map[string]types.AttributeValue{
+		"UserID": &types.AttributeValueMemberN{Value: "112"},
 	}
 
 	if err := UnmarshalItem(replace, &w); err != nil {
@@ -227,11 +181,13 @@ func TestUnmarshalMissing(t *testing.T) {
 		t.Error("bad unmarshal missing. want:", want, "got:", w)
 	}
 
-	replace2 := map[string]*dynamodb.AttributeValue{
-		"UserID": {N: aws.String("113")},
-		"Foo": {M: map[string]*dynamodb.AttributeValue{
-			"Bar": {N: aws.String("1338")},
-		}},
+	replace2 := map[string]types.AttributeValue{
+		"UserID": &types.AttributeValueMemberN{Value: "113"},
+		"Foo": &types.AttributeValueMemberM{
+			Value: map[string]types.AttributeValue{
+				"Bar": &types.AttributeValueMemberN{Value: "1338"},
+			},
+		},
 	}
 
 	want = widget2{

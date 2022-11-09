@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 const (
@@ -21,51 +21,55 @@ var (
 	maxUintStr = strconv.FormatUint(uint64(maxUint), 10)
 )
 
+func init() {
+	time.Local = time.UTC
+}
+
 type customString string
 type customEmpty struct{}
 
 var encodingTests = []struct {
 	name string
 	in   interface{}
-	out  *dynamodb.AttributeValue
+	out  types.AttributeValue
 }{
 	{
 		name: "strings",
 		in:   "hello",
-		out:  &dynamodb.AttributeValue{S: aws.String("hello")},
+		out:  &types.AttributeValueMemberS{Value: "hello"},
 	},
 	{
 		name: "bools",
 		in:   true,
-		out:  &dynamodb.AttributeValue{BOOL: aws.Bool(true)},
+		out:  &types.AttributeValueMemberBOOL{Value: true},
 	},
 	{
 		name: "ints",
 		in:   123,
-		out:  &dynamodb.AttributeValue{N: aws.String("123")},
+		out:  &types.AttributeValueMemberN{Value: "123"},
 	},
 	{
 		name: "uints",
 		in:   uint(123),
-		out:  &dynamodb.AttributeValue{N: aws.String("123")},
+		out:  &types.AttributeValueMemberN{Value: "123"},
 	},
 	{
 		name: "floats",
 		in:   1.2,
-		out:  &dynamodb.AttributeValue{N: aws.String("1.2")},
+		out:  &types.AttributeValueMemberN{Value: "1.2"},
 	},
 	{
 		name: "pointer (int)",
 		in:   new(int),
-		out:  &dynamodb.AttributeValue{N: aws.String("0")},
+		out:  &types.AttributeValueMemberN{Value: "0"},
 	},
 	{
 		name: "maps",
 		in: map[string]bool{
 			"OK": true,
 		},
-		out: &dynamodb.AttributeValue{M: map[string]*dynamodb.AttributeValue{
-			"OK": {BOOL: aws.Bool(true)},
+		out: &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
+			"OK": &types.AttributeValueMemberBOOL{Value: true},
 		}},
 	},
 	{
@@ -76,8 +80,8 @@ var encodingTests = []struct {
 		}{
 			Empty: map[string]bool{},
 		},
-		out: &dynamodb.AttributeValue{M: map[string]*dynamodb.AttributeValue{
-			"Empty": {M: map[string]*dynamodb.AttributeValue{}},
+		out: &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
+			"Empty": &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{}},
 		}},
 	},
 	{
@@ -87,9 +91,9 @@ var encodingTests = []struct {
 		}{
 			M1: map[textMarshaler]bool{textMarshaler(true): true},
 		},
-		out: &dynamodb.AttributeValue{M: map[string]*dynamodb.AttributeValue{
-			"M1": {M: map[string]*dynamodb.AttributeValue{
-				"true": {BOOL: aws.Bool(true)},
+		out: &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
+			"M1": &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
+				"true": &types.AttributeValueMemberBOOL{Value: true},
 			}},
 		}},
 	},
@@ -98,147 +102,147 @@ var encodingTests = []struct {
 		in: struct {
 			OK bool
 		}{OK: true},
-		out: &dynamodb.AttributeValue{M: map[string]*dynamodb.AttributeValue{
-			"OK": {BOOL: aws.Bool(true)},
+		out: &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
+			"OK": &types.AttributeValueMemberBOOL{Value: true},
 		}},
 	},
 	{
 		name: "[]byte",
 		in:   []byte{'O', 'K'},
-		out:  &dynamodb.AttributeValue{B: []byte{'O', 'K'}},
+		out:  &types.AttributeValueMemberB{Value: []byte{'O', 'K'}},
 	},
 	{
 		name: "slice",
 		in:   []int{1, 2, 3},
-		out: &dynamodb.AttributeValue{L: []*dynamodb.AttributeValue{
-			{N: aws.String("1")},
-			{N: aws.String("2")},
-			{N: aws.String("3")},
+		out: &types.AttributeValueMemberL{Value: []types.AttributeValue{
+			&types.AttributeValueMemberN{Value: "1"},
+			&types.AttributeValueMemberN{Value: "2"},
+			&types.AttributeValueMemberN{Value: "3"},
 		}},
 	},
 	{
 		name: "array",
 		in:   [3]int{1, 2, 3},
-		out: &dynamodb.AttributeValue{L: []*dynamodb.AttributeValue{
-			{N: aws.String("1")},
-			{N: aws.String("2")},
-			{N: aws.String("3")},
+		out: &types.AttributeValueMemberL{Value: []types.AttributeValue{
+			&types.AttributeValueMemberN{Value: "1"},
+			&types.AttributeValueMemberN{Value: "2"},
+			&types.AttributeValueMemberN{Value: "3"},
 		}},
 	},
 	{
 		name: "byte array",
 		in:   [4]byte{'a', 'b', 'c', 'd'},
-		out:  &dynamodb.AttributeValue{B: []byte{'a', 'b', 'c', 'd'}},
+		out:  &types.AttributeValueMemberB{Value: []byte{'a', 'b', 'c', 'd'}},
 	},
 	{
 		name: "dynamo.Marshaler",
 		in:   customMarshaler(1),
-		out:  &dynamodb.AttributeValue{BOOL: aws.Bool(true)},
+		out:  &types.AttributeValueMemberBOOL{Value: true},
 	},
 	{
 		name: "encoding.TextMarshaler",
 		in:   textMarshaler(true),
-		out:  &dynamodb.AttributeValue{S: aws.String("true")},
+		out:  &types.AttributeValueMemberS{Value: "true"},
 	},
 	{
 		name: "dynamodb.AttributeValue",
-		in: &dynamodb.AttributeValue{L: []*dynamodb.AttributeValue{
-			{N: aws.String("1")},
-			{N: aws.String("2")},
-			{N: aws.String("3")},
+		in: &types.AttributeValueMemberL{Value: []types.AttributeValue{
+			&types.AttributeValueMemberN{Value: "1"},
+			&types.AttributeValueMemberN{Value: "2"},
+			&types.AttributeValueMemberN{Value: "3"},
 		}},
-		out: &dynamodb.AttributeValue{L: []*dynamodb.AttributeValue{
-			{N: aws.String("1")},
-			{N: aws.String("2")},
-			{N: aws.String("3")},
+		out: &types.AttributeValueMemberL{Value: []types.AttributeValue{
+			&types.AttributeValueMemberN{Value: "1"},
+			&types.AttributeValueMemberN{Value: "2"},
+			&types.AttributeValueMemberN{Value: "3"},
 		}},
 	},
 	{
 		name: "slice with nil",
 		in:   []*int64{nil, aws.Int64(0), nil, aws.Int64(1337), nil},
-		out: &dynamodb.AttributeValue{L: []*dynamodb.AttributeValue{
-			{NULL: aws.Bool(true)},
-			{N: aws.String("0")},
-			{NULL: aws.Bool(true)},
-			{N: aws.String("1337")},
-			{NULL: aws.Bool(true)},
+		out: &types.AttributeValueMemberL{Value: []types.AttributeValue{
+			&types.AttributeValueMemberNULL{Value: true},
+			&types.AttributeValueMemberN{Value: "0"},
+			&types.AttributeValueMemberNULL{Value: true},
+			&types.AttributeValueMemberN{Value: "1337"},
+			&types.AttributeValueMemberNULL{Value: true},
 		}},
 	},
 	{
 		name: "array with nil",
 		in:   [...]*int64{nil, aws.Int64(0), nil, aws.Int64(1337), nil},
-		out: &dynamodb.AttributeValue{L: []*dynamodb.AttributeValue{
-			{NULL: aws.Bool(true)},
-			{N: aws.String("0")},
-			{NULL: aws.Bool(true)},
-			{N: aws.String("1337")},
-			{NULL: aws.Bool(true)},
+		out: &types.AttributeValueMemberL{Value: []types.AttributeValue{
+			&types.AttributeValueMemberNULL{Value: true},
+			&types.AttributeValueMemberN{Value: "0"},
+			&types.AttributeValueMemberNULL{Value: true},
+			&types.AttributeValueMemberN{Value: "1337"},
+			&types.AttributeValueMemberNULL{Value: true},
 		}},
 	},
 	{
 		name: "slice with empty string",
 		in:   []string{"", "hello", "", "world", ""},
-		out: &dynamodb.AttributeValue{L: []*dynamodb.AttributeValue{
-			{S: aws.String("")},
-			{S: aws.String("hello")},
-			{S: aws.String("")},
-			{S: aws.String("world")},
-			{S: aws.String("")},
+		out: &types.AttributeValueMemberL{Value: []types.AttributeValue{
+			&types.AttributeValueMemberS{Value: ""},
+			&types.AttributeValueMemberS{Value: "hello"},
+			&types.AttributeValueMemberS{Value: ""},
+			&types.AttributeValueMemberS{Value: "world"},
+			&types.AttributeValueMemberS{Value: ""},
 		}},
 	},
 	{
 		name: "array with empty string",
 		in:   [...]string{"", "hello", "", "world", ""},
-		out: &dynamodb.AttributeValue{L: []*dynamodb.AttributeValue{
-			{S: aws.String("")},
-			{S: aws.String("hello")},
-			{S: aws.String("")},
-			{S: aws.String("world")},
-			{S: aws.String("")},
+		out: &types.AttributeValueMemberL{Value: []types.AttributeValue{
+			&types.AttributeValueMemberS{Value: ""},
+			&types.AttributeValueMemberS{Value: "hello"},
+			&types.AttributeValueMemberS{Value: ""},
+			&types.AttributeValueMemberS{Value: "world"},
+			&types.AttributeValueMemberS{Value: ""},
 		}},
 	},
 	{
 		name: "slice of string pointers",
 		in:   []*string{nil, aws.String("hello"), aws.String(""), aws.String("world"), nil},
-		out: &dynamodb.AttributeValue{L: []*dynamodb.AttributeValue{
-			{NULL: aws.Bool(true)},
-			{S: aws.String("hello")},
-			{S: aws.String("")},
-			{S: aws.String("world")},
-			{NULL: aws.Bool(true)},
+		out: &types.AttributeValueMemberL{Value: []types.AttributeValue{
+			&types.AttributeValueMemberNULL{Value: true},
+			&types.AttributeValueMemberS{Value: "hello"},
+			&types.AttributeValueMemberS{Value: ""},
+			&types.AttributeValueMemberS{Value: "world"},
+			&types.AttributeValueMemberNULL{Value: true},
 		}},
 	},
 	{
 		name: "slice with empty binary",
 		in:   [][]byte{{}, []byte("hello"), {}, []byte("world"), {}},
-		out: &dynamodb.AttributeValue{L: []*dynamodb.AttributeValue{
-			{B: []byte{}},
-			{B: []byte{'h', 'e', 'l', 'l', 'o'}},
-			{B: []byte{}},
-			{B: []byte{'w', 'o', 'r', 'l', 'd'}},
-			{B: []byte{}},
+		out: &types.AttributeValueMemberL{Value: []types.AttributeValue{
+			&types.AttributeValueMemberB{Value: []byte{}},
+			&types.AttributeValueMemberB{Value: []byte{'h', 'e', 'l', 'l', 'o'}},
+			&types.AttributeValueMemberB{Value: []byte{}},
+			&types.AttributeValueMemberB{Value: []byte{'w', 'o', 'r', 'l', 'd'}},
+			&types.AttributeValueMemberB{Value: []byte{}},
 		}},
 	},
 	{
 		name: "array with empty binary",
 		in:   [...][]byte{{}, []byte("hello"), {}, []byte("world"), {}},
-		out: &dynamodb.AttributeValue{L: []*dynamodb.AttributeValue{
-			{B: []byte{}},
-			{B: []byte{'h', 'e', 'l', 'l', 'o'}},
-			{B: []byte{}},
-			{B: []byte{'w', 'o', 'r', 'l', 'd'}},
-			{B: []byte{}},
+		out: &types.AttributeValueMemberL{Value: []types.AttributeValue{
+			&types.AttributeValueMemberB{Value: []byte{}},
+			&types.AttributeValueMemberB{Value: []byte{'h', 'e', 'l', 'l', 'o'}},
+			&types.AttributeValueMemberB{Value: []byte{}},
+			&types.AttributeValueMemberB{Value: []byte{'w', 'o', 'r', 'l', 'd'}},
+			&types.AttributeValueMemberB{Value: []byte{}},
 		}},
 	},
 	{
 		name: "array with empty binary ptrs",
 		in:   [...]*[]byte{byteSlicePtr([]byte{}), byteSlicePtr([]byte("hello")), nil, byteSlicePtr([]byte("world")), byteSlicePtr([]byte{})},
-		out: &dynamodb.AttributeValue{L: []*dynamodb.AttributeValue{
-			{B: []byte{}},
-			{B: []byte{'h', 'e', 'l', 'l', 'o'}},
-			{NULL: aws.Bool(true)},
-			{B: []byte{'w', 'o', 'r', 'l', 'd'}},
-			{B: []byte{}},
+		out: &types.AttributeValueMemberL{Value: []types.AttributeValue{
+			&types.AttributeValueMemberB{Value: []byte{}},
+			&types.AttributeValueMemberB{Value: []byte{'h', 'e', 'l', 'l', 'o'}},
+			&types.AttributeValueMemberNULL{Value: true},
+			&types.AttributeValueMemberB{Value: []byte{'w', 'o', 'r', 'l', 'd'}},
+			&types.AttributeValueMemberB{Value: []byte{}},
 		}},
 	},
 }
@@ -246,7 +250,7 @@ var encodingTests = []struct {
 var itemEncodingTests = []struct {
 	name string
 	in   interface{}
-	out  map[string]*dynamodb.AttributeValue
+	out  map[string]types.AttributeValue
 }{
 	{
 		name: "strings",
@@ -255,8 +259,8 @@ var itemEncodingTests = []struct {
 		}{
 			A: "hello",
 		},
-		out: map[string]*dynamodb.AttributeValue{
-			"A": {S: aws.String("hello")},
+		out: map[string]types.AttributeValue{
+			"A": &types.AttributeValueMemberS{Value: "hello"},
 		},
 	},
 	{
@@ -266,8 +270,8 @@ var itemEncodingTests = []struct {
 		}{
 			A: "hello",
 		},
-		out: map[string]*dynamodb.AttributeValue{
-			"A": {S: aws.String("hello")},
+		out: map[string]types.AttributeValue{
+			"A": &types.AttributeValueMemberS{Value: "hello"},
 		},
 	},
 	{
@@ -277,8 +281,8 @@ var itemEncodingTests = []struct {
 		}{
 			A: new(textMarshaler),
 		},
-		out: map[string]*dynamodb.AttributeValue{
-			"A": {S: aws.String("false")},
+		out: map[string]types.AttributeValue{
+			"A": &types.AttributeValueMemberS{Value: "false"},
 		},
 	},
 	{
@@ -288,8 +292,8 @@ var itemEncodingTests = []struct {
 		}{
 			A: "hello",
 		},
-		out: map[string]*dynamodb.AttributeValue{
-			"renamed": {S: aws.String("hello")},
+		out: map[string]types.AttributeValue{
+			"renamed": &types.AttributeValueMemberS{Value: "hello"},
 		},
 	},
 	{
@@ -301,8 +305,8 @@ var itemEncodingTests = []struct {
 			A:     "",
 			Other: true,
 		},
-		out: map[string]*dynamodb.AttributeValue{
-			"Other": {BOOL: aws.Bool(true)},
+		out: map[string]types.AttributeValue{
+			"Other": &types.AttributeValueMemberBOOL{Value: true},
 		},
 	},
 	{
@@ -316,8 +320,8 @@ var itemEncodingTests = []struct {
 		}{
 			Other: true,
 		},
-		out: map[string]*dynamodb.AttributeValue{
-			"Other": {BOOL: aws.Bool(true)},
+		out: map[string]types.AttributeValue{
+			"Other": &types.AttributeValueMemberBOOL{Value: true},
 		},
 	},
 	{
@@ -334,14 +338,14 @@ var itemEncodingTests = []struct {
 			NilTime    *time.Time
 			NilCustom  *customMarshaler
 			NilText    *textMarshaler
-			NilAWS     *dynamodbattribute.UnixTime
+			NilAWS     *attributevalue.UnixTime
 		}{
 			OK:     "OK",
 			EmptyL: []int{},
 		},
-		out: map[string]*dynamodb.AttributeValue{
-			"OK":     {S: aws.String("OK")},
-			"EmptyL": {L: []*dynamodb.AttributeValue{}},
+		out: map[string]types.AttributeValue{
+			"OK":     &types.AttributeValueMemberS{Value: "OK"},
+			"EmptyL": &types.AttributeValueMemberL{Value: []types.AttributeValue{}},
 		},
 	},
 	{
@@ -352,9 +356,9 @@ var itemEncodingTests = []struct {
 		}{
 			B: []byte{},
 		},
-		out: map[string]*dynamodb.AttributeValue{
-			"S": {S: aws.String("")},
-			"B": {B: []byte{}},
+		out: map[string]types.AttributeValue{
+			"S": &types.AttributeValueMemberS{Value: ""},
+			"B": &types.AttributeValueMemberB{Value: []byte{}},
 		},
 	},
 	{
@@ -364,11 +368,11 @@ var itemEncodingTests = []struct {
 		}{
 			M: map[string]*string{"null": nil, "empty": aws.String(""), "normal": aws.String("hello")},
 		},
-		out: map[string]*dynamodb.AttributeValue{
-			"M": {M: map[string]*dynamodb.AttributeValue{
-				"null":   {NULL: aws.Bool(true)},
-				"empty":  {S: aws.String("")},
-				"normal": {S: aws.String("hello")},
+		out: map[string]types.AttributeValue{
+			"M": &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
+				"null":   &types.AttributeValueMemberNULL{Value: true},
+				"empty":  &types.AttributeValueMemberS{Value: ""},
+				"normal": &types.AttributeValueMemberS{Value: "hello"},
 			}},
 		},
 	},
@@ -383,12 +387,16 @@ var itemEncodingTests = []struct {
 				},
 			},
 		},
-		out: map[string]*dynamodb.AttributeValue{
-			"M": {M: map[string]*dynamodb.AttributeValue{
-				"nestedmap": {M: map[string]*dynamodb.AttributeValue{
-					"empty": {S: aws.String("")},
-				}},
-			}},
+		out: map[string]types.AttributeValue{
+			"M": &types.AttributeValueMemberM{
+				Value: map[string]types.AttributeValue{
+					"nestedmap": &types.AttributeValueMemberM{
+						Value: map[string]types.AttributeValue{
+							"empty": &types.AttributeValueMemberS{Value: ""},
+						},
+					},
+				},
+			},
 		},
 	},
 	{
@@ -402,14 +410,20 @@ var itemEncodingTests = []struct {
 				},
 			},
 		},
-		out: map[string]*dynamodb.AttributeValue{
-			"M": {M: map[string]*dynamodb.AttributeValue{
-				"slice": {L: []*dynamodb.AttributeValue{
-					{M: map[string]*dynamodb.AttributeValue{
-						"empty": {S: aws.String("")},
-					}},
-				}},
-			}},
+		out: map[string]types.AttributeValue{
+			"M": &types.AttributeValueMemberM{
+				Value: map[string]types.AttributeValue{
+					"slice": &types.AttributeValueMemberL{
+						Value: []types.AttributeValue{
+							&types.AttributeValueMemberM{
+								Value: map[string]types.AttributeValue{
+									"empty": &types.AttributeValueMemberS{Value: ""},
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 	},
 	{
@@ -423,14 +437,15 @@ var itemEncodingTests = []struct {
 				},
 			},
 		},
-		out: map[string]*dynamodb.AttributeValue{
-			"L": {L: []*dynamodb.AttributeValue{
-				{
-					M: map[string]*dynamodb.AttributeValue{
-						"empty": {S: aws.String("")},
+		out: map[string]types.AttributeValue{
+			"L": &types.AttributeValueMemberL{
+				Value: []types.AttributeValue{
+					&types.AttributeValueMemberM{
+						Value: map[string]types.AttributeValue{
+							"empty": &types.AttributeValueMemberS{Value: ""},
+						},
 					},
 				},
-			},
 			},
 		},
 	},
@@ -443,12 +458,12 @@ var itemEncodingTests = []struct {
 			M       map[string]*string `dynamo:",null"`
 			SS      []string           `dynamo:",null,set"`
 		}{},
-		out: map[string]*dynamodb.AttributeValue{
-			"S":       {NULL: aws.Bool(true)},
-			"B":       {NULL: aws.Bool(true)},
-			"NilTime": {NULL: aws.Bool(true)},
-			"M":       {NULL: aws.Bool(true)},
-			"SS":      {NULL: aws.Bool(true)},
+		out: map[string]types.AttributeValue{
+			"S":       &types.AttributeValueMemberNULL{Value: true},
+			"B":       &types.AttributeValueMemberNULL{Value: true},
+			"NilTime": &types.AttributeValueMemberNULL{Value: true},
+			"M":       &types.AttributeValueMemberNULL{Value: true},
+			"SS":      &types.AttributeValueMemberNULL{Value: true},
 		},
 	},
 	{
@@ -460,8 +475,8 @@ var itemEncodingTests = []struct {
 				Embedded: true,
 			},
 		},
-		out: map[string]*dynamodb.AttributeValue{
-			"Embedded": {BOOL: aws.Bool(true)},
+		out: map[string]types.AttributeValue{
+			"Embedded": &types.AttributeValueMemberBOOL{Value: true},
 		},
 	},
 	{
@@ -473,8 +488,8 @@ var itemEncodingTests = []struct {
 				Embedded: true,
 			},
 		},
-		out: map[string]*dynamodb.AttributeValue{
-			"Embedded": {BOOL: aws.Bool(true)},
+		out: map[string]types.AttributeValue{
+			"Embedded": &types.AttributeValueMemberBOOL{Value: true},
 		},
 	},
 	{
@@ -486,8 +501,8 @@ var itemEncodingTests = []struct {
 				Embedded: true,
 			},
 		},
-		out: map[string]*dynamodb.AttributeValue{
-			"Embedded": {BOOL: aws.Bool(true)},
+		out: map[string]types.AttributeValue{
+			"Embedded": &types.AttributeValueMemberBOOL{Value: true},
 		},
 	},
 	{
@@ -498,8 +513,8 @@ var itemEncodingTests = []struct {
 		}{
 			Embedded: "OK",
 		},
-		out: map[string]*dynamodb.AttributeValue{
-			"Embedded": {S: aws.String("OK")},
+		out: map[string]types.AttributeValue{
+			"Embedded": &types.AttributeValueMemberS{Value: "OK"},
 		},
 	},
 	{
@@ -510,8 +525,8 @@ var itemEncodingTests = []struct {
 		}{
 			Embedded: "OK",
 		},
-		out: map[string]*dynamodb.AttributeValue{
-			"Embedded": {S: aws.String("OK")},
+		out: map[string]types.AttributeValue{
+			"Embedded": &types.AttributeValueMemberS{Value: "OK"},
 		},
 	},
 	{
@@ -522,8 +537,8 @@ var itemEncodingTests = []struct {
 		}{
 			Embedded: "OK",
 		},
-		out: map[string]*dynamodb.AttributeValue{
-			"Embedded": {S: aws.String("OK")},
+		out: map[string]types.AttributeValue{
+			"Embedded": &types.AttributeValueMemberS{Value: "OK"},
 		},
 	},
 	{
@@ -569,26 +584,26 @@ var itemEncodingTests = []struct {
 			NS4:  map[int]struct{}{maxInt: {}},
 			NS5:  map[uint]bool{maxUint: true},
 		},
-		out: map[string]*dynamodb.AttributeValue{
-			"SS1":  {SS: []*string{aws.String("A"), aws.String("B")}},
-			"SS2":  {SS: []*string{aws.String("true"), aws.String("false")}},
-			"SS3":  {SS: []*string{aws.String("A")}},
-			"SS4":  {SS: []*string{aws.String("A")}},
-			"SS5":  {SS: []*string{aws.String("A")}},
-			"SS6":  {SS: []*string{aws.String("A"), aws.String("B")}},
-			"SS7":  {SS: []*string{aws.String("true")}},
-			"SS8":  {SS: []*string{aws.String("false")}},
-			"SS9":  {SS: []*string{aws.String("A"), aws.String("B"), aws.String("")}},
-			"SS10": {SS: []*string{aws.String("A")}},
-			"BS1":  {BS: [][]byte{{'A'}, {'B'}}},
-			"BS2":  {BS: [][]byte{{'A'}}},
-			"BS3":  {BS: [][]byte{{'A'}}},
-			"BS4":  {BS: [][]byte{{'A'}, {'B'}, {}}},
-			"NS1":  {NS: []*string{aws.String("1"), aws.String("2")}},
-			"NS2":  {NS: []*string{aws.String("1"), aws.String("2")}},
-			"NS3":  {NS: []*string{aws.String("1"), aws.String("2")}},
-			"NS4":  {NS: []*string{aws.String(maxIntStr)}},
-			"NS5":  {NS: []*string{aws.String(maxUintStr)}},
+		out: map[string]types.AttributeValue{
+			"SS1":  &types.AttributeValueMemberSS{Value: []string{"A", "B"}},
+			"SS2":  &types.AttributeValueMemberSS{Value: []string{"true", "false"}},
+			"SS3":  &types.AttributeValueMemberSS{Value: []string{"A"}},
+			"SS4":  &types.AttributeValueMemberSS{Value: []string{"A"}},
+			"SS5":  &types.AttributeValueMemberSS{Value: []string{"A"}},
+			"SS6":  &types.AttributeValueMemberSS{Value: []string{"A", "B"}},
+			"SS7":  &types.AttributeValueMemberSS{Value: []string{"true"}},
+			"SS8":  &types.AttributeValueMemberSS{Value: []string{"false"}},
+			"SS9":  &types.AttributeValueMemberSS{Value: []string{"A", "B", ""}},
+			"SS10": &types.AttributeValueMemberSS{Value: []string{"A"}},
+			"BS1":  &types.AttributeValueMemberBS{Value: [][]byte{{'A'}, {'B'}}},
+			"BS2":  &types.AttributeValueMemberBS{Value: [][]byte{{'A'}}},
+			"BS3":  &types.AttributeValueMemberBS{Value: [][]byte{{'A'}}},
+			"BS4":  &types.AttributeValueMemberBS{Value: [][]byte{{'A'}, {'B'}, {}}},
+			"NS1":  &types.AttributeValueMemberNS{Value: []string{"1", "2"}},
+			"NS2":  &types.AttributeValueMemberNS{Value: []string{"1", "2"}},
+			"NS3":  &types.AttributeValueMemberNS{Value: []string{"1", "2"}},
+			"NS4":  &types.AttributeValueMemberNS{Value: []string{maxIntStr}},
+			"NS5":  &types.AttributeValueMemberNS{Value: []string{maxUintStr}},
 		},
 	},
 	{
@@ -602,17 +617,17 @@ var itemEncodingTests = []struct {
 				"OK": true,
 			},
 		},
-		out: map[string]*dynamodb.AttributeValue{
-			"S": {S: aws.String("Hello")},
-			"B": {B: []byte{'A', 'B'}},
-			"N": {N: aws.String("1.2")},
-			"L": {L: []*dynamodb.AttributeValue{
-				{S: aws.String("A")},
-				{S: aws.String("B")},
-				{N: aws.String("1.2")},
+		out: map[string]types.AttributeValue{
+			"S": &types.AttributeValueMemberS{Value: "Hello"},
+			"B": &types.AttributeValueMemberB{Value: []byte{'A', 'B'}},
+			"N": &types.AttributeValueMemberN{Value: "1.2"},
+			"L": &types.AttributeValueMemberL{Value: []types.AttributeValue{
+				&types.AttributeValueMemberS{Value: "A"},
+				&types.AttributeValueMemberS{Value: "B"},
+				&types.AttributeValueMemberN{Value: "1.2"},
 			}},
-			"M": {M: map[string]*dynamodb.AttributeValue{
-				"OK": {BOOL: aws.Bool(true)},
+			"M": &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
+				"OK": &types.AttributeValueMemberBOOL{Value: true},
 			}},
 		},
 	},
@@ -625,22 +640,9 @@ var itemEncodingTests = []struct {
 				"Hello": "world",
 			},
 		},
-		out: map[string]*dynamodb.AttributeValue{
-			"M": {M: map[string]*dynamodb.AttributeValue{
-				"Hello": {S: aws.String("world")},
-			}},
-		},
-	},
-	{
-		name: "map string attributevalue",
-		in: map[string]*dynamodb.AttributeValue{
-			"M": {M: map[string]*dynamodb.AttributeValue{
-				"Hello": {S: aws.String("world")},
-			}},
-		},
-		out: map[string]*dynamodb.AttributeValue{
-			"M": {M: map[string]*dynamodb.AttributeValue{
-				"Hello": {S: aws.String("world")},
+		out: map[string]types.AttributeValue{
+			"M": &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
+				"Hello": &types.AttributeValueMemberS{Value: "world"},
 			}},
 		},
 	},
@@ -651,8 +653,8 @@ var itemEncodingTests = []struct {
 		}{
 			TTL: time.Date(2019, 1, 1, 0, 0, 0, 0, time.UTC),
 		},
-		out: map[string]*dynamodb.AttributeValue{
-			"TTL": {S: aws.String("2019-01-01T00:00:00Z")},
+		out: map[string]types.AttributeValue{
+			"TTL": &types.AttributeValueMemberS{Value: "2019-01-01T00:00:00Z"},
 		},
 	},
 	{
@@ -662,8 +664,8 @@ var itemEncodingTests = []struct {
 		}{
 			TTL: time.Date(2019, 1, 1, 0, 0, 0, 0, time.UTC),
 		},
-		out: map[string]*dynamodb.AttributeValue{
-			"TTL": {N: aws.String("1546300800")},
+		out: map[string]types.AttributeValue{
+			"TTL": &types.AttributeValueMemberN{Value: "1546300800"},
 		},
 	},
 	{
@@ -673,7 +675,7 @@ var itemEncodingTests = []struct {
 		}{
 			TTL: time.Time{},
 		},
-		out: map[string]*dynamodb.AttributeValue{},
+		out: map[string]types.AttributeValue{},
 	},
 	{
 		name: "*time.Time (unixtime encoding)",
@@ -682,8 +684,8 @@ var itemEncodingTests = []struct {
 		}{
 			TTL: aws.Time(time.Date(2019, 1, 1, 0, 0, 0, 0, time.UTC)),
 		},
-		out: map[string]*dynamodb.AttributeValue{
-			"TTL": {N: aws.String("1546300800")},
+		out: map[string]types.AttributeValue{
+			"TTL": &types.AttributeValueMemberN{Value: "1546300800"},
 		},
 	},
 	{
@@ -693,20 +695,20 @@ var itemEncodingTests = []struct {
 		}{
 			TTL: nil,
 		},
-		out: map[string]*dynamodb.AttributeValue{},
+		out: map[string]types.AttributeValue{},
 	},
 	{
 		name: "dynamodb.ItemUnmarshaler",
 		in:   customItemMarshaler{Thing: 52},
-		out: map[string]*dynamodb.AttributeValue{
-			"thing": {N: aws.String("52")},
+		out: map[string]types.AttributeValue{
+			"thing": &types.AttributeValueMemberN{Value: "52"},
 		},
 	},
 	{
 		name: "*dynamodb.ItemUnmarshaler",
 		in:   &customItemMarshaler{Thing: 52},
-		out: map[string]*dynamodb.AttributeValue{
-			"thing": {N: aws.String("52")},
+		out: map[string]types.AttributeValue{
+			"thing": &types.AttributeValueMemberN{Value: "52"},
 		},
 	},
 }
@@ -721,14 +723,13 @@ type ExportedEmbedded struct {
 
 type customMarshaler int
 
-func (cm customMarshaler) MarshalDynamo() (*dynamodb.AttributeValue, error) {
-	return &dynamodb.AttributeValue{
-		BOOL: aws.Bool(cm != 0),
-	}, nil
+func (cm customMarshaler) MarshalDynamo() (types.AttributeValue, error) {
+	return &types.AttributeValueMemberBOOL{Value: cm != 0}, nil
 }
 
-func (cm *customMarshaler) UnmarshalDynamo(av *dynamodb.AttributeValue) error {
-	if *av.BOOL == true {
+func (cm *customMarshaler) UnmarshalDynamo(av types.AttributeValue) error {
+
+	if res, ok := av.(*types.AttributeValueMemberBOOL); ok && res.Value == true {
 		*cm = 1
 	}
 	return nil
@@ -772,30 +773,29 @@ type customItemMarshaler struct {
 	Thing interface{} `dynamo:"thing"`
 }
 
-func (cim *customItemMarshaler) MarshalDynamoItem() (map[string]*dynamodb.AttributeValue, error) {
+func (cim *customItemMarshaler) MarshalDynamoItem() (map[string]types.AttributeValue, error) {
 	thing := strconv.Itoa(cim.Thing.(int))
-	attrs := map[string]*dynamodb.AttributeValue{
-		"thing": {
-			N: &thing,
-		},
+	attrs := map[string]types.AttributeValue{
+		"thing": &types.AttributeValueMemberN{Value: thing},
 	}
 
 	return attrs, nil
 }
 
-func (cim *customItemMarshaler) UnmarshalDynamoItem(item map[string]*dynamodb.AttributeValue) error {
+func (cim *customItemMarshaler) UnmarshalDynamoItem(item map[string]types.AttributeValue) error {
 	thingAttr := item["thing"]
 
-	if thingAttr == nil || thingAttr.N == nil {
+	if res, ok := thingAttr.(*types.AttributeValueMemberN); !ok {
 		return errors.New("Missing or not a number")
-	}
+	} else {
 
-	thing, err := strconv.Atoi(*thingAttr.N)
-	if err != nil {
-		return errors.New("Invalid number")
-	}
+		thing, err := strconv.Atoi(res.Value)
+		if err != nil {
+			return errors.New("Invalid number")
+		}
 
-	cim.Thing = thing
+		cim.Thing = thing
+	}
 	return nil
 }
 

@@ -4,14 +4,14 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 var itemEncodeOnlyTests = []struct {
 	name string
 	in   interface{}
-	out  map[string]*dynamodb.AttributeValue
+	out  map[string]types.AttributeValue
 }{
 	{
 		name: "omitemptyelem",
@@ -26,10 +26,10 @@ var itemEncodeOnlyTests = []struct {
 			M:     map[string]string{"test": ""},
 			Other: true,
 		},
-		out: map[string]*dynamodb.AttributeValue{
-			"L":     {L: []*dynamodb.AttributeValue{}},
-			"M":     {M: map[string]*dynamodb.AttributeValue{}},
-			"Other": {BOOL: aws.Bool(true)},
+		out: map[string]types.AttributeValue{
+			"L":     &types.AttributeValueMemberL{Value: []types.AttributeValue{}},
+			"M":     &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{}},
+			"Other": &types.AttributeValueMemberBOOL{Value: true},
 		},
 	},
 	{
@@ -43,8 +43,8 @@ var itemEncodeOnlyTests = []struct {
 			M:     map[string]string{"test": ""},
 			Other: true,
 		},
-		out: map[string]*dynamodb.AttributeValue{
-			"Other": {BOOL: aws.Bool(true)},
+		out: map[string]types.AttributeValue{
+			"Other": &types.AttributeValueMemberBOOL{Value: (true)},
 		},
 	},
 	{
@@ -62,14 +62,20 @@ var itemEncodeOnlyTests = []struct {
 				},
 			},
 		},
-		out: map[string]*dynamodb.AttributeValue{
-			"M": {M: map[string]*dynamodb.AttributeValue{
-				"struct": {M: map[string]*dynamodb.AttributeValue{
-					"InnerMap": {M: map[string]*dynamodb.AttributeValue{
-						// expected empty inside
-					}},
-				}},
-			}},
+		out: map[string]types.AttributeValue{
+			"M": &types.AttributeValueMemberM{
+				Value: map[string]types.AttributeValue{
+					"struct": &types.AttributeValueMemberM{
+						Value: map[string]types.AttributeValue{
+							"InnerMap": &types.AttributeValueMemberM{
+								Value: map[string]types.AttributeValue{
+									// expected empty inside
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 	},
 	{
@@ -83,8 +89,8 @@ var itemEncodeOnlyTests = []struct {
 			private:  1337,
 			private2: new(int),
 		},
-		out: map[string]*dynamodb.AttributeValue{
-			"Public": {N: aws.String("555")},
+		out: map[string]types.AttributeValue{
+			"Public": &types.AttributeValueMemberN{Value: ("555")},
 		},
 	},
 }

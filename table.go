@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/aws/smithy-go"
 )
 
 // Status is an enumeration of table and index statuses.
@@ -62,7 +62,7 @@ func (table Table) Wait(want ...Status) error {
 
 // Wait blocks until this table's status matches any status provided by want.
 // If no statuses are specified, the active status is used.
-func (table Table) WaitWithContext(ctx aws.Context, want ...Status) error {
+func (table Table) WaitWithContext(ctx context.Context, want ...Status) error {
 	if len(want) == 0 {
 		want = []Status{ActiveStatus}
 	}
@@ -75,9 +75,9 @@ func (table Table) WaitWithContext(ctx aws.Context, want ...Status) error {
 
 	err := retry(ctx, func() error {
 		desc, err := table.Describe().RunWithContext(ctx)
-		var aerr awserr.RequestFailure
+		var aerr smithy.APIError
 		if errors.As(err, &aerr) {
-			if aerr.Code() == "ResourceNotFoundException" {
+			if aerr.ErrorCode() == "ResourceNotFoundException" {
 				if wantGone {
 					return nil
 				}
@@ -103,8 +103,8 @@ func (table Table) WaitWithContext(ctx aws.Context, want ...Status) error {
 // - output LastEvaluatedKey
 // - input ExclusiveStartKey
 // - DescribeTable as a last resort (cached inside table)
-func (table Table) primaryKeys(ctx aws.Context, lek, esk map[string]*dynamodb.AttributeValue, index string) (map[string]struct{}, error) {
-	extract := func(item map[string]*dynamodb.AttributeValue) map[string]struct{} {
+func (table Table) primaryKeys(ctx context.Context, lek, esk map[string]types.AttributeValue, index string) (map[string]struct{}, error) {
+	extract := func(item map[string]types.AttributeValue) map[string]struct{} {
 		keys := make(map[string]struct{}, len(item))
 		for k := range item {
 			keys[k] = struct{}{}
@@ -150,7 +150,7 @@ func (table Table) primaryKeys(ctx aws.Context, lek, esk map[string]*dynamodb.At
 	return keys, nil
 }
 
-func lekify(item map[string]*dynamodb.AttributeValue, keys map[string]struct{}) (map[string]*dynamodb.AttributeValue, error) {
+func lekify(item map[string]types.AttributeValue, keys map[string]struct{}) (map[string]types.AttributeValue, error) {
 	if item == nil {
 		// this shouldn't happen because in queries without results, a LastEvaluatedKey should be given to us by AWS
 		return nil, fmt.Errorf("dynamo: can't determine LastEvaluatedKey: no keys or results")
@@ -158,7 +158,7 @@ func lekify(item map[string]*dynamodb.AttributeValue, keys map[string]struct{}) 
 	if keys == nil {
 		return nil, fmt.Errorf("dynamo: can't determine LastEvaluatedKey: failed to infer primary keys")
 	}
-	lek := make(map[string]*dynamodb.AttributeValue, len(keys))
+	lek := make(map[string]types.AttributeValue, len(keys))
 	for k := range keys {
 		v, ok := item[k]
 		if !ok {
@@ -188,10 +188,10 @@ func (dt *DeleteTable) Run() error {
 }
 
 // RunWithContext executes this request and deletes the table.
-func (dt *DeleteTable) RunWithContext(ctx aws.Context) error {
+func (dt *DeleteTable) RunWithContext(ctx context.Context) error {
 	input := dt.input()
 	return retry(ctx, func() error {
-		_, err := dt.table.db.client.DeleteTableWithContext(ctx, input)
+		_, err := dt.table.db.client.DeleteTable(ctx, input)
 		return err
 	})
 }
@@ -256,7 +256,7 @@ type ConsumedCapacity struct {
 	TableName string
 }
 
-func addConsumedCapacity(cc *ConsumedCapacity, raw *dynamodb.ConsumedCapacity) {
+func addConsumedCapacity(cc *ConsumedCapacity, raw *types.ConsumedCapacity) {
 	if cc == nil || raw == nil {
 		return
 	}

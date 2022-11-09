@@ -1,7 +1,7 @@
 ## dynamo [![GoDoc](https://godoc.org/github.com/guregu/dynamo?status.svg)](https://godoc.org/github.com/guregu/dynamo)
 `import "github.com/guregu/dynamo"`
 
-dynamo is an expressive [DynamoDB](https://aws.amazon.com/dynamodb/) client for Go, with an easy but powerful API. dynamo integrates with the official [AWS SDK](https://github.com/aws/aws-sdk-go/).
+dynamo is an expressive [DynamoDB](https://aws.amazon.com/dynamodb/) client for Go, with an easy but powerful API. dynamo integrates with the official [AWS SDK v2](https://github.com/aws/aws-sdk-go-v2/).
 
 This library is stable and versioned with Go modules.
 
@@ -12,9 +12,11 @@ package dynamo
 
 import (
 	"time"
+	"context"
+	"log"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/guregu/dynamo"
 )
 
@@ -34,13 +36,16 @@ type widget struct {
 
 
 func main() {
-	sess := session.Must(session.NewSession())
-	db := dynamo.New(sess, &aws.Config{Region: aws.String("us-west-2")})
+	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("us-east-1"))
+	if err != nil {
+		log.Fatalf("unable to load SDK config, %v", err)
+	}
+	db := dynamo.New(cfg)
 	table := db.Table("Widgets")
 
 	// put item
 	w := widget{UserID: 613, Time: time.Now(), Msg: "hello"}
-	err := table.Put(w).Run()
+	err = table.Put(w).Run()
 
 	// get the same item
 	var result widget

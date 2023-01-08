@@ -16,6 +16,8 @@ import (
 type DB struct {
 	client dynamodbiface.DynamoDBAPI
 	logger aws.Logger
+
+	isMock bool
 }
 
 // New creates a new client with the given configuration.

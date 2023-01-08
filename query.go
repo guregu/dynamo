@@ -194,6 +194,10 @@ func (q *Query) OneWithContext(ctx aws.Context, out interface{}) error {
 		return q.err
 	}
 
+	if q.isMock() {
+		return q.mockOne(out)
+	}
+
 	// Can we use the GetItem API?
 	if q.canGetItem() {
 		req := q.getItemInput()
@@ -262,6 +266,10 @@ func (q *Query) Count() (int64, error) {
 func (q *Query) CountWithContext(ctx aws.Context) (int64, error) {
 	if q.err != nil {
 		return 0, q.err
+	}
+
+	if q.isMock() {
+		return q.mockCount()
 	}
 
 	var count int64
@@ -334,6 +342,10 @@ func (itr *queryIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 	}
 	if itr.err != nil {
 		return false
+	}
+
+	if itr.query.isMock() {
+		return itr.mockNext(out)
 	}
 
 	// stop if exceed limit

@@ -36,6 +36,9 @@ type Table struct {
 	db   *DB
 	// desc is this table's cached description, used for inferring keys
 	desc *atomic.Value // Description
+
+	schema   tableschema
+	testData []testdata
 }
 
 // Table returns a Table handle specified by name.

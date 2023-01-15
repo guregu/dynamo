@@ -233,3 +233,93 @@ func TestMockNext(t *testing.T) {
 	})
 
 }
+
+func TestMockAll(t *testing.T) {
+	var (
+		db       = NewMockDB()
+		now      = time.Now().UTC()
+		testData = []interface{}{
+			widget{
+				UserID: 111,
+				Time:   now,
+			},
+			widget{
+				UserID: 111,
+				Time:   now.Add(1 * time.Second),
+			},
+			widget{
+				UserID: 222,
+				Msg:    "hello",
+			},
+			widget{
+				UserID: 222,
+				Msg:    "prefix hello",
+			},
+			widget{
+				UserID: 222,
+				Msg:    "prefix world",
+			},
+			widget{
+				Msg:  "uuid1",
+				Time: now.Add(-1 * time.Second),
+			},
+			widget{
+				Msg:  "uuid1",
+				Time: now.Add(1 * time.Second),
+			},
+			widget{
+				Msg:  "uuid1",
+				Time: now,
+			},
+		}
+	)
+
+	table, err := db.MockTable(UserAction2{}, testData)
+	if err != nil {
+		t.Error("unexpected error:", err)
+	}
+
+	tests := []struct {
+		name  string
+		query *Query
+		want  []widget
+	}{
+		{
+			name:  "gall by hashkey and rangekey",
+			query: table.Get("UserID", 111),
+			want: []widget{
+				testData[0].(widget),
+				testData[1].(widget),
+			},
+		},
+		{
+			name:  "all by local index",
+			query: table.Get("UserID", 222).Range("Msg", BeginsWith, "prefix").Index("ID-UUID-index"),
+			want: []widget{
+				testData[3].(widget),
+				testData[4].(widget),
+			},
+		},
+		{
+			name:  "all by global index",
+			query: table.Get("Msg", "uuid1").Range("Time", LessOrEqual, now).Index("UUID-index"),
+			want: []widget{
+				testData[5].(widget),
+				testData[7].(widget),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var got []widget
+			err = test.query.All(&got)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(got, test.want) {
+				t.Error("bad value. want:", test.want, "got:", got)
+			}
+		})
+	}
+}

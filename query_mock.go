@@ -63,6 +63,9 @@ func (itr *queryIter) mockNext(out interface{}) bool {
 		itr.err = err
 		return false
 	}
+	if len(results) == 0 {
+		return false
+	}
 	itr.output = &dynamodb.QueryOutput{Items: []map[string]*dynamodb.AttributeValue{}}
 	limit := len(results)
 	if itr.query.searchLimit > 0 {
@@ -198,7 +201,7 @@ func compareAttrValue(x, y *dynamodb.AttributeValue, operator Operator, rt refle
 			return true, nil
 		}
 	case BeginsWith:
-		if strings.HasPrefix(*y.S, *x.S) {
+		if strings.HasPrefix(*x.S, *y.S) {
 			return true, nil
 		}
 	case Less, LessOrEqual, Greater, GreaterOrEqual:

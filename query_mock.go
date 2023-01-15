@@ -16,7 +16,7 @@ func (q *Query) isMock() bool {
 }
 
 func (q *Query) mockOne(out interface{}) error {
-	results, err := q.list()
+	results, _, err := q.list()
 	if err != nil {
 		return err
 	}
@@ -29,7 +29,7 @@ func (q *Query) mockOne(out interface{}) error {
 }
 
 func (q *Query) mockCount() (int64, error) {
-	results, err := q.list()
+	results, _, err := q.list()
 	if err != nil {
 		return 0, err
 	}
@@ -43,21 +43,22 @@ func (itr *queryIter) mockNext(out interface{}) bool {
 		return false
 	}
 
-	// stop if no result
-	if int(itr.n) == len(itr.output.Items) {
-		return false
-	}
-
 	// can we use results we already have?
 	if itr.output != nil {
+		// stop if no result
+		if int(itr.n) == len(itr.output.Items) {
+			return false
+		}
+
 		item := itr.output.Items[int(itr.n)]
+		itr.last = item
 		itr.err = itr.unmarshal(item, out)
 		itr.n++
 		return itr.err == nil
 	}
 
 	// new query
-	results, err := itr.query.list()
+	results, keys, err := itr.query.list()
 	if err != nil {
 		itr.err = err
 		return false
@@ -86,23 +87,29 @@ func (itr *queryIter) mockNext(out interface{}) bool {
 		}
 	}
 
-	itr.err = itr.unmarshal(itr.output.Items[int(itr.n)], out)
+	itr.keys = map[string]struct{}{
+		keys.hashKey:  {},
+		keys.rangeKey: {},
+	}
+	item := itr.output.Items[int(itr.n)]
+	itr.last = item
+	itr.err = itr.unmarshal(item, out)
 	itr.n++
 	return itr.err == nil
 }
 
-func (q *Query) list() ([]testdata, error) {
+func (q *Query) list() ([]testdata, keyschema, error) {
 	keys, err := q.keyschema()
 	if err != nil {
-		return nil, err
+		return nil, keys, err
 	}
 
 	results, err := q.search(keys)
 	if err != nil {
-		return nil, err
+		return nil, keys, err
 	}
 
-	return results, nil
+	return results, keys, nil
 }
 
 func (q *Query) keyschema() (k keyschema, err error) {
@@ -381,21 +388,21 @@ func (q *Query) sort(data []testdata, keys keyschema) []testdata {
 		switch irv.Kind() {
 		case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
 			if *q.order == Descending {
-				return irv.Interface().(int64) > jrv.Interface().(int64)
+				return irv.Int() > jrv.Int()
 			} else {
-				return irv.Interface().(int64) < jrv.Interface().(int64)
+				return irv.Int() < jrv.Int()
 			}
 		case reflect.Uint, reflect.Uint64, reflect.Uint32, reflect.Uint16, reflect.Uint8:
 			if *q.order == Descending {
-				return irv.Interface().(uint64) > jrv.Interface().(uint64)
+				return irv.Uint() > jrv.Uint()
 			} else {
-				return irv.Interface().(uint64) < jrv.Interface().(uint64)
+				return irv.Uint() < jrv.Uint()
 			}
 		case reflect.Float64, reflect.Float32:
 			if *q.order == Descending {
-				return irv.Interface().(float64) > jrv.Interface().(float64)
+				return irv.Float() > jrv.Float()
 			} else {
-				return irv.Interface().(float64) < jrv.Interface().(float64)
+				return irv.Float() < jrv.Float()
 			}
 		default:
 			if *q.order == Descending {

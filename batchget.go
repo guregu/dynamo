@@ -45,11 +45,14 @@ type BatchGet struct {
 	reqs       []*Query
 	projection string
 	consistent bool
-	err        error
-	cc         *ConsumedCapacity
+
+	subber
+	err error
+	cc  *ConsumedCapacity
 }
 
 // Get creates a new batch get item request with the given keys.
+//
 //	table.Batch("ID", "Month").
 //		Get([]dynamo.Keys{{1, "2015-10"}, {42, "2015-12"}, {42, "1992-02"}}...).
 //		All(&results)
@@ -81,6 +84,21 @@ func (bg *BatchGet) add(keys []Keyed) {
 		}
 		bg.reqs = append(bg.reqs, get)
 	}
+}
+
+// Project limits the result attributes to the given paths.
+func (bg *BatchGet) Project(paths ...string) *BatchGet {
+	var expr string
+	for i, p := range paths {
+		if i != 0 {
+			expr += ", "
+		}
+		name, err := bg.escape(p)
+		bg.setError(err)
+		expr += name
+	}
+	bg.projection = expr
+	return bg
 }
 
 // Consistent will, if on is true, make this batch use a strongly consistent read.

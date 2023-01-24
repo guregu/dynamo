@@ -45,6 +45,7 @@ func TestBatchGetWrite(t *testing.T) {
 	var cc ConsumedCapacity
 	err = table.Batch("UserID", "Time").
 		Get(keys...).
+		Project("UserID", "Time").
 		Consistent(true).
 		ConsumedCapacity(&cc).
 		All(&results)
@@ -64,6 +65,9 @@ func TestBatchGetWrite(t *testing.T) {
 		other := widgets[result.UserID]
 		if result.UserID != other.UserID && !result.Time.Equal(other.Time) {
 			t.Error("unexpected result", result, "≠", other)
+		}
+		if result.Msg != "" {
+			t.Error("projection not applied, want: blank. got:", result.Msg)
 		}
 	}
 

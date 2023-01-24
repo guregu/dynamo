@@ -169,6 +169,7 @@ func (bg *BatchGet) input(start int) *dynamodb.BatchGetItemInput {
 	}
 	if bg.projection != "" {
 		kas.ProjectionExpression = &bg.projection
+		kas.ExpressionAttributeNames = bg.nameExpr
 	}
 	if bg.consistent {
 		kas.ConsistentRead = &bg.consistent

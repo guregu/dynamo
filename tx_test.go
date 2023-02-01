@@ -179,6 +179,10 @@ func TestTx(t *testing.T) {
 }
 
 func TestTxRetry(t *testing.T) {
+	if testDB == nil {
+		t.Skip(offlineSkipMsg)
+	}
+
 	date1 := time.Date(1999, 1, 1, 1, 1, 1, 0, time.UTC)
 	widget1 := widget{UserID: 69, Time: date1, Msg: "dog", Count: 0}
 

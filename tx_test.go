@@ -6,8 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gofrs/uuid"
-
 	"github.com/aws/aws-sdk-go/aws/awserr"
 )
 
@@ -57,11 +55,11 @@ func TestTx(t *testing.T) {
 	// idempotent write with provided idempotency token
 	tx = testDB.WriteTx()
 	cc, ccold = ConsumedCapacity{}, ConsumedCapacity{}
-	token, err := uuid.NewV4()
+	token, err := newIdempotencyToken()
 	if err != nil {
 		t.Error(err)
 	}
-	tx.IdempotentWithToken(token.String())
+	tx.IdempotentWithToken(token)
 	tx.Put(table.Put(widget1))
 	tx.Put(table.Put(widget2))
 	tx.ConsumedCapacity(&cc)
@@ -179,6 +177,10 @@ func TestTx(t *testing.T) {
 }
 
 func TestTxRetry(t *testing.T) {
+	if testDB == nil {
+		t.Skip(offlineSkipMsg)
+	}
+
 	date1 := time.Date(1999, 1, 1, 1, 1, 1, 0, time.UTC)
 	widget1 := widget{UserID: 69, Time: date1, Msg: "dog", Count: 0}
 

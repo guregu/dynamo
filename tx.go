@@ -1,11 +1,12 @@
 package dynamo
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/gofrs/uuid"
 )
 
 // ErrNoInput is returned when APIs that can take multiple inputs are run with zero inputs.
@@ -224,13 +225,19 @@ func (tx *WriteTx) Idempotent(enabled bool) *WriteTx {
 	}
 
 	if enabled {
-		uuid, err := uuid.NewV4()
+		token, err := newIdempotencyToken()
 		tx.setError(err)
-		tx.token = uuid.String()
+		tx.token = token
 	} else {
 		tx.token = ""
 	}
 	return tx
+}
+
+func newIdempotencyToken() (string, error) {
+	var b [16]byte
+	_, err := rand.Read(b[:])
+	return hex.EncodeToString(b[:]), err
 }
 
 // IdempotentWithToken marks this transaction as idempotent and explicitly specifies the token value.

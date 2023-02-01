@@ -15,6 +15,7 @@ type UserAction struct {
 	Time   time.Time `dynamo:",range"`
 	Seq    int64     `localIndex:"ID-Seq-index,range"`
 	UUID   string
+	Name   string
 	embeddedWithKeys
 }
 
@@ -41,7 +42,7 @@ func TestCreateTable(t *testing.T) {
 	// }
 
 	input := testDB.CreateTable("UserActions", UserAction{}).
-		Project("ID-Seq-index", IncludeProjection, "UUID").
+		Project("ID-Seq-index", IncludeProjection, "UUID", "Name").
 		Provision(4, 2).
 		ProvisionIndex("Embedded-index", 1, 2).
 		Tag("Tag-Key", "old value").
@@ -100,7 +101,7 @@ func TestCreateTable(t *testing.T) {
 			}},
 			Projection: &dynamodb.Projection{
 				ProjectionType:   aws.String("INCLUDE"),
-				NonKeyAttributes: []*string{aws.String("UUID")},
+				NonKeyAttributes: []*string{aws.String("UUID"), aws.String("Name")},
 			},
 		}},
 		ProvisionedThroughput: &dynamodb.ProvisionedThroughput{

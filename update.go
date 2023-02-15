@@ -46,6 +46,9 @@ func (table Table) Update(hashKey string, value interface{}) *Update {
 		remove: make(map[string]struct{}),
 	}
 	u.hashValue, u.err = marshal(value, flagNone)
+	if u.hashValue == nil {
+		u.setError(fmt.Errorf("dynamo: update hash key value is nil or omitted for attribute %q", u.hashKey))
+	}
 	return u
 }
 
@@ -55,6 +58,9 @@ func (u *Update) Range(name string, value interface{}) *Update {
 	u.rangeKey = name
 	u.rangeValue, err = marshal(value, flagNone)
 	u.setError(err)
+	if u.rangeValue == nil {
+		u.setError(fmt.Errorf("dynamo: update range key value is nil or omitted for attribute %q", u.rangeKey))
+	}
 	return u
 }
 
@@ -125,6 +131,7 @@ func (u *Update) SetIfNotExists(path string, value interface{}) *Update {
 
 // SetExpr performs a custom set expression, substituting the args into expr as in filter expressions.
 // See: http://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_UpdateItem.html#DDB-UpdateItem-request-UpdateExpression
+//
 //	SetExpr("MyMap.$.$ = ?", key1, key2, val)
 //	SetExpr("'Counter' = 'Counter' + ?", 1)
 func (u *Update) SetExpr(expr string, args ...interface{}) *Update {
@@ -250,7 +257,8 @@ func (u *Update) Remove(paths ...string) *Update {
 }
 
 // RemoveExpr performs a custom remove expression, substituting the args into expr as in filter expressions.
-// 	RemoveExpr("MyList[$]", 5)
+//
+//	RemoveExpr("MyList[$]", 5)
 func (u *Update) RemoveExpr(expr string, args ...interface{}) *Update {
 	expr, err := u.subExpr(expr, args...)
 	u.setError(err)

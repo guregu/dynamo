@@ -586,16 +586,14 @@ func marshalSet(rv reflect.Value, flags encodeFlags) (*dynamodb.AttributeValue, 
 
 var emptyStructType = reflect.TypeOf(struct{}{})
 
-func marshalSlice(values []interface{}) ([]*dynamodb.AttributeValue, error) {
+func marshalSliceNoOmit(values []interface{}) ([]*dynamodb.AttributeValue, error) {
 	avs := make([]*dynamodb.AttributeValue, 0, len(values))
 	for _, v := range values {
-		av, err := marshal(v, flagNone)
+		av, err := marshal(v, flagAllowEmpty)
 		if err != nil {
 			return nil, err
 		}
-		if av != nil {
-			avs = append(avs, av)
-		}
+		avs = append(avs, av)
 	}
 	return avs, nil
 }

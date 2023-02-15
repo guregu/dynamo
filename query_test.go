@@ -271,3 +271,26 @@ func TestQueryMagicLEK(t *testing.T) {
 		}
 	})
 }
+
+func TestQueryBadKeys(t *testing.T) {
+	if testDB == nil {
+		t.Skip(offlineSkipMsg)
+	}
+	table := testDB.Table(testTable)
+
+	t.Run("hash key", func(t *testing.T) {
+		var v interface{}
+		err := table.Get("UserID", "").Range("Time", Equal, "123").One(&v)
+		if err == nil {
+			t.Error("want error, got", err)
+		}
+	})
+
+	t.Run("range key", func(t *testing.T) {
+		var v interface{}
+		err := table.Get("UserID", 123).Range("Time", Equal, "").One(&v)
+		if err == nil {
+			t.Error("want error, got", err)
+		}
+	})
+}

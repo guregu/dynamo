@@ -1,6 +1,8 @@
 package dynamo
 
 import (
+	"fmt"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
@@ -33,6 +35,9 @@ func (table Table) Delete(name string, value interface{}) *Delete {
 		hashKey: name,
 	}
 	d.hashValue, d.err = marshal(value, flagNone)
+	if d.hashValue == nil {
+		d.setError(fmt.Errorf("dynamo: delete hash key value is nil or omitted for attribute %q", d.hashKey))
+	}
 	return d
 }
 
@@ -44,6 +49,9 @@ func (d *Delete) Range(name string, value interface{}) *Delete {
 	d.rangeKey = name
 	d.rangeValue, err = marshal(value, flagNone)
 	d.setError(err)
+	if d.rangeValue == nil {
+		d.setError(fmt.Errorf("dynamo: delete range key value is nil or omitted for attribute %q", d.rangeKey))
+	}
 	return d
 }
 

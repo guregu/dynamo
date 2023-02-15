@@ -2,6 +2,7 @@ package dynamo
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -79,6 +80,9 @@ func (table Table) Get(name string, value interface{}) *Query {
 		hashKey: name,
 	}
 	q.hashValue, q.err = marshal(value, flagNone)
+	if q.hashValue == nil {
+		q.setError(fmt.Errorf("dynamo: query hash key value is nil or omitted for attribute %q", q.hashKey))
+	}
 	return q
 }
 
@@ -90,8 +94,17 @@ func (q *Query) Range(name string, op Operator, values ...interface{}) *Query {
 	var err error
 	q.rangeKey = name
 	q.rangeOp = op
-	q.rangeValues, err = marshalSlice(values)
+	q.rangeValues, err = marshalSliceNoOmit(values)
 	q.setError(err)
+	for i, v := range q.rangeValues {
+		if v == nil {
+			q.setError(fmt.Errorf("dynamo: query range key value is nil or omitted for attribute %q (range key #%d of %d)", q.rangeKey, i+1, len(q.rangeValues)))
+			break
+		}
+	}
+	if len(q.rangeValues) == 0 {
+		q.setError(fmt.Errorf("dynamo: query range key values are missing for attribute %q", q.rangeKey))
+	}
 	return q
 }
 

@@ -1,6 +1,8 @@
 package dynamo
 
 import (
+	"fmt"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
@@ -29,6 +31,9 @@ func (table Table) Check(hashKey string, value interface{}) *ConditionCheck {
 		hashKey: hashKey,
 	}
 	check.hashValue, check.err = marshal(value, flagNone)
+	if check.hashValue == nil {
+		check.setError(fmt.Errorf("dynamo: check hash key value is nil or omitted for attribute %q", check.hashKey))
+	}
 	return check
 }
 
@@ -38,6 +43,9 @@ func (check *ConditionCheck) Range(rangeKey string, value interface{}) *Conditio
 	var err error
 	check.rangeValue, err = marshal(value, flagNone)
 	check.setError(err)
+	if check.rangeValue == nil {
+		check.setError(fmt.Errorf("dynamo: check range key value is nil or omitted for attribute %q", check.rangeKey))
+	}
 	return check
 }
 

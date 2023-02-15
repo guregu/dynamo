@@ -23,6 +23,13 @@ func TestSubExpr(t *testing.T) {
 	if subbed != expect {
 		t.Errorf("bad subbed expr: %v ≠ %v", subbed, expect)
 	}
+
+	if _, err = s.subExpr("$"); err == nil {
+		t.Error("missing name placeholder: want error but got nil")
+	}
+	if _, err = s.subExpr("$ = ?", "a"); err == nil {
+		t.Error("missing value placeholder: want error but got nil")
+	}
 }
 
 func TestWrapExpr(t *testing.T) {

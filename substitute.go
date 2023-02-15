@@ -80,6 +80,10 @@ func (s *subber) subExprFlags(flags encodeFlags, expr string, args ...interface{
 			sub := s.subName(item.Val[1 : len(item.Val)-1]) // trim ""
 			_, err = buf.WriteString(sub)
 		case exprs.ItemNamePlaceholder:
+			if idx >= len(args) {
+				err = fmt.Errorf("dynamo: missing argument for %s placeholder (at position %d of %q)", item.Val, item.Pos, expr)
+				break
+			}
 			switch x := args[idx].(type) {
 			case ExpressionLiteral:
 				_, err = buf.WriteString(s.merge(x))
@@ -98,16 +102,24 @@ func (s *subber) subExprFlags(flags encodeFlags, expr string, args ...interface{
 			case int64:
 				_, err = buf.WriteString(strconv.FormatInt(x, 10))
 			default:
-				err = fmt.Errorf("dynamo: type of argument for $ must be string, int, int64, encoding.TextMarshaler or dynamo.ExpressionLiteral (got %T)", x)
+				err = fmt.Errorf("dynamo: type of argument for $ must be string, int, int64, encoding.TextMarshaler or dynamo.ExpressionLiteral (got type %T at position %d of %q)", x, item.Pos, expr)
 			}
 			idx++
 		case exprs.ItemValuePlaceholder:
+			if idx >= len(args) {
+				err = fmt.Errorf("dynamo: missing argument for %s placeholder (at position %d of %q)", item.Val, item.Pos, expr)
+				break
+			}
 			var sub string
 			if sub, err = s.subValue(args[idx], flags); err == nil {
 				_, err = buf.WriteString(sub)
 			}
 			idx++
 		case exprs.ItemMagicLiteral:
+			if idx >= len(args) {
+				err = fmt.Errorf("dynamo: missing argument for %s placeholder (at position %d of %q)", item.Val, item.Pos, expr)
+				break
+			}
 			_, err = buf.WriteString(args[idx].(string))
 			idx++
 		}

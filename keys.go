@@ -18,8 +18,9 @@ type Keyed interface {
 }
 
 // Keys provides an easy way to specify the hash and range keys.
+//
 //	table.Batch("ID", "Month").
-//		Get([]dynamo.Keys{{1, "2015-10"}, {42, "2015-12"}, {42, "1992-02"}}...).
+//		Get(dynamo.Keys{1, "2015-10"}, dynamo.Keys{42, "2015-12"}, dynamo.Keys{42, "1992-02"}).
 //		All(&results)
 type Keys [2]interface{}
 

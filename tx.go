@@ -121,7 +121,7 @@ func (tx *GetTx) AllWithContext(ctx aws.Context, out interface{}) error {
 	var resp *dynamodb.TransactGetItemsOutput
 	err = retry(ctx, func() error {
 		var err error
-		resp, err = tx.db.client.TransactGetItems(input)
+		resp, err = tx.db.client.TransactGetItemsWithContext(ctx, input)
 		if tx.cc != nil && resp != nil {
 			for _, cc := range resp.ConsumedCapacity {
 				addConsumedCapacity(tx.cc, cc)

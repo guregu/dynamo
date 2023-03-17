@@ -34,7 +34,7 @@ func (table Table) Batch(hashAndRangeKeyName ...string) Batch {
 		b.hashKey = hashAndRangeKeyName[0]
 		b.rangeKey = hashAndRangeKeyName[1]
 	default:
-		b.err = fmt.Errorf("dynamo: batch: you may only provide the name of a range key and hash key. too many keys.")
+		b.err = fmt.Errorf("dynamo: batch: you may only provide the name of a range key and hash key. too many keys")
 	}
 	return b
 }

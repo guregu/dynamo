@@ -20,6 +20,9 @@ type Scan struct {
 	limit       int64
 	searchLimit int64
 
+	segment       int64
+	totalSegments int64
+
 	subber
 
 	err error
@@ -43,6 +46,13 @@ func (s *Scan) StartFrom(key PagingKey) *Scan {
 // Index specifies the name of the index that Scan will operate on.
 func (s *Scan) Index(name string) *Scan {
 	s.index = name
+	return s
+}
+
+// Parallel specifies the Segment and Total Segments to operate on in a parallel scan.
+func (s *Scan) Parallel(segment int64, totalSegments int64) *Scan {
+	s.segment = segment
+	s.totalSegments = totalSegments
 	return s
 }
 
@@ -203,6 +213,10 @@ func (s *Scan) scanInput() *dynamodb.ScanInput {
 		ConsistentRead:            &s.consistent,
 		ExpressionAttributeNames:  s.nameExpr,
 		ExpressionAttributeValues: s.valueExpr,
+	}
+	if s.totalSegments > 0 {
+		input.Segment = &s.segment
+		input.TotalSegments = &s.totalSegments
 	}
 	if s.limit > 0 {
 		if len(s.filters) == 0 {

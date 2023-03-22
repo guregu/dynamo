@@ -49,8 +49,8 @@ func (s *Scan) Index(name string) *Scan {
 	return s
 }
 
-// Parallel specifies the Segment and Total Segments to operate on in a parallel scan.
-func (s *Scan) Parallel(segment int64, totalSegments int64) *Scan {
+// Segment specifies the Segment and Total Segments to operate on in a parallel scan.
+func (s *Scan) Segment(segment int64, totalSegments int64) *Scan {
 	s.segment = segment
 	s.totalSegments = totalSegments
 	return s

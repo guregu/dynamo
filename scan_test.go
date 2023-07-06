@@ -1,6 +1,7 @@
 package dynamo
 
 import (
+	"context"
 	"reflect"
 	"testing"
 	"time"
@@ -25,49 +26,81 @@ func TestScan(t *testing.T) {
 		t.Error("unexpected error:", err)
 	}
 
-	// now check if get all and count return the same amount of items
-	var result []widget
-	var cc ConsumedCapacity
-	err = table.Scan().Filter("UserID = ?", 42).Consistent(true).ConsumedCapacity(&cc).All(&result)
-	if err != nil {
-		t.Error("unexpected error:", err)
-	}
-
+	// count items via Query
 	ct, err := table.Get("UserID", 42).Consistent(true).Count()
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
-	if int(ct) != len(result) {
-		t.Errorf("count and scan don't match. count: %d, scan: %d", ct, len(result))
-	}
-	if cc.Total == 0 {
-		t.Error("bad consumed capacity", cc)
-	}
+
+	// now check if get all and count return the same amount of items
+	t.Run("All", func(t *testing.T) {
+		var result []widget
+		var cc ConsumedCapacity
+		err = table.Scan().Filter("UserID = ?", 42).Consistent(true).ConsumedCapacity(&cc).All(&result)
+		if err != nil {
+			t.Error("unexpected error:", err)
+		}
+		if int(ct) != len(result) {
+			t.Errorf("count and scan don't match. count: %d, scan: %d", ct, len(result))
+		}
+		if cc.Total == 0 {
+			t.Error("bad consumed capacity", cc)
+		}
+
+		// search for our inserted item
+		found := false
+		for _, w := range result {
+			if w.Time.Equal(item.Time) && reflect.DeepEqual(w, item) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("exact match of put item not found in scan")
+		}
+	})
 
 	// check this against Scan's count, too
-	var cc2 ConsumedCapacity
-	scanCt, err := table.Scan().Filter("UserID = ?", 42).Consistent(true).ConsumedCapacity(&cc2).Count()
-	if err != nil {
-		t.Error("unexpected error:", err)
-	}
-	if scanCt != ct {
-		t.Errorf("scan count and get count don't match. scan count: %d, get count: %d", scanCt, ct)
-	}
-	if cc2.Total == 0 {
-		t.Error("bad consumed capacity", cc2)
-	}
-
-	// search for our inserted item
-	found := false
-	for _, w := range result {
-		if w.Time.Equal(item.Time) && reflect.DeepEqual(w, item) {
-			found = true
-			break
+	t.Run("Count", func(t *testing.T) {
+		var cc2 ConsumedCapacity
+		scanCt, err := table.Scan().Filter("UserID = ?", 42).Consistent(true).ConsumedCapacity(&cc2).Count()
+		if err != nil {
+			t.Error("unexpected error:", err)
 		}
-	}
-	if !found {
-		t.Error("exact match of put item not found in scan")
-	}
+		if scanCt != ct {
+			t.Errorf("scan count and get count don't match. scan count: %d, get count: %d", scanCt, ct)
+		}
+		if cc2.Total == 0 {
+			t.Error("bad consumed capacity", cc2)
+		}
+	})
+
+	t.Run("AllParallel", func(t *testing.T) {
+		var result2 []widget
+		var cc3 ConsumedCapacity
+		err = table.Scan().Filter("UserID = ?", 42).Consistent(true).ConsumedCapacity(&cc3).AllParallel(context.Background(), 4, &result2)
+		if err != nil {
+			t.Error("unexpected error:", err)
+		}
+		if int(ct) != len(result2) {
+			t.Errorf("count and scan don't match. count: %d, scan: %d", ct, len(result2))
+		}
+		if cc3.Total == 0 {
+			t.Error("bad consumed capacity", cc3)
+		}
+
+		// search for our inserted item
+		found := false
+		for _, w := range result2 {
+			if w.Time.Equal(item.Time) && reflect.DeepEqual(w, item) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("exact match of put item not found in scan")
+		}
+	})
 }
 
 func TestScanPaging(t *testing.T) {
@@ -76,18 +109,56 @@ func TestScanPaging(t *testing.T) {
 	}
 	table := testDB.Table(testTable)
 
-	widgets := [10]widget{}
-	itr := table.Scan().SearchLimit(1).Iter()
-	for i := 0; i < len(widgets); i++ {
-		more := itr.Next(&widgets[i])
-		if itr.Err() != nil {
-			t.Error("unexpected error", itr.Err())
+	// prepare data
+	insert := make([]interface{}, 10)
+	for i := 0; i < len(insert); i++ {
+		insert[i] = widget{
+			UserID: 2068,
+			Time:   time.Date(2068, 1, i+1, 0, 0, 0, 0, time.UTC),
+			Msg:    "garbage",
 		}
-		if !more {
-			break
-		}
-		itr = table.Scan().StartFrom(itr.LastEvaluatedKey()).SearchLimit(1).Iter()
 	}
+	if _, err := table.Batch().Write().Put(insert...).Run(); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("synchronous", func(t *testing.T) {
+		widgets := [10]widget{}
+		itr := table.Scan().Consistent(true).SearchLimit(1).Iter()
+		for i := 0; i < len(widgets); i++ {
+			more := itr.Next(&widgets[i])
+			if itr.Err() != nil {
+				t.Error("unexpected error", itr.Err())
+			}
+			if !more {
+				break
+			}
+			itr = table.Scan().StartFrom(itr.LastEvaluatedKey()).SearchLimit(1).Iter()
+		}
+	})
+
+	t.Run("parallel", func(t *testing.T) {
+		const segments = 2
+		ctx := context.Background()
+		widgets := [10]widget{}
+		itr := table.Scan().Consistent(true).SearchLimit(1).IterParallel(ctx, segments)
+		for i := 0; i < len(widgets)/segments; i++ {
+			var more bool
+			for j := 0; j < segments; j++ {
+				more = itr.Next(&widgets[i*segments+j])
+				if !more && j != segments-1 {
+					t.Error("bad number of results from parallel scan")
+				}
+			}
+			if itr.Err() != nil {
+				t.Error("unexpected error", itr.Err())
+			}
+			if !more {
+				break
+			}
+			itr = table.Scan().SearchLimit(1).IterParallelStartFrom(ctx, itr.LastEvaluatedKeys())
+		}
+	})
 }
 
 func TestScanMagicLEK(t *testing.T) {
@@ -113,12 +184,10 @@ func TestScanMagicLEK(t *testing.T) {
 			Msg:    "TestScanMagicLEK",
 		},
 	}
-
-	t.Run("prepare data", func(t *testing.T) {
-		if _, err := table.Batch().Write().Put(widgets...).Run(); err != nil {
-			t.Fatal(err)
-		}
-	})
+	// prepare data
+	if _, err := table.Batch().Write().Put(widgets...).Run(); err != nil {
+		t.Fatal(err)
+	}
 
 	t.Run("having to use DescribeTable", func(t *testing.T) {
 		itr := table.Scan().Filter("'Msg' = ?", "TestScanMagicLEK").Limit(2).Iter()

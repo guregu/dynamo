@@ -177,6 +177,13 @@ type PagingIter interface {
 	LastEvaluatedKey() PagingKey
 }
 
+type ParallelIter interface {
+	Iter
+	// LastEvaluatedKeys returns each parallel segment's last evaluated key in order of segment number.
+	// The slice will be the same size as the number of segments, and the keys can be nil.
+	LastEvaluatedKeys() []PagingKey
+}
+
 // PagingKey is a key used for splitting up partial results.
 // Get a PagingKey from a PagingIter and pass it to StartFrom in Query or Scan.
 type PagingKey map[string]*dynamodb.AttributeValue

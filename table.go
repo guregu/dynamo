@@ -322,3 +322,66 @@ func addConsumedCapacity(cc *ConsumedCapacity, raw *dynamodb.ConsumedCapacity) {
 		cc.TableName = *raw.TableName
 	}
 }
+
+func mergeConsumedCapacity(dst, src *ConsumedCapacity) {
+	if dst == nil || src == nil {
+		return
+	}
+	dst.Total += src.Total
+	dst.Read += src.Read
+	dst.Write += src.Write
+	if len(src.GSI) > 0 {
+		if dst.GSI == nil {
+			dst.GSI = make(map[string]float64, len(src.GSI))
+		}
+		for name, consumed := range src.GSI {
+			dst.GSI[name] = dst.GSI[name] + consumed
+		}
+	}
+	if len(src.GSIRead) > 0 {
+		if dst.GSIRead == nil {
+			dst.GSIRead = make(map[string]float64, len(src.GSIRead))
+		}
+		for name, consumed := range src.GSIRead {
+			dst.GSIRead[name] = dst.GSIRead[name] + consumed
+		}
+	}
+	if len(src.GSIWrite) > 0 {
+		if dst.GSIWrite == nil {
+			dst.GSIWrite = make(map[string]float64, len(src.GSIWrite))
+		}
+		for name, consumed := range src.GSIWrite {
+			dst.GSIWrite[name] = dst.GSIWrite[name] + consumed
+		}
+	}
+	if len(src.LSI) > 0 {
+		if dst.LSI == nil {
+			dst.LSI = make(map[string]float64, len(src.LSI))
+		}
+		for name, consumed := range src.LSI {
+			dst.LSI[name] = dst.LSI[name] + consumed
+		}
+	}
+	if len(src.LSIRead) > 0 {
+		if dst.LSIRead == nil {
+			dst.LSIRead = make(map[string]float64, len(src.LSIRead))
+		}
+		for name, consumed := range src.LSIRead {
+			dst.LSIRead[name] = dst.LSIRead[name] + consumed
+		}
+	}
+	if len(src.LSIWrite) > 0 {
+		if dst.LSIWrite == nil {
+			dst.LSIWrite = make(map[string]float64, len(src.LSIWrite))
+		}
+		for name, consumed := range src.LSIWrite {
+			dst.LSIWrite[name] = dst.LSIWrite[name] + consumed
+		}
+	}
+	dst.Table += src.Table
+	dst.TableRead += src.TableRead
+	dst.TableWrite += src.TableWrite
+	if dst.TableName == "" && src.TableName != "" {
+		dst.TableName = src.TableName
+	}
+}

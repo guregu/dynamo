@@ -203,8 +203,6 @@ func (s *Scan) AllWithLastEvaluatedKeyContext(ctx context.Context, out interface
 
 // AllParallel executes this request by running the given number of segments in parallel, then unmarshaling all results to out, which must be a pointer to a slice.
 func (s *Scan) AllParallel(ctx context.Context, segments int64, out interface{}) error {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
 	iters := s.newSegments(segments, nil)
 	ps := newParallelScan(iters, s.cc, true, unmarshalAppend)
 	go ps.run(ctx)
@@ -216,8 +214,6 @@ func (s *Scan) AllParallel(ctx context.Context, segments int64, out interface{})
 // AllParallelWithLastEvaluatedKeys executes this request by running the given number of segments in parallel, then unmarshaling all results to out, which must be a pointer to a slice.
 // Returns a slice of LastEvalutedKeys that can be used to continue the query later.
 func (s *Scan) AllParallelWithLastEvaluatedKeys(ctx context.Context, segments int64, out interface{}) ([]PagingKey, error) {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
 	iters := s.newSegments(segments, nil)
 	ps := newParallelScan(iters, s.cc, false, unmarshalAppend)
 	go ps.run(ctx)
@@ -229,8 +225,6 @@ func (s *Scan) AllParallelWithLastEvaluatedKeys(ctx context.Context, segments in
 // AllParallelStartFrom executes this request by continuing parallel scans from the given LastEvaluatedKeys, then unmarshaling all results to out, which must be a pointer to a slice.
 // Returns a new slice of LastEvaluatedKeys after the scan finishes.
 func (s *Scan) AllParallelStartFrom(ctx context.Context, keys []PagingKey, out interface{}) ([]PagingKey, error) {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
 	iters := s.newSegments(int64(len(keys)), keys)
 	ps := newParallelScan(iters, s.cc, false, unmarshalAppend)
 	go ps.run(ctx)

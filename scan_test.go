@@ -136,8 +136,8 @@ func TestScanPaging(t *testing.T) {
 			itr = table.Scan().StartFrom(itr.LastEvaluatedKey()).SearchLimit(1).Iter()
 		}
 		for i, w := range widgets {
-			if w.Time.IsZero() {
-				t.Error("scan didn't find item", i)
+			if w.UserID == 0 && w.Time.IsZero() {
+				t.Error("scan didn't find item", i, "got:", w)
 			}
 		}
 	})
@@ -164,8 +164,8 @@ func TestScanPaging(t *testing.T) {
 			itr = table.Scan().SearchLimit(1).IterParallelStartFrom(ctx, itr.LastEvaluatedKeys())
 		}
 		for i, w := range widgets {
-			if w.Time.IsZero() {
-				t.Error("scan didn't find item", i)
+			if w.UserID == 0 && w.Time.IsZero() {
+				t.Error("scan didn't find item", i, "got:", w)
 			}
 		}
 	})

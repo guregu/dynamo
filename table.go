@@ -100,9 +100,9 @@ func (table Table) WaitWithContext(ctx aws.Context, want ...Status) error {
 
 // primaryKeys attempts to determine this table's primary keys.
 // It will try:
-// - output LastEvaluatedKey
-// - input ExclusiveStartKey
-// - DescribeTable as a last resort (cached inside table)
+//   - output LastEvaluatedKey
+//   - input ExclusiveStartKey
+//   - DescribeTable as a last resort (cached inside table)
 func (table Table) primaryKeys(ctx aws.Context, lek, esk map[string]*dynamodb.AttributeValue, index string) (map[string]struct{}, error) {
 	extract := func(item map[string]*dynamodb.AttributeValue) map[string]struct{} {
 		keys := make(map[string]struct{}, len(item))

@@ -177,6 +177,7 @@ type PagingIter interface {
 	LastEvaluatedKey() PagingKey
 }
 
+// PagingIter is an iterator of combined request results from multiple iterators running in parallel.
 type ParallelIter interface {
 	Iter
 	// LastEvaluatedKeys returns each parallel segment's last evaluated key in order of segment number.

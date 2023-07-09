@@ -26,7 +26,7 @@ type widget struct {
 
 	Msg       string              `dynamo:"Message"`    // Change name in the database
 	Count     int                 `dynamo:",omitempty"` // Omits if zero value
-	Children  []widget            // Lists
+	Children  []widget            // List of maps
 	Friends   []string            `dynamo:",set"` // Sets
 	Set       map[string]struct{} `dynamo:",set"` // Map sets, too!
 	SecretKey string              `dynamo:"-"`    // Ignored

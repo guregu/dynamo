@@ -467,7 +467,7 @@ func (itr *scanIter) LastEvaluatedKey() PagingKey {
 		// this matches old behavior before the LEK was automatically generated
 		// TODO(v2): fix this.
 		if err != nil {
-			itr.scan.table.db.log("Warning:", err, "Returning a later LastEvaluatedKey.")
+			itr.scan.table.db.log("dynamo: Warning:", err, "Returning a later LastEvaluatedKey.")
 			return itr.output.LastEvaluatedKey
 		}
 		return lek

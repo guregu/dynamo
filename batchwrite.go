@@ -1,6 +1,7 @@
 package dynamo
 
 import (
+	"context"
 	"math"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -71,7 +72,7 @@ func (bw *BatchWrite) Run() (wrote int, err error) {
 	return bw.RunWithContext(ctx)
 }
 
-func (bw *BatchWrite) RunWithContext(ctx aws.Context) (wrote int, err error) {
+func (bw *BatchWrite) RunWithContext(ctx context.Context) (wrote int, err error) {
 	if bw.err != nil {
 		return 0, bw.err
 	}

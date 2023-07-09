@@ -1,6 +1,7 @@
 package dynamo
 
 import (
+	"context"
 	"encoding"
 	"fmt"
 	"reflect"
@@ -61,12 +62,14 @@ type CreateTable struct {
 // for the primary key and all indices.
 //
 // An example of a from struct follows:
-// 	type UserAction struct {
-// 		UserID string    `dynamo:"ID,hash" index:"Seq-ID-index,range"`
-// 		Time   time.Time `dynamo:",range"`
-// 		Seq    int64     `localIndex:"ID-Seq-index,range" index:"Seq-ID-index,hash"`
-// 		UUID   string    `index:"UUID-index,hash"`
-// 	}
+//
+//	type UserAction struct {
+//		UserID string    `dynamo:"ID,hash" index:"Seq-ID-index,range"`
+//		Time   time.Time `dynamo:",range"`
+//		Seq    int64     `localIndex:"ID-Seq-index,range" index:"Seq-ID-index,hash"`
+//		UUID   string    `index:"UUID-index,hash"`
+//	}
+//
 // This creates a table with the primary hash key ID and range key Time.
 // It creates two global secondary indices called UUID-index and Seq-ID-index,
 // and a local secondary index called ID-Seq-index.
@@ -238,7 +241,7 @@ func (ct *CreateTable) Run() error {
 }
 
 // RunWithContext creates this table or returns an error.
-func (ct *CreateTable) RunWithContext(ctx aws.Context) error {
+func (ct *CreateTable) RunWithContext(ctx context.Context) error {
 	if ct.err != nil {
 		return ct.err
 	}
@@ -258,7 +261,7 @@ func (ct *CreateTable) Wait() error {
 }
 
 // WaitWithContext creates this table and blocks until it exists and is ready to use.
-func (ct *CreateTable) WaitWithContext(ctx aws.Context) error {
+func (ct *CreateTable) WaitWithContext(ctx context.Context) error {
 	if err := ct.RunWithContext(ctx); err != nil {
 		return err
 	}

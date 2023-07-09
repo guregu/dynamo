@@ -2,6 +2,7 @@
 package dynamo
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -67,7 +68,7 @@ func (lt *ListTables) All() ([]string, error) {
 }
 
 // AllWithContext returns every table or an error.
-func (lt *ListTables) AllWithContext(ctx aws.Context) ([]string, error) {
+func (lt *ListTables) AllWithContext(ctx context.Context) ([]string, error) {
 	var tables []string
 	itr := lt.Iter()
 	var name string
@@ -96,7 +97,7 @@ func (itr *ltIter) Next(out interface{}) bool {
 	return itr.NextWithContext(ctx, out)
 }
 
-func (itr *ltIter) NextWithContext(ctx aws.Context, out interface{}) bool {
+func (itr *ltIter) NextWithContext(ctx context.Context, out interface{}) bool {
 	if ctx.Err() != nil {
 		itr.err = ctx.Err()
 	}
@@ -162,7 +163,7 @@ type Iter interface {
 	Next(out interface{}) bool
 	// NextWithContext tries to unmarshal the next result into out.
 	// Returns false when it is complete or if it runs into an error.
-	NextWithContext(ctx aws.Context, out interface{}) bool
+	NextWithContext(ctx context.Context, out interface{}) bool
 	// Err returns the error encountered, if any.
 	// You should check this after Next is finished.
 	Err() error

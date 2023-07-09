@@ -1,6 +1,8 @@
 package dynamo
 
 import (
+	"context"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
@@ -36,7 +38,7 @@ func (ttl *UpdateTTL) Run() error {
 }
 
 // RunWithContext executes this request.
-func (ttl *UpdateTTL) RunWithContext(ctx aws.Context) error {
+func (ttl *UpdateTTL) RunWithContext(ctx context.Context) error {
 	input := ttl.input()
 
 	err := retry(ctx, func() error {
@@ -74,7 +76,7 @@ func (d *DescribeTTL) Run() (TTLDescription, error) {
 }
 
 // RunWithContext executes this request and returns details about time to live, or an error.
-func (d *DescribeTTL) RunWithContext(ctx aws.Context) (TTLDescription, error) {
+func (d *DescribeTTL) RunWithContext(ctx context.Context) (TTLDescription, error) {
 	input := d.input()
 
 	var result *dynamodb.DescribeTimeToLiveOutput

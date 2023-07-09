@@ -1,6 +1,8 @@
 package dynamo
 
 import (
+	"context"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
@@ -58,7 +60,7 @@ func (p *Put) Run() error {
 }
 
 // Run executes this put.
-func (p *Put) RunWithContext(ctx aws.Context) error {
+func (p *Put) RunWithContext(ctx context.Context) error {
 	p.returnType = "NONE"
 	_, err := p.run(ctx)
 	return err
@@ -74,7 +76,7 @@ func (p *Put) OldValue(out interface{}) error {
 
 // OldValueWithContext executes this put, unmarshaling the previous value into out.
 // Returns ErrNotFound is there was no previous value.
-func (p *Put) OldValueWithContext(ctx aws.Context, out interface{}) error {
+func (p *Put) OldValueWithContext(ctx context.Context, out interface{}) error {
 	p.returnType = "ALL_OLD"
 	output, err := p.run(ctx)
 	switch {
@@ -86,7 +88,7 @@ func (p *Put) OldValueWithContext(ctx aws.Context, out interface{}) error {
 	return unmarshalItem(output.Attributes, out)
 }
 
-func (p *Put) run(ctx aws.Context) (output *dynamodb.PutItemOutput, err error) {
+func (p *Put) run(ctx context.Context) (output *dynamodb.PutItemOutput, err error) {
 	if p.err != nil {
 		return nil, p.err
 	}

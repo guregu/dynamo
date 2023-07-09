@@ -1,6 +1,7 @@
 package dynamo
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -83,7 +84,7 @@ func (d *Delete) Run() error {
 	return d.RunWithContext(ctx)
 }
 
-func (d *Delete) RunWithContext(ctx aws.Context) error {
+func (d *Delete) RunWithContext(ctx context.Context) error {
 	d.returnType = "NONE"
 	_, err := d.run(ctx)
 	return err
@@ -97,7 +98,7 @@ func (d *Delete) OldValue(out interface{}) error {
 	return d.OldValueWithContext(ctx, out)
 }
 
-func (d *Delete) OldValueWithContext(ctx aws.Context, out interface{}) error {
+func (d *Delete) OldValueWithContext(ctx context.Context, out interface{}) error {
 	d.returnType = "ALL_OLD"
 	output, err := d.run(ctx)
 	switch {
@@ -109,7 +110,7 @@ func (d *Delete) OldValueWithContext(ctx aws.Context, out interface{}) error {
 	return unmarshalItem(output.Attributes, out)
 }
 
-func (d *Delete) run(ctx aws.Context) (*dynamodb.DeleteItemOutput, error) {
+func (d *Delete) run(ctx context.Context) (*dynamodb.DeleteItemOutput, error) {
 	if d.err != nil {
 		return nil, d.err
 	}

@@ -1,6 +1,7 @@
 package dynamo
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
@@ -66,7 +67,7 @@ func (tx *GetTx) Run() error {
 }
 
 // RunWithContext executes this transaction and unmarshals everything specified by GetOne.
-func (tx *GetTx) RunWithContext(ctx aws.Context) error {
+func (tx *GetTx) RunWithContext(ctx context.Context) error {
 	input, err := tx.input()
 	if err != nil {
 		return err
@@ -113,7 +114,7 @@ func (tx *GetTx) All(out interface{}) error {
 }
 
 // AllWithContext executes this transaction and unmarshals every value to out, which must be a pointer to a slice.
-func (tx *GetTx) AllWithContext(ctx aws.Context, out interface{}) error {
+func (tx *GetTx) AllWithContext(ctx context.Context, out interface{}) error {
 	input, err := tx.input()
 	if err != nil {
 		return err
@@ -264,7 +265,7 @@ func (tx *WriteTx) Run() error {
 }
 
 // RunWithContext executes this transaction.
-func (tx *WriteTx) RunWithContext(ctx aws.Context) error {
+func (tx *WriteTx) RunWithContext(ctx context.Context) error {
 	if tx.err != nil {
 		return tx.err
 	}

@@ -1,6 +1,7 @@
 package dynamo
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -295,7 +296,7 @@ func (u *Update) Run() error {
 }
 
 // RunWithContext executes this update.
-func (u *Update) RunWithContext(ctx aws.Context) error {
+func (u *Update) RunWithContext(ctx context.Context) error {
 	u.returnType = "NONE"
 	_, err := u.run(ctx)
 	return err
@@ -311,7 +312,7 @@ func (u *Update) Value(out interface{}) error {
 
 // ValueWithContext executes this update, encoding out with the new value after the update.
 // This is equivalent to ReturnValues = ALL_NEW in the DynamoDB API.
-func (u *Update) ValueWithContext(ctx aws.Context, out interface{}) error {
+func (u *Update) ValueWithContext(ctx context.Context, out interface{}) error {
 	u.returnType = "ALL_NEW"
 	output, err := u.run(ctx)
 	if err != nil {
@@ -330,7 +331,7 @@ func (u *Update) OldValue(out interface{}) error {
 
 // OldValueWithContext executes this update, encoding out with the old value before the update.
 // This is equivalent to ReturnValues = ALL_OLD in the DynamoDB API.
-func (u *Update) OldValueWithContext(ctx aws.Context, out interface{}) error {
+func (u *Update) OldValueWithContext(ctx context.Context, out interface{}) error {
 	u.returnType = "ALL_OLD"
 	output, err := u.run(ctx)
 	if err != nil {
@@ -349,7 +350,7 @@ func (u *Update) OnlyUpdatedValue(out interface{}) error {
 
 // OnlyUpdatedValueWithContext executes this update, encoding out with only with new values of the attributes that were changed.
 // This is equivalent to ReturnValues = UPDATED_NEW in the DynamoDB API.
-func (u *Update) OnlyUpdatedValueWithContext(ctx aws.Context, out interface{}) error {
+func (u *Update) OnlyUpdatedValueWithContext(ctx context.Context, out interface{}) error {
 	u.returnType = "UPDATED_NEW"
 	output, err := u.run(ctx)
 	if err != nil {
@@ -368,7 +369,7 @@ func (u *Update) OnlyUpdatedOldValue(out interface{}) error {
 
 // OnlyUpdatedOldValueWithContext executes this update, encoding out with only with old values of the attributes that were changed.
 // This is equivalent to ReturnValues = UPDATED_OLD in the DynamoDB API.
-func (u *Update) OnlyUpdatedOldValueWithContext(ctx aws.Context, out interface{}) error {
+func (u *Update) OnlyUpdatedOldValueWithContext(ctx context.Context, out interface{}) error {
 	u.returnType = "UPDATED_OLD"
 	output, err := u.run(ctx)
 	if err != nil {
@@ -377,7 +378,7 @@ func (u *Update) OnlyUpdatedOldValueWithContext(ctx aws.Context, out interface{}
 	return unmarshalItem(output.Attributes, out)
 }
 
-func (u *Update) run(ctx aws.Context) (*dynamodb.UpdateItemOutput, error) {
+func (u *Update) run(ctx context.Context) (*dynamodb.UpdateItemOutput, error) {
 	if u.err != nil {
 		return nil, u.err
 	}

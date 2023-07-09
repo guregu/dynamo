@@ -1,6 +1,7 @@
 package dynamo
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -202,7 +203,7 @@ func (q *Query) One(out interface{}) error {
 	return q.OneWithContext(ctx, out)
 }
 
-func (q *Query) OneWithContext(ctx aws.Context, out interface{}) error {
+func (q *Query) OneWithContext(ctx context.Context, out interface{}) error {
 	if q.err != nil {
 		return q.err
 	}
@@ -272,7 +273,7 @@ func (q *Query) Count() (int64, error) {
 	return q.CountWithContext(ctx)
 }
 
-func (q *Query) CountWithContext(ctx aws.Context) (int64, error) {
+func (q *Query) CountWithContext(ctx context.Context) (int64, error) {
 	if q.err != nil {
 		return 0, q.err
 	}
@@ -340,7 +341,7 @@ func (itr *queryIter) Next(out interface{}) bool {
 	return itr.NextWithContext(ctx, out)
 }
 
-func (itr *queryIter) NextWithContext(ctx aws.Context, out interface{}) bool {
+func (itr *queryIter) NextWithContext(ctx context.Context, out interface{}) bool {
 	// stop if we have an error
 	if ctx.Err() != nil {
 		itr.err = ctx.Err()
@@ -465,7 +466,7 @@ func (q *Query) All(out interface{}) error {
 	return q.AllWithContext(ctx, out)
 }
 
-func (q *Query) AllWithContext(ctx aws.Context, out interface{}) error {
+func (q *Query) AllWithContext(ctx context.Context, out interface{}) error {
 	iter := &queryIter{
 		query:     q,
 		unmarshal: unmarshalAppend,
@@ -484,7 +485,7 @@ func (q *Query) AllWithLastEvaluatedKey(out interface{}) (PagingKey, error) {
 	return q.AllWithLastEvaluatedKeyContext(ctx, out)
 }
 
-func (q *Query) AllWithLastEvaluatedKeyContext(ctx aws.Context, out interface{}) (PagingKey, error) {
+func (q *Query) AllWithLastEvaluatedKeyContext(ctx context.Context, out interface{}) (PagingKey, error) {
 	iter := &queryIter{
 		query:     q,
 		unmarshal: unmarshalAppend,

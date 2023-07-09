@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
@@ -62,7 +61,7 @@ func (table Table) Wait(want ...Status) error {
 
 // Wait blocks until this table's status matches any status provided by want.
 // If no statuses are specified, the active status is used.
-func (table Table) WaitWithContext(ctx aws.Context, want ...Status) error {
+func (table Table) WaitWithContext(ctx context.Context, want ...Status) error {
 	if len(want) == 0 {
 		want = []Status{ActiveStatus}
 	}
@@ -103,7 +102,7 @@ func (table Table) WaitWithContext(ctx aws.Context, want ...Status) error {
 //   - output LastEvaluatedKey
 //   - input ExclusiveStartKey
 //   - DescribeTable as a last resort (cached inside table)
-func (table Table) primaryKeys(ctx aws.Context, lek, esk map[string]*dynamodb.AttributeValue, index string) (map[string]struct{}, error) {
+func (table Table) primaryKeys(ctx context.Context, lek, esk map[string]*dynamodb.AttributeValue, index string) (map[string]struct{}, error) {
 	extract := func(item map[string]*dynamodb.AttributeValue) map[string]struct{} {
 		keys := make(map[string]struct{}, len(item))
 		for k := range item {
@@ -188,7 +187,7 @@ func (dt *DeleteTable) Run() error {
 }
 
 // RunWithContext executes this request and deletes the table.
-func (dt *DeleteTable) RunWithContext(ctx aws.Context) error {
+func (dt *DeleteTable) RunWithContext(ctx context.Context) error {
 	input := dt.input()
 	return retry(ctx, func() error {
 		_, err := dt.table.db.client.DeleteTableWithContext(ctx, input)

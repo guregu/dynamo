@@ -1,6 +1,7 @@
 package dynamo
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -124,7 +125,7 @@ func (bg *BatchGet) All(out interface{}) error {
 }
 
 // AllWithContext executes this request and unmarshals all results to out, which must be a pointer to a slice.
-func (bg *BatchGet) AllWithContext(ctx aws.Context, out interface{}) error {
+func (bg *BatchGet) AllWithContext(ctx context.Context, out interface{}) error {
 	iter := newBGIter(bg, unmarshalAppend, bg.err)
 	for iter.NextWithContext(ctx, out) {
 	}
@@ -220,7 +221,7 @@ func (itr *bgIter) Next(out interface{}) bool {
 	return itr.NextWithContext(ctx, out)
 }
 
-func (itr *bgIter) NextWithContext(ctx aws.Context, out interface{}) bool {
+func (itr *bgIter) NextWithContext(ctx context.Context, out interface{}) bool {
 	// stop if we have an error
 	if ctx.Err() != nil {
 		itr.err = ctx.Err()

@@ -1,6 +1,7 @@
 package dynamo
 
 import (
+	"context"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -255,7 +256,7 @@ func (dt *DescribeTable) Run() (Description, error) {
 	return dt.RunWithContext(ctx)
 }
 
-func (dt *DescribeTable) RunWithContext(ctx aws.Context) (Description, error) {
+func (dt *DescribeTable) RunWithContext(ctx context.Context) (Description, error) {
 	input := dt.input()
 
 	var result *dynamodb.DescribeTableOutput

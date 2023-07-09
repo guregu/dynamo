@@ -1,6 +1,7 @@
 package dynamo
 
 import (
+	"context"
 	"errors"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -111,7 +112,7 @@ func (ut *UpdateTable) Run() (Description, error) {
 	return ut.RunWithContext(ctx)
 }
 
-func (ut *UpdateTable) RunWithContext(ctx aws.Context) (Description, error) {
+func (ut *UpdateTable) RunWithContext(ctx context.Context) (Description, error) {
 	if ut.err != nil {
 		return Description{}, ut.err
 	}

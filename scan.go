@@ -169,7 +169,7 @@ func (s *Scan) All(out interface{}) error {
 }
 
 // AllWithContext executes this request and unmarshals all results to out, which must be a pointer to a slice.
-func (s *Scan) AllWithContext(ctx aws.Context, out interface{}) error {
+func (s *Scan) AllWithContext(ctx context.Context, out interface{}) error {
 	itr := &scanIter{
 		scan:      s,
 		unmarshal: unmarshalAppend,
@@ -190,7 +190,7 @@ func (s *Scan) AllWithLastEvaluatedKey(out interface{}) (PagingKey, error) {
 
 // AllWithLastEvaluatedKeyContext executes this request and unmarshals all results to out, which must be a pointer to a slice.
 // It returns a key you can use with StartWith to continue this query.
-func (s *Scan) AllWithLastEvaluatedKeyContext(ctx aws.Context, out interface{}) (PagingKey, error) {
+func (s *Scan) AllWithLastEvaluatedKeyContext(ctx context.Context, out interface{}) (PagingKey, error) {
 	itr := &scanIter{
 		scan:      s,
 		unmarshal: unmarshalAppend,
@@ -202,7 +202,7 @@ func (s *Scan) AllWithLastEvaluatedKeyContext(ctx aws.Context, out interface{}) 
 }
 
 // AllParallel executes this request by running the given number of segments in parallel, then unmarshaling all results to out, which must be a pointer to a slice.
-func (s *Scan) AllParallel(ctx aws.Context, segments int64, out interface{}) error {
+func (s *Scan) AllParallel(ctx context.Context, segments int64, out interface{}) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	iters := s.newSegments(segments, nil)
@@ -215,7 +215,7 @@ func (s *Scan) AllParallel(ctx aws.Context, segments int64, out interface{}) err
 
 // AllParallelWithLastEvaluatedKeys executes this request by running the given number of segments in parallel, then unmarshaling all results to out, which must be a pointer to a slice.
 // Returns a slice of LastEvalutedKeys that can be used to continue the query later.
-func (s *Scan) AllParallelWithLastEvaluatedKeys(ctx aws.Context, segments int64, out interface{}) ([]PagingKey, error) {
+func (s *Scan) AllParallelWithLastEvaluatedKeys(ctx context.Context, segments int64, out interface{}) ([]PagingKey, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	iters := s.newSegments(segments, nil)
@@ -228,7 +228,7 @@ func (s *Scan) AllParallelWithLastEvaluatedKeys(ctx aws.Context, segments int64,
 
 // AllParallelStartFrom executes this request by continuing parallel scans from the given LastEvaluatedKeys, then unmarshaling all results to out, which must be a pointer to a slice.
 // Returns a new slice of LastEvaluatedKeys after the scan finishes.
-func (s *Scan) AllParallelStartFrom(ctx aws.Context, keys []PagingKey, out interface{}) ([]PagingKey, error) {
+func (s *Scan) AllParallelStartFrom(ctx context.Context, keys []PagingKey, out interface{}) ([]PagingKey, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	iters := s.newSegments(int64(len(keys)), keys)
@@ -251,7 +251,7 @@ func (s *Scan) Count() (int64, error) {
 // CountWithContext executes this request and returns the number of items matching the scan.
 // It takes into account the filter, limit, search limit, and all other parameters given.
 // It may return a higher count than the limits.
-func (s *Scan) CountWithContext(ctx aws.Context) (int64, error) {
+func (s *Scan) CountWithContext(ctx context.Context) (int64, error) {
 	if s.err != nil {
 		return 0, s.err
 	}
@@ -362,7 +362,7 @@ func (itr *scanIter) Next(out interface{}) bool {
 	return itr.NextWithContext(ctx, out)
 }
 
-func (itr *scanIter) NextWithContext(ctx aws.Context, out interface{}) bool {
+func (itr *scanIter) NextWithContext(ctx context.Context, out interface{}) bool {
 redo:
 	// stop if we have an error
 	if ctx.Err() != nil {

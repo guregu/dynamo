@@ -1,10 +1,13 @@
 package dynamo
 
 import (
+	"context"
 	"strings"
+	"sync"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"golang.org/x/sync/errgroup"
 )
 
 // Scan is a request to scan all the data in a table.
@@ -38,6 +41,7 @@ func (table Table) Scan() *Scan {
 
 // StartFrom makes this scan continue from a previous one.
 // Use Scan.Iter's LastEvaluatedKey.
+// Ignored by ParallelIter and friends, pass multiple keys to ParallelIterStartFrom instead.
 func (s *Scan) StartFrom(key PagingKey) *Scan {
 	s.startKey = key
 	return s
@@ -49,11 +53,37 @@ func (s *Scan) Index(name string) *Scan {
 	return s
 }
 
-// Segment specifies the Segment and Total Segments to operate on in a parallel scan.
+// Segment specifies the Segment and Total Segments to operate on in a manual parallel scan.
+// This is useful if you want to control the parallel scans by yourself instead of using ParallelIter.
+// Ignored by ParallelIter and friends.
 func (s *Scan) Segment(segment int64, totalSegments int64) *Scan {
 	s.segment = segment
 	s.totalSegments = totalSegments
 	return s
+}
+
+func (s *Scan) newSegments(segments int64, leks []PagingKey) []*scanIter {
+	iters := make([]*scanIter, segments)
+	lekLen := int64(len(leks))
+	for i := int64(0); i < segments; i++ {
+		seg := *s
+		var cc *ConsumedCapacity
+		if s.cc != nil {
+			cc = new(ConsumedCapacity)
+		}
+		seg.Segment(i, segments).ConsumedCapacity(cc)
+		if i < lekLen {
+			lek := leks[i]
+			if lek == nil {
+				continue
+			}
+			seg.StartFrom(leks[i])
+		} else {
+			seg.StartFrom(nil)
+		}
+		iters[i] = seg.Iter().(*scanIter)
+	}
+	return iters
 }
 
 // Project limits the result attributes to the given paths.
@@ -113,12 +143,29 @@ func (s *Scan) Iter() PagingIter {
 	}
 }
 
+// IterParallel returns a results iterator for this request, running the given number of segments in parallel.
+// Canceling the context given here will cancel the processing of all segments.
+func (s *Scan) IterParallel(ctx context.Context, segments int64) ParallelIter {
+	iters := s.newSegments(segments, nil)
+	ps := newParallelScan(iters, s.cc, false, unmarshalItem)
+	go ps.run(ctx)
+	return ps
+}
+
+// IterParallelFrom returns a results iterator continued from a previous ParallelIter's LastEvaluatedKeys.
+// Canceling the context given here will cancel the processing of all segments.
+func (s *Scan) IterParallelStartFrom(ctx context.Context, keys []PagingKey) ParallelIter {
+	iters := s.newSegments(int64(len(keys)), keys)
+	ps := newParallelScan(iters, s.cc, false, unmarshalItem)
+	go ps.run(ctx)
+	return ps
+}
+
 // All executes this request and unmarshals all results to out, which must be a pointer to a slice.
 func (s *Scan) All(out interface{}) error {
 	ctx, cancel := defaultContext()
 	defer cancel()
-	_, err := s.AllWithLastEvaluatedKeyContext(ctx, out)
-	return err
+	return s.AllWithContext(ctx, out)
 }
 
 // AllWithContext executes this request and unmarshals all results to out, which must be a pointer to a slice.
@@ -152,6 +199,44 @@ func (s *Scan) AllWithLastEvaluatedKeyContext(ctx aws.Context, out interface{}) 
 	for itr.NextWithContext(ctx, out) {
 	}
 	return itr.LastEvaluatedKey(), itr.Err()
+}
+
+// AllParallel executes this request by running the given number of segments in parallel, then unmarshaling all results to out, which must be a pointer to a slice.
+func (s *Scan) AllParallel(ctx aws.Context, segments int64, out interface{}) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	iters := s.newSegments(segments, nil)
+	ps := newParallelScan(iters, s.cc, true, unmarshalAppend)
+	go ps.run(ctx)
+	for ps.NextWithContext(ctx, out) {
+	}
+	return ps.Err()
+}
+
+// AllParallelWithLastEvaluatedKeys executes this request by running the given number of segments in parallel, then unmarshaling all results to out, which must be a pointer to a slice.
+// Returns a slice of LastEvalutedKeys that can be used to continue the query later.
+func (s *Scan) AllParallelWithLastEvaluatedKeys(ctx aws.Context, segments int64, out interface{}) ([]PagingKey, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	iters := s.newSegments(segments, nil)
+	ps := newParallelScan(iters, s.cc, false, unmarshalAppend)
+	go ps.run(ctx)
+	for ps.NextWithContext(ctx, out) {
+	}
+	return ps.LastEvaluatedKeys(), ps.Err()
+}
+
+// AllParallelStartFrom executes this request by continuing parallel scans from the given LastEvaluatedKeys, then unmarshaling all results to out, which must be a pointer to a slice.
+// Returns a new slice of LastEvaluatedKeys after the scan finishes.
+func (s *Scan) AllParallelStartFrom(ctx aws.Context, keys []PagingKey, out interface{}) ([]PagingKey, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	iters := s.newSegments(int64(len(keys)), keys)
+	ps := newParallelScan(iters, s.cc, false, unmarshalAppend)
+	go ps.run(ctx)
+	for ps.NextWithContext(ctx, out) {
+	}
+	return ps.LastEvaluatedKeys(), ps.Err()
 }
 
 // Count executes this request and returns the number of items matching the scan.
@@ -278,6 +363,7 @@ func (itr *scanIter) Next(out interface{}) bool {
 }
 
 func (itr *scanIter) NextWithContext(ctx aws.Context, out interface{}) bool {
+redo:
 	// stop if we have an error
 	if ctx.Err() != nil {
 		itr.err = ctx.Err()
@@ -339,7 +425,7 @@ func (itr *scanIter) NextWithContext(ctx aws.Context, out interface{}) bool {
 
 	if len(itr.output.Items) == 0 {
 		if itr.output.LastEvaluatedKey != nil {
-			return itr.NextWithContext(ctx, out)
+			goto redo
 		}
 		return false
 	}
@@ -393,4 +479,115 @@ func (itr *scanIter) LastEvaluatedKey() PagingKey {
 		return lek
 	}
 	return nil
+}
+
+type parallelScan struct {
+	iters []*scanIter
+	items chan map[string]*dynamodb.AttributeValue
+
+	leks []PagingKey
+	cc   *ConsumedCapacity
+	err  error
+	mu   *sync.Mutex
+
+	unmarshal unmarshalFunc
+}
+
+func newParallelScan(iters []*scanIter, cc *ConsumedCapacity, skipLEK bool, unmarshal unmarshalFunc) *parallelScan {
+	ps := &parallelScan{
+		iters:     iters,
+		items:     make(chan map[string]*dynamodb.AttributeValue),
+		cc:        cc,
+		mu:        new(sync.Mutex),
+		unmarshal: unmarshal,
+	}
+	if !skipLEK {
+		ps.leks = make([]PagingKey, len(ps.iters))
+	}
+	return ps
+}
+
+func (ps *parallelScan) run(ctx context.Context) {
+	grp, ctx := errgroup.WithContext(ctx)
+	for i, iter := range ps.iters {
+		i, iter := i, iter
+		if iter == nil {
+			continue
+		}
+		grp.Go(func() error {
+			var item map[string]*dynamodb.AttributeValue
+			for iter.NextWithContext(ctx, &item) {
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case ps.items <- item:
+				}
+
+				if ps.leks != nil {
+					lek := iter.LastEvaluatedKey()
+					ps.mu.Lock()
+					ps.leks[i] = lek
+					ps.mu.Unlock()
+				}
+			}
+
+			if ps.cc != nil && iter.scan.cc != nil {
+				ps.mu.Lock()
+				mergeConsumedCapacity(ps.cc, iter.scan.cc)
+				ps.mu.Unlock()
+			}
+
+			return iter.Err()
+		})
+	}
+	err := grp.Wait()
+	if err != nil {
+		ps.setError(err)
+	}
+	close(ps.items)
+}
+
+func (ps *parallelScan) Next(out interface{}) bool {
+	ctx, cancel := defaultContext()
+	defer cancel()
+	return ps.NextWithContext(ctx, out)
+}
+
+func (ps *parallelScan) NextWithContext(ctx context.Context, out interface{}) bool {
+	select {
+	case <-ctx.Done():
+		ps.setError(ctx.Err())
+		return false
+	case item := <-ps.items:
+		if item == nil {
+			return false
+		}
+		if err := ps.unmarshal(item, out); err != nil {
+			ps.setError(err)
+			return false
+		}
+		return true
+	}
+}
+
+func (ps *parallelScan) setError(err error) {
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+	if ps.err == nil {
+		ps.err = err
+	}
+}
+
+func (ps *parallelScan) Err() error {
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+	return ps.err
+}
+
+func (ps *parallelScan) LastEvaluatedKeys() []PagingKey {
+	keys := make([]PagingKey, len(ps.leks))
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+	copy(keys, ps.leks)
+	return keys
 }

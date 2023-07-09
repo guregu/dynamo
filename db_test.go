@@ -35,8 +35,8 @@ func init() {
 
 // widget is the data structure used for integration tests
 type widget struct {
-	UserID int       // PK
-	Time   time.Time // RK
+	UserID int       `dynamo:",hash"`
+	Time   time.Time `dynamo:",range"`
 	Msg    string
 	Count  int
 	Meta   map[string]string

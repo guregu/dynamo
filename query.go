@@ -248,7 +248,7 @@ func (q *Query) OneWithContext(ctx context.Context, out interface{}) error {
 		switch {
 		case len(res.Items) == 0:
 			return ErrNotFound
-		case len(res.Items) > 1:
+		case len(res.Items) > 1 && q.limit != 1:
 			return ErrTooMany
 		case res.LastEvaluatedKey != nil && q.searchLimit != 0:
 			return ErrTooMany

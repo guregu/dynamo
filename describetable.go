@@ -126,10 +126,16 @@ func newDescription(table *dynamodb.TableDescription) Description {
 
 	for _, index := range table.GlobalSecondaryIndexes {
 		idx := Index{
-			Name:       *index.IndexName,
-			ARN:        *index.IndexArn,
-			Status:     Status(*index.IndexStatus),
 			Throughput: newThroughput(index.ProvisionedThroughput),
+		}
+		if index.IndexName != nil {
+			idx.Name = *index.IndexName
+		}
+		if index.IndexArn != nil {
+			idx.ARN = *index.IndexArn
+		}
+		if index.IndexStatus != nil {
+			idx.Status = Status(*index.IndexStatus)
 		}
 		if index.Projection != nil && index.Projection.ProjectionType != nil {
 			idx.ProjectionType = IndexProjection(*index.Projection.ProjectionType)
@@ -151,11 +157,15 @@ func newDescription(table *dynamodb.TableDescription) Description {
 	}
 	for _, index := range table.LocalSecondaryIndexes {
 		idx := Index{
-			Name:       *index.IndexName,
-			ARN:        *index.IndexArn,
 			Status:     ActiveStatus, // local secondary index is always active (technically, it has no status)
 			Local:      true,
 			Throughput: desc.Throughput, // has the same throughput as the table
+		}
+		if index.IndexName != nil {
+			idx.Name = *index.IndexName
+		}
+		if index.IndexArn != nil {
+			idx.ARN = *index.IndexArn
 		}
 		if index.Projection != nil && index.Projection.ProjectionType != nil {
 			idx.ProjectionType = IndexProjection(*index.Projection.ProjectionType)

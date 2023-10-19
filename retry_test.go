@@ -7,6 +7,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
@@ -34,15 +35,43 @@ func TestRetryMax(t *testing.T) {
 					fmt.Sprintf("try-%d", runs),
 				)
 			})
-			if err != nil {
+			if err == nil {
 				t.Fatal("expected error, got nil")
 			}
 			if want := max + 1; runs != want {
-				t.Error("wrong number of retries. want:", want, "got:", runs)
+				t.Error("wrong number of runs. want:", want, "got:", runs)
 			}
 		}
 	}
 	t.Run(test(0))
 	t.Run(test(1))
 	t.Run(test(3))
+}
+
+func TestRetryCustom(t *testing.T) {
+	t.Parallel()
+	sesh, err := session.NewSession(&aws.Config{
+		Retryer:    client.NoOpRetryer{},
+		MaxRetries: aws.Int(10), // should be ignored (superseded by Retryer)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	db := New(sesh)
+
+	var runs int
+	err = db.retry(context.Background(), func() error {
+		runs++
+		return awserr.NewRequestFailure(
+			awserr.New(dynamodb.ErrCodeProvisionedThroughputExceededException, "dummy error", nil),
+			400,
+			fmt.Sprintf("try-%d", runs),
+		)
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if want := 1; runs != want {
+		t.Error("wrong number of runs. want:", want, "got:", runs)
+	}
 }

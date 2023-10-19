@@ -26,6 +26,11 @@ func defaultContext() (context.Context, context.CancelFunc) {
 }
 
 func (db *DB) retry(ctx context.Context, f func() error) error {
+	// if a custom retryer has been set, the SDK will retry for us
+	if db.retryer != nil {
+		return f()
+	}
+
 	var err error
 	var next time.Duration
 	b := backoff.WithContext(backoff.NewExponentialBackOff(), ctx)
@@ -42,7 +47,7 @@ func (db *DB) retry(ctx context.Context, f func() error) error {
 			return err
 		}
 
-		if err = aws.SleepWithContext(ctx, next); err != nil {
+		if err := aws.SleepWithContext(ctx, next); err != nil {
 			return err
 		}
 	}

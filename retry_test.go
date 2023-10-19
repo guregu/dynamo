@@ -19,7 +19,8 @@ func TestRetryMax(t *testing.T) {
 			t.Parallel()
 			t.Helper()
 			sesh, err := session.NewSession(&aws.Config{
-				MaxRetries: aws.Int(max),
+				MaxRetries:  aws.Int(max),
+				Credentials: dummyCreds,
 			})
 			if err != nil {
 				t.Fatal(err)
@@ -51,8 +52,9 @@ func TestRetryMax(t *testing.T) {
 func TestRetryCustom(t *testing.T) {
 	t.Parallel()
 	sesh, err := session.NewSession(&aws.Config{
-		Retryer:    client.NoOpRetryer{},
-		MaxRetries: aws.Int(10), // should be ignored (superseded by Retryer)
+		Retryer:     client.NoOpRetryer{},
+		MaxRetries:  aws.Int(10), // should be ignored (superseded by Retryer)
+		Credentials: dummyCreds,
 	})
 	if err != nil {
 		t.Fatal(err)

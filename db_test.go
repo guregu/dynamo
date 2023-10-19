@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 )
 
@@ -13,6 +14,8 @@ var (
 	testDB    *DB
 	testTable = "TestDB"
 )
+
+var dummyCreds = credentials.NewStaticCredentials("dummy", "dummy", "")
 
 const offlineSkipMsg = "DYNAMO_TEST_REGION not set"
 

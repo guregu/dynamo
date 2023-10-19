@@ -277,7 +277,7 @@ redo:
 		itr.idx = 0
 	}
 
-	itr.err = retry(ctx, func() error {
+	itr.err = itr.bg.batch.table.db.retry(ctx, func() error {
 		var err error
 		itr.output, err = itr.bg.batch.table.db.client.BatchGetItemWithContext(ctx, itr.input)
 		return err

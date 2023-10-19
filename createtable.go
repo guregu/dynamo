@@ -247,7 +247,7 @@ func (ct *CreateTable) RunWithContext(ctx context.Context) error {
 	}
 
 	input := ct.input()
-	return retry(ctx, func() error {
+	return ct.db.retry(ctx, func() error {
 		_, err := ct.db.client.CreateTableWithContext(ctx, input)
 		return err
 	})

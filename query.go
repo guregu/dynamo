@@ -213,7 +213,7 @@ func (q *Query) OneWithContext(ctx context.Context, out interface{}) error {
 		req := q.getItemInput()
 
 		var res *dynamodb.GetItemOutput
-		err := retry(ctx, func() error {
+		err := q.table.db.retry(ctx, func() error {
 			var err error
 			res, err = q.table.db.client.GetItemWithContext(ctx, req)
 			if err != nil {
@@ -238,7 +238,7 @@ func (q *Query) OneWithContext(ctx context.Context, out interface{}) error {
 	req := q.queryInput()
 
 	var res *dynamodb.QueryOutput
-	err := retry(ctx, func() error {
+	err := q.table.db.retry(ctx, func() error {
 		var err error
 		res, err = q.table.db.client.QueryWithContext(ctx, req)
 		if err != nil {
@@ -284,7 +284,7 @@ func (q *Query) CountWithContext(ctx context.Context) (int64, error) {
 		req := q.queryInput()
 		req.Select = selectCount
 
-		err := retry(ctx, func() error {
+		err := q.table.db.retry(ctx, func() error {
 			var err error
 			res, err = q.table.db.client.QueryWithContext(ctx, req)
 			if err != nil {
@@ -385,7 +385,7 @@ func (itr *queryIter) NextWithContext(ctx context.Context, out interface{}) bool
 		itr.idx = 0
 	}
 
-	itr.err = retry(ctx, func() error {
+	itr.err = itr.query.table.db.retry(ctx, func() error {
 		var err error
 		itr.output, err = itr.query.table.db.client.QueryWithContext(ctx, itr.input)
 		return err

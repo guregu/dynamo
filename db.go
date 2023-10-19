@@ -15,19 +15,24 @@ import (
 
 // DB is a DynamoDB client.
 type DB struct {
-	client dynamodbiface.DynamoDBAPI
-	logger aws.Logger
+	client   dynamodbiface.DynamoDBAPI
+	logger   aws.Logger
+	retryMax int
 }
 
 // New creates a new client with the given configuration.
 func New(p client.ConfigProvider, cfgs ...*aws.Config) *DB {
 	cfg := p.ClientConfig(dynamodb.EndpointsID, cfgs...)
 	db := &DB{
-		client: dynamodb.New(p, cfgs...),
-		logger: cfg.Config.Logger,
+		client:   dynamodb.New(p, cfgs...),
+		logger:   cfg.Config.Logger,
+		retryMax: -1,
 	}
 	if db.logger == nil {
 		db.logger = aws.NewDefaultLogger()
+	}
+	if cfg.Config.MaxRetries != nil {
+		db.retryMax = *cfg.Config.MaxRetries
 	}
 	return db
 }
@@ -123,7 +128,7 @@ func (itr *ltIter) NextWithContext(ctx context.Context, out interface{}) bool {
 		}
 	}
 
-	itr.err = retry(ctx, func() error {
+	itr.err = itr.lt.db.retry(ctx, func() error {
 		res, err := itr.lt.db.client.ListTablesWithContext(ctx, itr.input())
 		if err != nil {
 			return err

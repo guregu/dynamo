@@ -25,11 +25,11 @@ func defaultContext() (context.Context, context.CancelFunc) {
 	return context.WithDeadline(aws.BackgroundContext(), time.Now().Add(RetryTimeout))
 }
 
-func retry(ctx context.Context, f func() error) error {
+func (db *DB) retry(ctx context.Context, f func() error) error {
 	var err error
 	var next time.Duration
 	b := backoff.WithContext(backoff.NewExponentialBackOff(), ctx)
-	for {
+	for i := 0; db.retryMax < 0 || i <= db.retryMax; i++ {
 		if err = f(); err == nil {
 			return nil
 		}
@@ -46,6 +46,7 @@ func retry(ctx context.Context, f func() error) error {
 			return err
 		}
 	}
+	return err
 }
 
 // errRetry is a sentinel error to retry, should never be returned to user

@@ -73,7 +73,7 @@ func (tx *GetTx) RunWithContext(ctx context.Context) error {
 		return err
 	}
 	var resp *dynamodb.TransactGetItemsOutput
-	err = retry(ctx, func() error {
+	err = tx.db.retry(ctx, func() error {
 		var err error
 		resp, err = tx.db.client.TransactGetItemsWithContext(ctx, input)
 		if tx.cc != nil && resp != nil {
@@ -120,7 +120,7 @@ func (tx *GetTx) AllWithContext(ctx context.Context, out interface{}) error {
 		return err
 	}
 	var resp *dynamodb.TransactGetItemsOutput
-	err = retry(ctx, func() error {
+	err = tx.db.retry(ctx, func() error {
 		var err error
 		resp, err = tx.db.client.TransactGetItemsWithContext(ctx, input)
 		if tx.cc != nil && resp != nil {
@@ -273,7 +273,7 @@ func (tx *WriteTx) RunWithContext(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	err = retry(ctx, func() error {
+	err = tx.db.retry(ctx, func() error {
 		out, err := tx.db.client.TransactWriteItemsWithContext(ctx, input)
 		if tx.cc != nil && out != nil {
 			for _, cc := range out.ConsumedCapacity {

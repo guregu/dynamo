@@ -254,7 +254,7 @@ func (s *Scan) CountWithContext(ctx context.Context) (int64, error) {
 	input.Select = aws.String(dynamodb.SelectCount)
 	for {
 		var out *dynamodb.ScanOutput
-		err := retry(ctx, func() error {
+		err := s.table.db.retry(ctx, func() error {
 			var err error
 			out, err = s.table.db.client.ScanWithContext(ctx, input)
 			return err
@@ -401,7 +401,7 @@ redo:
 		itr.idx = 0
 	}
 
-	itr.err = retry(ctx, func() error {
+	itr.err = itr.scan.table.db.retry(ctx, func() error {
 		var err error
 		itr.output, err = itr.scan.table.db.client.ScanWithContext(ctx, itr.input)
 		return err

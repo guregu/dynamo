@@ -94,7 +94,7 @@ func (p *Put) run(ctx context.Context) (output *dynamodb.PutItemOutput, err erro
 	}
 
 	req := p.input()
-	retry(ctx, func() error {
+	p.table.db.retry(ctx, func() error {
 		output, err = p.table.db.client.PutItemWithContext(ctx, req)
 		return err
 	})

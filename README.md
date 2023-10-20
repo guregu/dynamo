@@ -175,6 +175,38 @@ type UserAction struct {
 
 This creates a table with the primary hash key ID and range key Time. It creates two global secondary indices called UUID-index and Seq-ID-index, and a local secondary index called ID-Seq-index.
 
+### Retrying
+
+Requests that fail with certain errors (e.g. `ThrottlingException`) are [automatically retried](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Programming.Errors.html#Programming.Errors.RetryAndBackoff).
+Methods that take a `context.Context` will retry until the context is canceled.
+Methods without a context will use the `RetryTimeout` global variable, which can be changed; using context is recommended instead.
+
+#### Limiting or disabling retrying
+
+The maximum number of retries can be configured via the `MaxRetries` field in the `*aws.Config` passed to `dynamo.New()`. A value of `0` will disable retrying. A value of `-1` means unlimited and is the default (however, context or `RetryTimeout` will still apply).
+
+```go
+db := dynamo.New(session, &aws.Config{
+	MaxRetries: aws.Int(0), // disables automatic retrying
+})
+```
+
+#### Custom retrying logic
+
+If a custom [`request.Retryer`](https://pkg.go.dev/github.com/aws/aws-sdk-go/aws/request#Retryer) is set via the `Retryer` field in `*aws.Config`, dynamo will delegate retrying entirely to it, taking precedence over other retrying settings. This allows you to have full control over all aspects of retrying.
+
+Example using [`client.DefaultRetryer`](https://pkg.go.dev/github.com/aws/aws-sdk-go/aws/client#DefaultRetryer):
+
+```go
+retryer := client.DefaultRetryer{
+	NumMaxRetries:    10,
+	MinThrottleDelay: 500 * time.Millisecond,
+	MaxThrottleDelay: 30 * time.Second,
+}
+db := dynamo.New(session, &aws.Config{
+	Retryer: retryer,
+})
+```
 
 ### Compatibility with the official AWS library
 

@@ -72,7 +72,7 @@ func (table Table) WaitWithContext(ctx context.Context, want ...Status) error {
 		}
 	}
 
-	err := retry(ctx, func() error {
+	err := table.db.retry(ctx, func() error {
 		desc, err := table.Describe().RunWithContext(ctx)
 		var aerr awserr.RequestFailure
 		if errors.As(err, &aerr) {
@@ -132,7 +132,7 @@ func (table Table) primaryKeys(ctx context.Context, lek, esk map[string]*dynamod
 	}
 
 	keys := make(map[string]struct{})
-	err := retry(ctx, func() error {
+	err := table.db.retry(ctx, func() error {
 		desc, err := table.Describe().RunWithContext(ctx)
 		if err != nil {
 			return err
@@ -189,7 +189,7 @@ func (dt *DeleteTable) Run() error {
 // RunWithContext executes this request and deletes the table.
 func (dt *DeleteTable) RunWithContext(ctx context.Context) error {
 	input := dt.input()
-	return retry(ctx, func() error {
+	return dt.table.db.retry(ctx, func() error {
 		_, err := dt.table.db.client.DeleteTableWithContext(ctx, input)
 		return err
 	})

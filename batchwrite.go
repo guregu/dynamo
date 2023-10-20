@@ -94,7 +94,7 @@ func (bw *BatchWrite) RunWithContext(ctx context.Context) (wrote int, err error)
 		for {
 			var res *dynamodb.BatchWriteItemOutput
 			req := bw.input(ops)
-			err := retry(ctx, func() error {
+			err := bw.batch.table.db.retry(ctx, func() error {
 				var err error
 				res, err = bw.batch.table.db.client.BatchWriteItemWithContext(ctx, req)
 				return err

@@ -9,41 +9,84 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/client"
+	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
 )
 
 // DB is a DynamoDB client.
 type DB struct {
-	client dynamodbiface.DynamoDBAPI
-	logger aws.Logger
+	client   dynamodbiface.DynamoDBAPI
+	logger   aws.Logger
+	retryer  request.Retryer
+	retryMax int
 }
 
 // New creates a new client with the given configuration.
+// If Retryer is configured, retrying responsibility will be delegated to it.
+// If MaxRetries is configured, the maximum number of retry attempts will be limited to the specified value
+// (0 for no retrying, -1 for default behavior of unlimited retries).
+// MaxRetries is ignored if Retryer is set.
 func New(p client.ConfigProvider, cfgs ...*aws.Config) *DB {
 	cfg := p.ClientConfig(dynamodb.EndpointsID, cfgs...)
-	db := &DB{
-		client: dynamodb.New(p, cfgs...),
-		logger: cfg.Config.Logger,
-	}
-	if db.logger == nil {
-		db.logger = aws.NewDefaultLogger()
-	}
-	return db
+	return newDB(dynamodb.New(p, cfgs...), cfg.Config)
 }
 
 // NewFromIface creates a new client with the given interface.
 func NewFromIface(client dynamodbiface.DynamoDBAPI) *DB {
-	return &DB{
-		client: client,
-		logger: aws.NewDefaultLogger(),
+	if c, ok := client.(*dynamodb.DynamoDB); ok {
+		return newDB(c, &c.Config)
 	}
+	return newDB(client, &aws.Config{})
+}
+
+func newDB(client dynamodbiface.DynamoDBAPI, cfg *aws.Config) *DB {
+	db := &DB{
+		client:   client,
+		logger:   cfg.Logger,
+		retryMax: -1,
+	}
+
+	if db.logger == nil {
+		db.logger = aws.NewDefaultLogger()
+	}
+
+	if retryer, ok := cfg.Retryer.(request.Retryer); ok {
+		db.retryer = retryer
+	} else if cfg.MaxRetries != nil {
+		db.retryMax = *cfg.MaxRetries
+	}
+
+	return db
 }
 
 // Client returns this DB's internal client used to make API requests.
 func (db *DB) Client() dynamodbiface.DynamoDBAPI {
 	return db.client
 }
+
+// TODO: should we expose these, or come up with a better interface?
+// They could be useful in conjunction with NewFromIface, but SetRetryer would be misleading;
+// dynamo expects it to be called from within the dynamodbapi interface.
+// Probably best to create a forward-compatible (v2-friendly) configuration API instead.
+
+// func (db *DB) SetRetryer(retryer request.Retryer) {
+// 	db.retryer = retryer
+// }
+
+// func (db *DB) SetMaxRetries(max int) *DB {
+// 	db.retryMax = max
+// 	return db
+// }
+
+// func (db *DB) SetLogger(logger aws.Logger) *DB {
+// 	if logger == nil {
+// 		db.logger = noopLogger{}
+// 		return db
+// 	}
+// 	db.logger = logger
+// 	return db
+// }
 
 func (db *DB) log(v ...interface{}) {
 	db.logger.Log(v...)
@@ -123,7 +166,7 @@ func (itr *ltIter) NextWithContext(ctx context.Context, out interface{}) bool {
 		}
 	}
 
-	itr.err = retry(ctx, func() error {
+	itr.err = itr.lt.db.retry(ctx, func() error {
 		res, err := itr.lt.db.client.ListTablesWithContext(ctx, itr.input())
 		if err != nil {
 			return err
@@ -211,3 +254,7 @@ func IsCondCheckFailed(err error) bool {
 
 	return false
 }
+
+// type noopLogger struct{}
+
+// func (noopLogger) Log(...interface{}) {}

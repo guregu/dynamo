@@ -41,7 +41,7 @@ func (ttl *UpdateTTL) Run() error {
 func (ttl *UpdateTTL) RunWithContext(ctx context.Context) error {
 	input := ttl.input()
 
-	err := retry(ctx, func() error {
+	err := ttl.table.db.retry(ctx, func() error {
 		_, err := ttl.table.db.client.UpdateTimeToLiveWithContext(ctx, input)
 		return err
 	})
@@ -80,7 +80,7 @@ func (d *DescribeTTL) RunWithContext(ctx context.Context) (TTLDescription, error
 	input := d.input()
 
 	var result *dynamodb.DescribeTimeToLiveOutput
-	err := retry(ctx, func() error {
+	err := d.table.db.retry(ctx, func() error {
 		var err error
 		result, err = d.table.db.client.DescribeTimeToLiveWithContext(ctx, input)
 		return err

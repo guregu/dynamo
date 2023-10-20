@@ -117,7 +117,7 @@ func (d *Delete) run(ctx context.Context) (*dynamodb.DeleteItemOutput, error) {
 
 	input := d.deleteInput()
 	var output *dynamodb.DeleteItemOutput
-	err := retry(ctx, func() error {
+	err := d.table.db.retry(ctx, func() error {
 		var err error
 		output, err = d.table.db.client.DeleteItemWithContext(ctx, input)
 		return err

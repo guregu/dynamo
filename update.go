@@ -385,7 +385,7 @@ func (u *Update) run(ctx context.Context) (*dynamodb.UpdateItemOutput, error) {
 
 	input := u.updateInput()
 	var output *dynamodb.UpdateItemOutput
-	err := retry(ctx, func() error {
+	err := u.table.db.retry(ctx, func() error {
 		var err error
 		output, err = u.table.db.client.UpdateItemWithContext(ctx, input)
 		return err

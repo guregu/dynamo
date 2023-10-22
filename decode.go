@@ -75,6 +75,9 @@ func unmarshalReflect(av *dynamodb.AttributeValue, rv reflect.Value) error {
 			if av.S != nil {
 				return x.UnmarshalText([]byte(*av.S))
 			}
+			if av.N != nil {
+				return x.UnmarshalText([]byte(*av.N))
+			}
 		}
 	}
 

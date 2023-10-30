@@ -86,6 +86,7 @@ func BenchmarkEncodeVeryComplex(b *testing.B) {
 
 func BenchmarkDecodeVeryComplex(b *testing.B) {
 	av, _ := marshalItem(veryComplexObject)
+	b.ResetTimer()
 
 	var out fancyObject
 	for n := 0; n < b.N; n++ {

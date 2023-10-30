@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -383,7 +382,7 @@ func marshalReflect(rv reflect.Value, flags encodeFlags) (*dynamodb.AttributeVal
 }
 
 func marshalSet(rv reflect.Value, flags encodeFlags) (*dynamodb.AttributeValue, error) {
-	iface := reflect.Zero(rv.Type().Elem()).Interface()
+	iface := reflect.New(rv.Type().Elem()).Elem().Interface()
 	switch iface.(type) {
 	case encoding.TextMarshaler:
 		ss := make([]*string, 0, rv.Len())
@@ -613,18 +612,29 @@ const (
 )
 
 func fieldInfo(field reflect.StructField) (name string, flags encodeFlags) {
-	tags := strings.Split(field.Tag.Get("dynamo"), ",")
-	if len(tags) == 0 {
+	tag := field.Tag.Get("dynamo")
+	if tag == "" {
 		return field.Name, flagNone
 	}
 
-	name = tags[0]
-	if name == "" {
-		name = field.Name
-	}
+	begin := 0
+	for i := 0; i <= len(tag); i++ {
+		if !(i == len(tag) || tag[i] == ',') {
+			continue
+		}
+		part := tag[begin:i]
+		begin = i + 1
 
-	for _, t := range tags[1:] {
-		switch t {
+		if name == "" {
+			if part == "" {
+				name = field.Name
+			} else {
+				name = part
+			}
+			continue
+		}
+
+		switch part {
 		case "set":
 			flags |= flagSet
 		case "omitempty":

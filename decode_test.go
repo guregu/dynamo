@@ -52,16 +52,17 @@ var itemDecodeOnlyTests = []struct {
 
 func TestUnmarshalAsymmetric(t *testing.T) {
 	for _, tc := range itemDecodeOnlyTests {
-		rv := reflect.New(reflect.TypeOf(tc.expect))
-		expect := rv.Interface()
-		err := UnmarshalItem(tc.given, expect)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", tc.name, err)
-			continue
-		}
-		if !reflect.DeepEqual(rv.Elem().Interface(), tc.expect) {
-			t.Errorf("%s: bad result: %#v ≠ %#v", tc.name, rv.Elem().Interface(), tc.expect)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			rv := reflect.New(reflect.TypeOf(tc.expect))
+			expect := rv.Interface()
+			err := UnmarshalItem(tc.given, expect)
+			if err != nil {
+				t.Fatalf("%s: unexpected error: %v", tc.name, err)
+			}
+			if !reflect.DeepEqual(rv.Elem().Interface(), tc.expect) {
+				t.Errorf("%s: bad result: %#v ≠ %#v", tc.name, rv.Elem().Interface(), tc.expect)
+			}
+		})
 	}
 }
 
@@ -114,29 +115,37 @@ func TestUnmarshalAppend(t *testing.T) {
 
 func TestUnmarshal(t *testing.T) {
 	for _, tc := range encodingTests {
-		rv := reflect.New(reflect.TypeOf(tc.in))
-		err := unmarshalReflect(tc.out, rv.Elem())
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", tc.name, err)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			rv := reflect.New(reflect.TypeOf(tc.in))
+			// dec := newDecodePlan(rv.Elem())
+			// err := dec.decodeAttr(flagNone, tc.out, rv)
+			err := Unmarshal(tc.out, rv.Interface())
+			if err != nil {
+				t.Errorf("%s: unexpected error: %v", tc.name, err)
+			}
 
-		if !reflect.DeepEqual(rv.Elem().Interface(), tc.in) {
-			t.Errorf("%s: bad result: %#v ≠ %#v", tc.name, rv.Elem().Interface(), tc.out)
-		}
+			got := rv.Elem().Interface()
+			if !reflect.DeepEqual(got, tc.in) {
+				t.Errorf("%s: bad result: \n%#v ≠\n%#v", tc.name, got, tc.out)
+			}
+		})
 	}
 }
 
 func TestUnmarshalItem(t *testing.T) {
 	for _, tc := range itemEncodingTests {
-		rv := reflect.New(reflect.TypeOf(tc.in))
-		err := unmarshalItem(tc.out, rv.Interface())
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", tc.name, err)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			rv := reflect.New(reflect.TypeOf(tc.in))
+			err := unmarshalItem(tc.out, rv.Interface())
+			if err != nil {
+				t.Errorf("%s: unexpected error: %v", tc.name, err)
+			}
 
-		if !reflect.DeepEqual(rv.Elem().Interface(), tc.in) {
-			t.Errorf("%s: bad result: %#v ≠ %#v", tc.name, rv.Elem().Interface(), tc.in)
-		}
+			iface := rv.Elem().Interface()
+			if !reflect.DeepEqual(iface, tc.in) {
+				t.Errorf("%s: bad result: %#v ≠ %#v", tc.name, iface, tc.in)
+			}
+		})
 	}
 }
 
@@ -278,4 +287,38 @@ func TestUnmarshalClearFields(t *testing.T) {
 			t.Error("bad result. want:", item, "got:", foo)
 		}
 	}
+}
+
+func BenchmarkUnmarshalReflect(b *testing.B) {
+	// av := &dynamodb.AttributeValue{
+	// 	L: []*dynamodb.AttributeValue{
+	// 		{S: aws.String("fooooooooo")},
+	// 	},
+	// }
+	// for i := 0; i < b.N; i++ {
+	// 	var list []string
+	// 	unmarshalReflect(av, reflect.ValueOf(&list))
+	// }
+
+	var got widget
+	for i := 0; i < b.N; i++ {
+		unmarshalItem(exampleItem, &got)
+	}
+}
+
+var exampleItem = map[string]*dynamodb.AttributeValue{
+	"UserID": &dynamodb.AttributeValue{N: aws.String("555")},
+	"Msg":    &dynamodb.AttributeValue{S: aws.String("fux")},
+	"Count":  &dynamodb.AttributeValue{N: aws.String("1337")},
+	"Meta": &dynamodb.AttributeValue{M: map[string]*dynamodb.AttributeValue{
+		"Foo": &dynamodb.AttributeValue{S: aws.String("1336")},
+	}},
+}
+var exampleWant = widget{
+	UserID: 555,
+	Msg:    "fux",
+	Count:  1337,
+	Meta: map[string]string{
+		"Foo": "1336",
+	},
 }

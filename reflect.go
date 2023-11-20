@@ -14,7 +14,6 @@ var (
 	rtypeTimePtr         = reflect.TypeOf((*time.Time)(nil))
 	rtypeTime            = reflect.TypeOf(time.Time{})
 	rtypeUnmarshaler     = reflect.TypeOf((*Unmarshaler)(nil)).Elem()
-	rtypeAWSBypass       = reflect.TypeOf(awsEncoder{})
 	rtypeAWSUnmarshaler  = reflect.TypeOf((*dynamodbattribute.Unmarshaler)(nil)).Elem()
 	rtypeTextUnmarshaler = reflect.TypeOf((*encoding.TextUnmarshaler)(nil)).Elem()
 )
@@ -116,6 +115,21 @@ func visitFields(item map[string]*dynamodb.AttributeValue, rv reflect.Value, see
 		}
 	}
 	return nil
+}
+
+func reallocSlice(v reflect.Value, size int) {
+	if v.IsNil() || v.Cap() < size {
+		slicev := reflect.MakeSlice(v.Type(), size, size)
+		v.Set(slicev)
+		return
+	}
+	v.Set(v.Slice(0, size))
+}
+
+func reallocMap(v reflect.Value, size int) {
+	if v.IsNil() || v.Len() > 0 {
+		v.Set(reflect.MakeMapWithSize(v.Type(), size))
+	}
 }
 
 func nullish(v reflect.Value) bool {

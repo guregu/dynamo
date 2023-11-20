@@ -306,12 +306,30 @@ func BenchmarkUnmarshalReflect(b *testing.B) {
 	}
 }
 
+func TestDecode3(t *testing.T) {
+	want := exampleWant
+	var got widget
+	rv := reflect.ValueOf(&got)
+	r, err := getDecodePlan(rv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.decodeItem(exampleItem, &got); err != nil {
+		t.Error(err)
+	}
+	if !reflect.DeepEqual(want, got) {
+		t.Error("bad decode. want:", want, "got:", got)
+	}
+	// spew.Dump(got)
+	// t.Fail()
+}
+
 var exampleItem = map[string]*dynamodb.AttributeValue{
-	"UserID": &dynamodb.AttributeValue{N: aws.String("555")},
-	"Msg":    &dynamodb.AttributeValue{S: aws.String("fux")},
-	"Count":  &dynamodb.AttributeValue{N: aws.String("1337")},
-	"Meta": &dynamodb.AttributeValue{M: map[string]*dynamodb.AttributeValue{
-		"Foo": &dynamodb.AttributeValue{S: aws.String("1336")},
+	"UserID": {N: aws.String("555")},
+	"Msg":    {S: aws.String("fux")},
+	"Count":  {N: aws.String("1337")},
+	"Meta": {M: map[string]*dynamodb.AttributeValue{
+		"Foo": {S: aws.String("1336")},
 	}},
 }
 var exampleWant = widget{

@@ -1,9 +1,11 @@
 package dynamo
 
 import (
+	"encoding"
 	"fmt"
 	"reflect"
 	"strconv"
+	"time"
 
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
@@ -34,82 +36,15 @@ func Unmarshal(av *dynamodb.AttributeValue, out interface{}) error {
 	}
 
 	rv := reflect.ValueOf(out)
-	plan := getDecodePlan(reflect.ValueOf(out))
+	plan, err := getDecodePlan(reflect.ValueOf(out))
+	if err != nil {
+		return err
+	}
 	return plan.decodeAttr(flagNone, av, rv)
 }
 
 // used in iterators for unmarshaling one item
 type unmarshalFunc func(map[string]*dynamodb.AttributeValue, interface{}) error
-
-func visitFields(item map[string]*dynamodb.AttributeValue, rv reflect.Value, seen map[string]struct{}, fn func(av *dynamodb.AttributeValue, flags encodeFlags, v reflect.Value) error) error {
-	for rv.Kind() == reflect.Pointer {
-		if rv.IsNil() {
-			if !rv.CanSet() {
-				return nil
-			}
-			rv.Set(reflect.New(rv.Type().Elem()))
-		}
-		rv = rv.Elem()
-	}
-
-	if rv.Kind() != reflect.Struct {
-		panic("not a struct")
-	}
-
-	if seen == nil {
-		seen = make(map[string]struct{})
-	}
-
-	// fields := make(map[string]reflect.Value)
-	for i := 0; i < rv.Type().NumField(); i++ {
-		field := rv.Type().Field(i)
-		fv := rv.Field(i)
-		isPtr := fv.Type().Kind() == reflect.Ptr
-
-		name, flags := fieldInfo(field)
-		if name == "-" {
-			// skip
-			continue
-		}
-
-		if seen != nil {
-			if _, ok := seen[name]; ok {
-				continue
-			}
-		}
-
-		// embed anonymous structs, they could be pointers so test that too
-		if (fv.Type().Kind() == reflect.Struct || isPtr && fv.Type().Elem().Kind() == reflect.Struct) && field.Anonymous {
-			if isPtr {
-				fv = indirect(fv)
-			}
-
-			if !fv.IsValid() {
-				// inaccessible
-				continue
-			}
-
-			if err := visitFields(item, fv, seen, fn); err != nil {
-				return err
-			}
-			continue
-		}
-
-		if !field.IsExported() {
-			continue
-		}
-
-		if seen != nil {
-			seen[name] = struct{}{}
-		}
-		av := item[name] // might be nil
-		// debugf("visit: %s --> %s[%s](%v, %v, %v)", name, runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name(), field.Type, av, flags, fv)
-		if err := fn(av, flags, fv); err != nil {
-			return err
-		}
-	}
-	return nil
-}
 
 func unmarshalItem(item map[string]*dynamodb.AttributeValue, out interface{}) error {
 	switch out := out.(type) {
@@ -121,7 +56,10 @@ func unmarshalItem(item map[string]*dynamodb.AttributeValue, out interface{}) er
 	if rv.Kind() != reflect.Ptr {
 		return fmt.Errorf("dynamo: unmarshal: not a pointer: %T", out)
 	}
-	plan := getDecodePlan(reflect.ValueOf(out))
+	plan, err := getDecodePlan(reflect.ValueOf(out))
+	if err != nil {
+		return err
+	}
 	return plan.decodeItem(item, rv.Interface())
 }
 
@@ -146,86 +84,260 @@ func unmarshalAppend(item map[string]*dynamodb.AttributeValue, out interface{}) 
 	return nil
 }
 
-// av2iface converts an av into interface{}.
-func av2iface(av *dynamodb.AttributeValue) (interface{}, error) {
-	switch {
-	case av.B != nil:
-		return av.B, nil
-	case av.BS != nil:
-		return av.BS, nil
-	case av.BOOL != nil:
-		return *av.BOOL, nil
-	case av.N != nil:
-		return strconv.ParseFloat(*av.N, 64)
-	case av.S != nil:
-		return *av.S, nil
-	case av.L != nil:
-		list := make([]interface{}, 0, len(av.L))
-		for _, item := range av.L {
-			iface, err := av2iface(item)
-			if err != nil {
-				return nil, err
-			}
-			list = append(list, iface)
-		}
-		return list, nil
-	case av.NS != nil:
-		set := make([]float64, 0, len(av.NS))
-		for _, n := range av.NS {
-			f, err := strconv.ParseFloat(*n, 64)
-			if err != nil {
-				return nil, err
-			}
-			set = append(set, f)
-		}
-		return set, nil
-	case av.SS != nil:
-		set := make([]string, 0, len(av.SS))
-		for _, s := range av.SS {
-			set = append(set, *s)
-		}
-		return set, nil
-	case av.M != nil:
-		m := make(map[string]interface{}, len(av.M))
-		for k, v := range av.M {
-			iface, err := av2iface(v)
-			if err != nil {
-				return nil, err
-			}
-			m[k] = iface
-		}
-		return m, nil
-	case av.NULL != nil:
-		return nil, nil
+type decodeFunc func(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue, rv reflect.Value) error
+
+func decodeInvalid(fieldType string) func(plan *decodePlan, _ encodeFlags, av *dynamodb.AttributeValue, v reflect.Value) error {
+	return func(plan *decodePlan, _ encodeFlags, av *dynamodb.AttributeValue, v reflect.Value) error {
+		return fmt.Errorf("dynamo: cannot unmarshal %s data into %s", avTypeName(av), fieldType)
 	}
-	return nil, fmt.Errorf("dynamo: unsupported AV: %#v", *av)
 }
 
-func avTypeName(av *dynamodb.AttributeValue) string {
-	if av == nil {
-		return "<nil>"
+func decodePtr(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue, rv reflect.Value) error {
+	var elem reflect.Value
+	if rv.IsNil() {
+		if rv.CanSet() {
+			elem = reflect.New(rv.Type().Elem())
+			rv.Set(elem)
+		} else {
+			return nil
+		}
+	} else {
+		elem = rv.Elem()
 	}
-	switch {
-	case av.B != nil:
-		return "binary"
-	case av.BS != nil:
-		return "binary set"
-	case av.BOOL != nil:
-		return "boolean"
-	case av.N != nil:
-		return "number"
-	case av.S != nil:
-		return "string"
-	case av.L != nil:
-		return "list"
-	case av.NS != nil:
-		return "number set"
-	case av.SS != nil:
-		return "string set"
-	case av.M != nil:
-		return "map"
-	case av.NULL != nil:
-		return "null"
+	if err := plan.decodeAttr(flags, av, elem); err != nil {
+		return err
 	}
-	return "<empty>"
+	return nil
+}
+
+func decodeString(plan *decodePlan, state encodeFlags, av *dynamodb.AttributeValue, v reflect.Value) error {
+	v.SetString(*av.S)
+	return nil
+}
+
+func decodeInt(plan *decodePlan, state encodeFlags, av *dynamodb.AttributeValue, v reflect.Value) error {
+	n, err := strconv.ParseInt(*av.N, 10, 64)
+	if err != nil {
+		return err
+	}
+	v.SetInt(n)
+	return nil
+}
+
+func decodeUint(plan *decodePlan, state encodeFlags, av *dynamodb.AttributeValue, v reflect.Value) error {
+	n, err := strconv.ParseUint(*av.N, 10, 64)
+	if err != nil {
+		return err
+	}
+	v.SetUint(n)
+	return nil
+}
+
+func decodeFloat(plan *decodePlan, state encodeFlags, av *dynamodb.AttributeValue, v reflect.Value) error {
+	f, err := strconv.ParseFloat(*av.N, 64)
+	if err != nil {
+		return err
+	}
+	v.SetFloat(f)
+	return nil
+}
+
+func decodeBool(plan *decodePlan, state encodeFlags, av *dynamodb.AttributeValue, v reflect.Value) error {
+	v.SetBool(*av.BOOL)
+	return nil
+}
+
+func decodeAny(plan *decodePlan, state encodeFlags, av *dynamodb.AttributeValue, v reflect.Value) error {
+	iface, err := av2iface(av)
+	if err != nil {
+		return err
+	}
+	if iface == nil {
+		v.Set(reflect.Zero(v.Type()))
+	} else {
+		v.Set(reflect.ValueOf(iface))
+	}
+	return nil
+}
+
+func decodeNull(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue, rv reflect.Value) error {
+	if !rv.IsValid() {
+		return nil
+	}
+	if rv.CanSet() {
+		rv.SetZero()
+		return nil
+	}
+	return nil
+}
+
+func decodeBytes(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue, v reflect.Value) error {
+	v.SetBytes(av.B)
+	return nil
+}
+
+func decodeList(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue, v reflect.Value) error {
+	slicev := reflect.MakeSlice(v.Type(), len(av.L), len(av.L))
+	for i, innerAV := range av.L {
+		innerRV := slicev.Index(i).Addr()
+		if err := plan.decodeAttr(flags, innerAV, innerRV); err != nil {
+			return err
+		}
+		// debugf("slice[i=%d] %#v <- %v", i, slicev.Index(i).Interface(), innerAV)
+	}
+	v.Set(slicev)
+	return nil
+}
+
+func decodeSliceBS(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue, v reflect.Value) error {
+	slicev := reflect.MakeSlice(v.Type(), len(av.BS), len(av.BS))
+	for i, b := range av.BS {
+		innerRV := slicev.Index(i).Addr()
+		if err := plan.decodeAttr(flags, &dynamodb.AttributeValue{B: b}, innerRV); err != nil {
+			return err
+		}
+	}
+	v.Set(slicev)
+	return nil
+}
+
+func decodeSliceSS(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue, v reflect.Value) error {
+	slicev := reflect.MakeSlice(v.Type(), len(av.SS), len(av.SS))
+	for i, s := range av.SS {
+		innerRV := slicev.Index(i).Addr()
+		if err := plan.decodeAttr(flags, &dynamodb.AttributeValue{S: s}, innerRV); err != nil {
+			return err
+		}
+	}
+	v.Set(slicev)
+	return nil
+}
+
+func decodeSliceNS(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue, v reflect.Value) error {
+	slicev := reflect.MakeSlice(v.Type(), len(av.NS), len(av.NS))
+	for i, n := range av.NS {
+		innerRV := slicev.Index(i).Addr()
+		if err := plan.decodeAttr(flags, &dynamodb.AttributeValue{N: n}, innerRV); err != nil {
+			return err
+		}
+	}
+	v.Set(slicev)
+	return nil
+}
+
+func decodeArrayB(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue, v reflect.Value) error {
+	if len(av.B) > v.Len() {
+		return fmt.Errorf("dynamo: cannot marshal %s into %s; too small (dst len: %d, src len: %d)", avTypeName(av), v.Type().String(), v.Len(), len(av.B))
+	}
+	reflect.Copy(v, reflect.ValueOf(av.B))
+	return nil
+}
+
+func decodeArrayL(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue, v reflect.Value) error {
+	if len(av.L) > v.Len() {
+		return fmt.Errorf("dynamo: cannot marshal %s into %s; too small (dst len: %d, src len: %d)", avTypeName(av), v.Type().String(), v.Len(), len(av.L))
+	}
+	for i, innerAV := range av.L {
+		if err := plan.decodeAttr(flags, innerAV, v.Index(i)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func decodeUnixTime(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue, rv reflect.Value) error {
+	rv = indirect(rv)
+
+	ts, err := strconv.ParseInt(*av.N, 10, 64)
+	if err != nil {
+		return err
+	}
+
+	rv.Set(reflect.ValueOf(time.Unix(ts, 0).UTC()))
+	return nil
+}
+
+func decodeStruct(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue, rv reflect.Value) error {
+	err := visitFields(av.M, rv, nil, func(av *dynamodb.AttributeValue, flags encodeFlags, v reflect.Value) error {
+		if av == nil {
+			if v.CanSet() && !nullish(v) {
+				v.SetZero()
+			}
+			return nil
+		}
+		return plan.decodeAttr(flags, av, v)
+	})
+	return err
+}
+
+func decodeMap(decodeKey func(reflect.Value, string) error) func(plan *decodePlan, _ encodeFlags, av *dynamodb.AttributeValue, v reflect.Value) error {
+	/*
+		Something like:
+
+			if out == nil {
+					out = make(map[K]V, len(item))
+			}
+			kp := new(K)
+			for name, av := range item {
+				vp := new(V)
+				decodeKey(kp, name)
+				decodeAttr(av, vp) // TODO fix order
+				out[*kp] = *vp
+			}
+	*/
+	return func(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue, rv reflect.Value) error {
+		if rv.IsNil() || rv.Len() > 0 {
+			rv.Set(reflect.MakeMapWithSize(rv.Type(), len(av.M)))
+		}
+		kp := reflect.New(rv.Type().Key())
+		for name, v := range av.M {
+			if err := decodeKey(kp, name); err != nil {
+				return fmt.Errorf("error decoding key %q into %v", name, kp.Type().Elem())
+			}
+			innerRV := reflect.New(rv.Type().Elem())
+			if err := plan.decodeAttr(flags, v, innerRV.Elem()); err != nil {
+				return fmt.Errorf("error decoding key %q into %v", name, kp.Type().Elem())
+			}
+			rv.SetMapIndex(kp.Elem(), innerRV.Elem())
+		}
+		return nil
+	}
+}
+
+func decodeMapKeyFunc(rv reflect.Value) func(keyv reflect.Value, value string) error {
+	if reflect.PtrTo(rv.Type().Key()).Implements(rtypeTextUnmarshaler) {
+		return func(kv reflect.Value, s string) error {
+			tm := kv.Interface().(encoding.TextUnmarshaler)
+			if err := tm.UnmarshalText([]byte(s)); err != nil {
+				return fmt.Errorf("dynamo: unmarshal map: key error: %w", err)
+			}
+			return nil
+		}
+	}
+	return func(kv reflect.Value, s string) error {
+		kv.Elem().SetString(s)
+		return nil
+	}
+}
+
+func decodeIface[T any](fn func(t T, av *dynamodb.AttributeValue) error) func(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue, v reflect.Value) error {
+	return func(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue, rv reflect.Value) error {
+		if !rv.CanInterface() {
+			return nil
+		}
+		var iface interface{}
+		if rv.Kind() != reflect.Pointer && rv.CanAddr() {
+			iface = rv.Addr().Interface()
+		} else {
+			if rv.IsNil() {
+				if rv.CanSet() {
+					rv.Set(reflect.New(rv.Type().Elem()))
+				} else {
+					return nil
+				}
+			}
+			iface = rv.Interface()
+		}
+		return fn(iface.(T), av)
+	}
 }

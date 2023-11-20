@@ -1,8 +1,12 @@
 package dynamo
 
 import (
+	"reflect"
 	"testing"
 	"time"
+
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
 var (
@@ -101,6 +105,41 @@ func BenchmarkDecodeVeryComplexMap(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		unmarshalItem(av, &out)
 	}
+}
+
+func BenchmarkUnmarshal3(b *testing.B) {
+	var got widget
+	rv := reflect.ValueOf(&got)
+	// x := newRecipe(rv)
+	for i := 0; i < b.N; i++ {
+		r, _ := getDecodePlan(rv)
+		if err := r.decodeItem(exampleItem, &got); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkUnmarshalTE(b *testing.B) {
+	// te := textMarshaler(true)
+	got := struct {
+		Foo textMarshaler
+	}{}
+
+	b.Run("new", func(b *testing.B) {
+		rv := reflect.ValueOf(&got)
+		// x := newRecipe(rv)
+		for i := 0; i < b.N; i++ {
+			r, _ := getDecodePlan(rv)
+			if err := r.decodeItem(map[string]*dynamodb.AttributeValue{
+				"Foo": &dynamodb.AttributeValue{S: aws.String("true")},
+			}, &got); err != nil {
+				b.Fatal(err)
+			}
+			if got.Foo != true {
+				b.Fatal("bad")
+			}
+		}
+	})
 }
 
 type simpleObject struct {

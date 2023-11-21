@@ -310,11 +310,11 @@ func TestDecode3(t *testing.T) {
 	want := exampleWant
 	var got widget
 	rv := reflect.ValueOf(&got)
-	r, err := getDecodePlan(rv)
+	r, err := getDecodePlan(rv.Type())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := r.decodeItem(exampleItem, &got); err != nil {
+	if err := r.decodeItem(exampleItem, rv); err != nil {
 		t.Error(err)
 	}
 	if !reflect.DeepEqual(want, got) {

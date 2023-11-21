@@ -36,7 +36,7 @@ func Unmarshal(av *dynamodb.AttributeValue, out interface{}) error {
 	}
 
 	rv := reflect.ValueOf(out)
-	plan, err := getDecodePlan(reflect.ValueOf(out))
+	plan, err := getDecodePlan(rv.Type())
 	if err != nil {
 		return err
 	}
@@ -48,11 +48,11 @@ type unmarshalFunc func(map[string]*dynamodb.AttributeValue, interface{}) error
 
 func unmarshalItem(item map[string]*dynamodb.AttributeValue, out interface{}) error {
 	rv := reflect.ValueOf(out)
-	plan, err := getDecodePlan(rv)
+	plan, err := getDecodePlan(rv.Type())
 	if err != nil {
 		return err
 	}
-	return plan.decodeItem(item, rv.Interface())
+	return plan.decodeItem(item, rv)
 }
 
 func unmarshalAppend(item map[string]*dynamodb.AttributeValue, out interface{}) error {
@@ -293,8 +293,8 @@ func decodeMap(decodeKey func(reflect.Value, string) error) func(plan *decodePla
 
 type decodeKeyFunc func(reflect.Value, string) error
 
-func decodeMapKeyFunc(rv reflect.Value) decodeKeyFunc {
-	if reflect.PtrTo(rv.Type().Key()).Implements(rtypeTextUnmarshaler) {
+func decodeMapKeyFunc(rt reflect.Type) decodeKeyFunc {
+	if reflect.PtrTo(rt.Key()).Implements(rtypeTextUnmarshaler) {
 		return func(kv reflect.Value, s string) error {
 			tm := kv.Interface().(encoding.TextUnmarshaler)
 			if err := tm.UnmarshalText([]byte(s)); err != nil {

@@ -112,14 +112,14 @@ func BenchmarkUnmarshal3(b *testing.B) {
 	rv := reflect.ValueOf(&got)
 	// x := newRecipe(rv)
 	for i := 0; i < b.N; i++ {
-		r, _ := getDecodePlan(rv)
-		if err := r.decodeItem(exampleItem, &got); err != nil {
+		r, _ := getDecodePlan(rv.Type())
+		if err := r.decodeItem(exampleItem, rv); err != nil {
 			b.Fatal(err)
 		}
 	}
 }
 
-func BenchmarkUnmarshalTE(b *testing.B) {
+func BenchmarkUnmarshalText(b *testing.B) {
 	// te := textMarshaler(true)
 	got := struct {
 		Foo textMarshaler
@@ -129,10 +129,10 @@ func BenchmarkUnmarshalTE(b *testing.B) {
 		rv := reflect.ValueOf(&got)
 		// x := newRecipe(rv)
 		for i := 0; i < b.N; i++ {
-			r, _ := getDecodePlan(rv)
+			r, _ := getDecodePlan(rv.Type())
 			if err := r.decodeItem(map[string]*dynamodb.AttributeValue{
 				"Foo": &dynamodb.AttributeValue{S: aws.String("true")},
-			}, &got); err != nil {
+			}, rv); err != nil {
 				b.Fatal(err)
 			}
 			if got.Foo != true {

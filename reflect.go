@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 )
 
+// special attribute encoders
 var (
 	rtypeAttr            = reflect.TypeOf((*dynamodb.AttributeValue)(nil))
 	rtypeTimePtr         = reflect.TypeOf((*time.Time)(nil))
@@ -16,6 +17,13 @@ var (
 	rtypeUnmarshaler     = reflect.TypeOf((*Unmarshaler)(nil)).Elem()
 	rtypeAWSUnmarshaler  = reflect.TypeOf((*dynamodbattribute.Unmarshaler)(nil)).Elem()
 	rtypeTextUnmarshaler = reflect.TypeOf((*encoding.TextUnmarshaler)(nil)).Elem()
+)
+
+// special item encoders
+var (
+	rtypeItem            = reflect.TypeOf((**map[string]*dynamodb.AttributeValue)(nil)).Elem()
+	rtypeItemUnmarshaler = reflect.TypeOf((*ItemUnmarshaler)(nil)).Elem()
+	rtypeAWSBypass       = reflect.TypeOf(awsEncoder{})
 )
 
 func indirect(rv reflect.Value) reflect.Value {
@@ -78,10 +86,8 @@ func visitFields(item map[string]*dynamodb.AttributeValue, rv reflect.Value, see
 			continue
 		}
 
-		if seen != nil {
-			if _, ok := seen[name]; ok {
-				continue
-			}
+		if _, ok := seen[name]; ok {
+			continue
 		}
 
 		// embed anonymous structs, they could be pointers so test that too
@@ -111,6 +117,61 @@ func visitFields(item map[string]*dynamodb.AttributeValue, rv reflect.Value, see
 		av := item[name] // might be nil
 		// debugf("visit: %s --> %s[%s](%v, %v, %v)", name, runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name(), field.Type, av, flags, fv)
 		if err := fn(av, flags, fv); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func visitTypeFields(rt reflect.Type, seen map[string]struct{}, fn func(flags encodeFlags, vt reflect.Type) error) error {
+	for rt.Kind() == reflect.Pointer {
+		rt = rt.Elem()
+	}
+	if rt.Kind() != reflect.Struct {
+		panic("not a struct")
+	}
+
+	if seen == nil {
+		seen = make(map[string]struct{})
+	}
+
+	// fields := make(map[string]reflect.Value)
+	for i := 0; i < rt.NumField(); i++ {
+		field := rt.Field(i)
+		ft := field.Type
+		isPtr := ft.Kind() == reflect.Ptr
+
+		name, flags := fieldInfo(field)
+		if name == "-" {
+			// skip
+			continue
+		}
+
+		if _, ok := seen[name]; ok {
+			continue
+		}
+
+		// embed anonymous structs, they could be pointers so test that too
+		if (ft.Kind() == reflect.Struct || isPtr && ft.Elem().Kind() == reflect.Struct) && field.Anonymous {
+			for ft.Kind() == reflect.Ptr {
+				ft = ft.Elem()
+			}
+
+			if err := visitTypeFields(ft, seen, fn); err != nil {
+				return err
+			}
+			continue
+		}
+
+		if !field.IsExported() {
+			continue
+		}
+
+		if seen != nil {
+			seen[name] = struct{}{}
+		}
+
+		if err := fn(flags, ft); err != nil {
 			return err
 		}
 	}

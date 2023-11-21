@@ -142,6 +142,57 @@ func BenchmarkUnmarshalText(b *testing.B) {
 	})
 }
 
+func BenchmarkUnmarshalAppend(b *testing.B) {
+	items := make([]Item, 10_000)
+	for i := range items {
+		items[i] = Item{
+			"Hello": &dynamodb.AttributeValue{S: aws.String("world")},
+		}
+	}
+	b.ResetTimer()
+
+	dst := make([]struct {
+		Hello string
+	}, 0, len(items))
+	for i := 0; i < b.N; i++ {
+		for j := range items {
+			if err := unmarshalAppend(items[j], &dst); err != nil {
+				b.Fatal(err)
+			}
+		}
+		if len(dst) != len(items) {
+			b.Fatal("bad")
+		}
+		dst = dst[:0]
+	}
+}
+
+func BenchmarkUnmarshalAppend2(b *testing.B) {
+	items := make([]Item, 10_000)
+	for i := range items {
+		items[i] = Item{
+			"Hello": &dynamodb.AttributeValue{S: aws.String("world")},
+		}
+	}
+	b.ResetTimer()
+
+	dst := make([]struct {
+		Hello string
+	}, 0, len(items))
+	do := unmarshalAppendTo(&dst)
+	for i := 0; i < b.N; i++ {
+		for j := range items {
+			if err := do(items[j], &dst); err != nil {
+				b.Fatal(err)
+			}
+		}
+		if len(dst) != len(items) {
+			b.Fatal("bad")
+		}
+		dst = dst[:0]
+	}
+}
+
 type simpleObject struct {
 	User  int
 	Other string

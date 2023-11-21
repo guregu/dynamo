@@ -172,7 +172,7 @@ func (s *Scan) All(out interface{}) error {
 func (s *Scan) AllWithContext(ctx context.Context, out interface{}) error {
 	itr := &scanIter{
 		scan:      s,
-		unmarshal: unmarshalAppend,
+		unmarshal: unmarshalAppendTo(out),
 		err:       s.err,
 	}
 	for itr.NextWithContext(ctx, out) {
@@ -193,7 +193,7 @@ func (s *Scan) AllWithLastEvaluatedKey(out interface{}) (PagingKey, error) {
 func (s *Scan) AllWithLastEvaluatedKeyContext(ctx context.Context, out interface{}) (PagingKey, error) {
 	itr := &scanIter{
 		scan:      s,
-		unmarshal: unmarshalAppend,
+		unmarshal: unmarshalAppendTo(out),
 		err:       s.err,
 	}
 	for itr.NextWithContext(ctx, out) {
@@ -204,7 +204,7 @@ func (s *Scan) AllWithLastEvaluatedKeyContext(ctx context.Context, out interface
 // AllParallel executes this request by running the given number of segments in parallel, then unmarshaling all results to out, which must be a pointer to a slice.
 func (s *Scan) AllParallel(ctx context.Context, segments int64, out interface{}) error {
 	iters := s.newSegments(segments, nil)
-	ps := newParallelScan(iters, s.cc, true, unmarshalAppend)
+	ps := newParallelScan(iters, s.cc, true, unmarshalAppendTo(out))
 	go ps.run(ctx)
 	for ps.NextWithContext(ctx, out) {
 	}
@@ -215,7 +215,7 @@ func (s *Scan) AllParallel(ctx context.Context, segments int64, out interface{})
 // Returns a slice of LastEvalutedKeys that can be used to continue the query later.
 func (s *Scan) AllParallelWithLastEvaluatedKeys(ctx context.Context, segments int64, out interface{}) ([]PagingKey, error) {
 	iters := s.newSegments(segments, nil)
-	ps := newParallelScan(iters, s.cc, false, unmarshalAppend)
+	ps := newParallelScan(iters, s.cc, false, unmarshalAppendTo(out))
 	go ps.run(ctx)
 	for ps.NextWithContext(ctx, out) {
 	}
@@ -226,7 +226,7 @@ func (s *Scan) AllParallelWithLastEvaluatedKeys(ctx context.Context, segments in
 // Returns a new slice of LastEvaluatedKeys after the scan finishes.
 func (s *Scan) AllParallelStartFrom(ctx context.Context, keys []PagingKey, out interface{}) ([]PagingKey, error) {
 	iters := s.newSegments(int64(len(keys)), keys)
-	ps := newParallelScan(iters, s.cc, false, unmarshalAppend)
+	ps := newParallelScan(iters, s.cc, false, unmarshalAppendTo(out))
 	go ps.run(ctx)
 	for ps.NextWithContext(ctx, out) {
 	}

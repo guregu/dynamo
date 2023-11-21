@@ -469,7 +469,7 @@ func (q *Query) All(out interface{}) error {
 func (q *Query) AllWithContext(ctx context.Context, out interface{}) error {
 	iter := &queryIter{
 		query:     q,
-		unmarshal: unmarshalAppend,
+		unmarshal: unmarshalAppendTo(out),
 		err:       q.err,
 	}
 	for iter.NextWithContext(ctx, out) {
@@ -488,7 +488,7 @@ func (q *Query) AllWithLastEvaluatedKey(out interface{}) (PagingKey, error) {
 func (q *Query) AllWithLastEvaluatedKeyContext(ctx context.Context, out interface{}) (PagingKey, error) {
 	iter := &queryIter{
 		query:     q,
-		unmarshal: unmarshalAppend,
+		unmarshal: unmarshalAppendTo(out),
 		err:       q.err,
 	}
 	for iter.NextWithContext(ctx, out) {

@@ -118,7 +118,7 @@ func (bg *BatchGet) ConsumedCapacity(cc *ConsumedCapacity) *BatchGet {
 
 // All executes this request and unmarshals all results to out, which must be a pointer to a slice.
 func (bg *BatchGet) All(out interface{}) error {
-	iter := newBGIter(bg, unmarshalAppend, bg.err)
+	iter := newBGIter(bg, unmarshalAppendTo(out), bg.err)
 	for iter.Next(out) {
 	}
 	return iter.Err()
@@ -126,7 +126,7 @@ func (bg *BatchGet) All(out interface{}) error {
 
 // AllWithContext executes this request and unmarshals all results to out, which must be a pointer to a slice.
 func (bg *BatchGet) AllWithContext(ctx context.Context, out interface{}) error {
-	iter := newBGIter(bg, unmarshalAppend, bg.err)
+	iter := newBGIter(bg, unmarshalAppendTo(out), bg.err)
 	for iter.NextWithContext(ctx, out) {
 	}
 	return iter.Err()

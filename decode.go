@@ -76,13 +76,50 @@ func unmarshalAppend(item map[string]*dynamodb.AttributeValue, out interface{}) 
 	return nil
 }
 
-type decodeFunc func(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue, rv reflect.Value) error
+func unmarshalAppendTo(out interface{}) func(item map[string]*dynamodb.AttributeValue, out interface{}) error {
+	if awsenc, ok := out.(awsEncoder); ok {
+		return func(item map[string]*dynamodb.AttributeValue, _ any) error {
+			return unmarshalAppendAWS(item, awsenc.iface)
+		}
+	}
 
-func decodeInvalid(fieldType string) func(plan *decodePlan, _ encodeFlags, av *dynamodb.AttributeValue, v reflect.Value) error {
-	return func(plan *decodePlan, _ encodeFlags, av *dynamodb.AttributeValue, v reflect.Value) error {
-		return fmt.Errorf("dynamo: cannot unmarshal %s data into %s", avTypeName(av), fieldType)
+	ptr := reflect.ValueOf(out)
+	slicet := ptr.Type().Elem()
+	membert := slicet.Elem()
+	if ptr.Kind() != reflect.Ptr || slicet.Kind() != reflect.Slice {
+		return func(item map[string]*dynamodb.AttributeValue, _ any) error {
+			return fmt.Errorf("dynamo: unmarshal append: result argument must be a slice pointer")
+		}
+	}
+
+	plan, err := getDecodePlan(membert)
+	if err != nil {
+		return func(item map[string]*dynamodb.AttributeValue, _ any) error {
+			return err
+		}
+	}
+
+	/*
+		Like:
+			member := new(T)
+			return func(item, ...) {
+				decode(item, member)
+				*slice = append(*slice, *member)
+			}
+	*/
+	member := reflect.New(membert) // *T of *[]T
+	return func(item map[string]*dynamodb.AttributeValue, _ any) error {
+		if err := plan.decodeItem(item, member); err != nil {
+			return err
+		}
+		slice := ptr.Elem()
+		slice = reflect.Append(slice, member.Elem())
+		ptr.Elem().Set(slice)
+		return nil
 	}
 }
+
+type decodeFunc func(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue, rv reflect.Value) error
 
 func decodePtr(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue, rv reflect.Value) error {
 	var elem reflect.Value

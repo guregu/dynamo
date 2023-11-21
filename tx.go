@@ -139,11 +139,12 @@ func (tx *GetTx) AllWithContext(ctx context.Context, out interface{}) error {
 	if err := tx.unmarshal(resp); err != nil {
 		return err
 	}
+	push := unmarshalAppendTo(out)
 	for _, item := range resp.Responses {
 		if item.Item == nil {
 			continue
 		}
-		if err := unmarshalAppend(item.Item, out); err != nil {
+		if err := push(item.Item, out); err != nil {
 			return err
 		}
 	}

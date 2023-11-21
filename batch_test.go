@@ -151,7 +151,8 @@ func TestBatchGetEmptySets(t *testing.T) {
 
 func TestBatchEmptyInput(t *testing.T) {
 	table := testDB.Table(testTable)
-	err := table.Batch("UserID", "Time").Get().All(nil)
+	var out []any
+	err := table.Batch("UserID", "Time").Get().All(&out)
 	if err != ErrNoInput {
 		t.Error("unexpected error", err)
 	}

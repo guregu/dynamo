@@ -110,9 +110,9 @@ func BenchmarkDecodeVeryComplexMap(b *testing.B) {
 func BenchmarkUnmarshal3(b *testing.B) {
 	var got widget
 	rv := reflect.ValueOf(&got)
+	r, _ := getDecodePlan(rv.Type())
 	// x := newRecipe(rv)
 	for i := 0; i < b.N; i++ {
-		r, _ := getDecodePlan(rv.Type())
 		if err := r.decodeItem(exampleItem, rv); err != nil {
 			b.Fatal(err)
 		}

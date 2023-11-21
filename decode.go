@@ -102,56 +102,6 @@ func decodePtr(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue,
 	return nil
 }
 
-func decodeString(plan *decodePlan, state encodeFlags, av *dynamodb.AttributeValue, v reflect.Value) error {
-	v.SetString(*av.S)
-	return nil
-}
-
-func decodeInt(plan *decodePlan, state encodeFlags, av *dynamodb.AttributeValue, v reflect.Value) error {
-	n, err := strconv.ParseInt(*av.N, 10, 64)
-	if err != nil {
-		return err
-	}
-	v.SetInt(n)
-	return nil
-}
-
-func decodeUint(plan *decodePlan, state encodeFlags, av *dynamodb.AttributeValue, v reflect.Value) error {
-	n, err := strconv.ParseUint(*av.N, 10, 64)
-	if err != nil {
-		return err
-	}
-	v.SetUint(n)
-	return nil
-}
-
-func decodeFloat(plan *decodePlan, state encodeFlags, av *dynamodb.AttributeValue, v reflect.Value) error {
-	f, err := strconv.ParseFloat(*av.N, 64)
-	if err != nil {
-		return err
-	}
-	v.SetFloat(f)
-	return nil
-}
-
-func decodeBool(plan *decodePlan, state encodeFlags, av *dynamodb.AttributeValue, v reflect.Value) error {
-	v.SetBool(*av.BOOL)
-	return nil
-}
-
-func decodeAny(plan *decodePlan, state encodeFlags, av *dynamodb.AttributeValue, v reflect.Value) error {
-	iface, err := av2iface(av)
-	if err != nil {
-		return err
-	}
-	if iface == nil {
-		v.Set(reflect.Zero(v.Type()))
-	} else {
-		v.Set(reflect.ValueOf(iface))
-	}
-	return nil
-}
-
 func decodeNull(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue, rv reflect.Value) error {
 	if !rv.IsValid() {
 		return nil
@@ -163,12 +113,49 @@ func decodeNull(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue
 	return nil
 }
 
+func decodeString(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue, v reflect.Value) error {
+	v.SetString(*av.S)
+	return nil
+}
+
+func decodeInt(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue, v reflect.Value) error {
+	n, err := strconv.ParseInt(*av.N, 10, 64)
+	if err != nil {
+		return err
+	}
+	v.SetInt(n)
+	return nil
+}
+
+func decodeUint(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue, v reflect.Value) error {
+	n, err := strconv.ParseUint(*av.N, 10, 64)
+	if err != nil {
+		return err
+	}
+	v.SetUint(n)
+	return nil
+}
+
+func decodeFloat(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue, v reflect.Value) error {
+	f, err := strconv.ParseFloat(*av.N, 64)
+	if err != nil {
+		return err
+	}
+	v.SetFloat(f)
+	return nil
+}
+
+func decodeBool(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue, v reflect.Value) error {
+	v.SetBool(*av.BOOL)
+	return nil
+}
+
 func decodeBytes(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue, v reflect.Value) error {
 	v.SetBytes(av.B)
 	return nil
 }
 
-func decodeList(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue, v reflect.Value) error {
+func decodeSliceL(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue, v reflect.Value) error {
 	reallocSlice(v, len(av.L))
 	for i, innerAV := range av.L {
 		innerRV := v.Index(i).Addr()
@@ -179,6 +166,16 @@ func decodeList(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue
 	}
 	return nil
 }
+
+// func decodeSliceB(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue, v reflect.Value) error {
+// 	reallocSlice(v, len(av.B))
+// 	for i, b := range av.B {
+// 		innerB := reflect.ValueOf(b).Convert(v.Type().Elem())
+// 		innerRV := v.Index(i)
+// 		innerRV.Set(innerB)
+// 	}
+// 	return nil
+// }
 
 func decodeSliceBS(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue, v reflect.Value) error {
 	reallocSlice(v, len(av.BS))
@@ -232,18 +229,6 @@ func decodeArrayL(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeVal
 			return err
 		}
 	}
-	return nil
-}
-
-func decodeUnixTime(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue, rv reflect.Value) error {
-	rv = indirect(rv)
-
-	ts, err := strconv.ParseInt(*av.N, 10, 64)
-	if err != nil {
-		return err
-	}
-
-	rv.Set(reflect.ValueOf(time.Unix(ts, 0).UTC()))
 	return nil
 }
 
@@ -339,8 +324,8 @@ func decodeMapNS(decodeKey decodeKeyFunc, truthy reflect.Value) func(plan *decod
 func decodeMapBS(decodeKey decodeKeyFunc, truthy reflect.Value) func(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue, rv reflect.Value) error {
 	return func(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue, rv reflect.Value) error {
 		reallocMap(rv, len(av.BS))
+		kv := reflect.New(rv.Type().Key()).Elem()
 		for _, bb := range av.BS {
-			kv := reflect.New(rv.Type().Key()).Elem()
 			reflect.Copy(kv, reflect.ValueOf(bb))
 			rv.SetMapIndex(kv, truthy)
 		}
@@ -359,7 +344,7 @@ func decodeIface[T any](fn func(t T, av *dynamodb.AttributeValue) error) func(pl
 		} else {
 			if rv.IsNil() {
 				if rv.CanSet() {
-					rv.Set(reflect.New(rv.Type().Elem()))
+					rv.Set(reflect.New(rv.Type()).Elem())
 				} else {
 					return nil
 				}
@@ -368,4 +353,29 @@ func decodeIface[T any](fn func(t T, av *dynamodb.AttributeValue) error) func(pl
 		}
 		return fn(iface.(T), av)
 	}
+}
+
+func decodeAny(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue, v reflect.Value) error {
+	iface, err := av2iface(av)
+	if err != nil {
+		return err
+	}
+	if iface == nil {
+		v.SetZero()
+	} else {
+		v.Set(reflect.ValueOf(iface))
+	}
+	return nil
+}
+
+func decodeUnixTime(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue, rv reflect.Value) error {
+	rv = indirect(rv)
+
+	ts, err := strconv.ParseInt(*av.N, 10, 64)
+	if err != nil {
+		return err
+	}
+
+	rv.Set(reflect.ValueOf(time.Unix(ts, 0).UTC()))
+	return nil
 }

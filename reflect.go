@@ -21,7 +21,7 @@ var (
 
 // special item encoders
 var (
-	rtypeItem            = reflect.TypeOf((**map[string]*dynamodb.AttributeValue)(nil)).Elem()
+	rtypeItem            = reflect.TypeOf((*map[string]*dynamodb.AttributeValue)(nil))
 	rtypeItemUnmarshaler = reflect.TypeOf((*ItemUnmarshaler)(nil)).Elem()
 	rtypeAWSBypass       = reflect.TypeOf(awsEncoder{})
 )
@@ -153,10 +153,6 @@ func visitTypeFields(rt reflect.Type, seen map[string]struct{}, fn func(flags en
 
 		// embed anonymous structs, they could be pointers so test that too
 		if (ft.Kind() == reflect.Struct || isPtr && ft.Elem().Kind() == reflect.Struct) && field.Anonymous {
-			for ft.Kind() == reflect.Ptr {
-				ft = ft.Elem()
-			}
-
 			if err := visitTypeFields(ft, seen, fn); err != nil {
 				return err
 			}
@@ -203,4 +199,16 @@ func nullish(v reflect.Value) bool {
 		return v.IsNil() || v.Len() == 0
 	}
 	return false
+}
+
+func truthy(rt reflect.Type) reflect.Value {
+	switch {
+	case rt.Elem().Kind() == reflect.Bool:
+		return reflect.ValueOf(true).Convert(rt.Elem())
+	case rt.Elem() == emptyStructType:
+		fallthrough
+	case rt.Elem().Kind() == reflect.Struct && rt.Elem().NumField() == 0:
+		return reflect.ValueOf(struct{}{}).Convert(rt.Elem())
+	}
+	return reflect.Value{}
 }

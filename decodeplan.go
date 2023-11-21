@@ -69,19 +69,6 @@ func (plan *decodePlan) handle(key unmarshalKey, fn decodeFunc) {
 	// debugf("handle %#v -> %s", key, runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name())
 }
 
-func (plan *decodePlan) decodeItemBypass(item map[string]*dynamodb.AttributeValue, out any) error {
-	switch x := out.(type) {
-	case *map[string]*dynamodb.AttributeValue:
-		*x = item
-		return nil
-	case awsEncoder:
-		return dynamodbattribute.UnmarshalMap(item, x.iface)
-	case ItemUnmarshaler:
-		return x.UnmarshalDynamoItem(item)
-	}
-	return nil
-}
-
 func (plan *decodePlan) decodeItem(item map[string]*dynamodb.AttributeValue, outv reflect.Value) error {
 	out := outv
 	outv = indirectPtr(outv)
@@ -107,6 +94,19 @@ func (plan *decodePlan) decodeItem(item map[string]*dynamodb.AttributeValue, out
 
 bad:
 	return fmt.Errorf("dynamo: cannot unmarshal item into type %v (must be a pointer to a map or struct, or a supported interface)", out.Type())
+}
+
+func (plan *decodePlan) decodeItemBypass(item map[string]*dynamodb.AttributeValue, out any) error {
+	switch x := out.(type) {
+	case *map[string]*dynamodb.AttributeValue:
+		*x = item
+		return nil
+	case awsEncoder:
+		return dynamodbattribute.UnmarshalMap(item, x.iface)
+	case ItemUnmarshaler:
+		return x.UnmarshalDynamoItem(item)
+	}
+	return nil
 }
 
 func (plan *decodePlan) decodeAttr(flags encodeFlags, av *dynamodb.AttributeValue, rv reflect.Value) error {
@@ -147,7 +147,7 @@ retry:
 	}
 
 	// debugf("lookup fail %#v.", unmarshalKey{gotype: gotype, shape: shapeOf(av)})
-	return fmt.Errorf("no unmarshaler found for %v", rv.Type())
+	return fmt.Errorf("dynamo: cannot unmarshal %s attribute value into type %s", avTypeName(av), rv.Type().String())
 }
 
 func (plan *decodePlan) decodeType(key unmarshalKey, flags encodeFlags, av *dynamodb.AttributeValue, rv reflect.Value) (bool, error) {
@@ -209,7 +209,6 @@ func (plan *decodePlan) learn(rt reflect.Type) {
 			plan.handle(this('S'), decodeIface[encoding.TextUnmarshaler](func(t encoding.TextUnmarshaler, av *dynamodb.AttributeValue) error {
 				return t.UnmarshalText([]byte(*av.S))
 			}))
-			plan.handle(this('_'), decodeInvalid("encoding.TextUnmarshaler"))
 			return
 		}
 
@@ -224,45 +223,37 @@ func (plan *decodePlan) learn(rt reflect.Type) {
 	case reflect.Ptr:
 		plan.learn(rt.Elem())
 		plan.handle(this('_'), decodePtr)
+
 	case reflect.Bool:
 		plan.handle(this('T'), decodeBool)
-		plan.handle(this('_'), decodeInvalid("bool"))
+
 	case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
 		plan.handle(this('N'), decodeInt)
-		plan.handle(this('_'), decodeInvalid("int"))
+
 	case reflect.Uint, reflect.Uint64, reflect.Uint32, reflect.Uint16, reflect.Uint8:
 		plan.handle(this('N'), decodeUint)
-		plan.handle(this('_'), decodeInvalid("uint"))
+
 	case reflect.Float64, reflect.Float32:
 		plan.handle(this('N'), decodeFloat)
-		plan.handle(this('_'), decodeInvalid("float"))
+
 	case reflect.String:
 		plan.handle(this('S'), decodeString)
-		plan.handle(this('_'), decodeInvalid("string"))
+
 	case reflect.Struct:
 		visitTypeFields(rt, nil, func(flags encodeFlags, vt reflect.Type) error {
 			plan.learn(vt)
 			return nil
 		})
 		plan.handle(this('M'), decodeStruct)
-	case reflect.Map:
-		var truthy reflect.Value
-		switch {
-		case rt.Elem().Kind() == reflect.Bool:
-			truthy = reflect.ValueOf(true)
-		case rt.Elem() == emptyStructType:
-			fallthrough
-		case rt.Elem().Kind() == reflect.Struct && rt.Elem().NumField() == 0:
-			truthy = reflect.ValueOf(struct{}{})
-		}
 
+	case reflect.Map:
 		plan.learn(rt.Key())
 		plan.learn(rt.Elem())
 
 		decodeKey := decodeMapKeyFunc(rt)
 		plan.handle(this('M'), decodeMap(decodeKey))
-		plan.handle(this('_'), decodeInvalid("map"))
 
+		truthy := truthy(rt)
 		if !truthy.IsValid() {
 			bad := func(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue, rv reflect.Value) error {
 				return fmt.Errorf("dynamo: unmarshal map set: value type must be struct{} or bool, got %v", rt)
@@ -278,25 +269,26 @@ func (plan *decodePlan) learn(rt reflect.Type) {
 		plan.handle(this('b'), decodeMapBS(decodeKey, truthy))
 	case reflect.Slice:
 		plan.learn(rt.Elem())
-		plan.handle(this('B'), decodeBytes)
-		plan.handle(this('L'), decodeList)
+		if rt.Elem().Kind() == reflect.Uint8 {
+			plan.handle(this('B'), decodeBytes)
+		}
+		/*
+			else {
+				plan.handle(this('B'), decodeSliceB)
+			}
+		*/
+		plan.handle(this('L'), decodeSliceL)
 		plan.handle(this('b'), decodeSliceBS)
 		plan.handle(this('s'), decodeSliceSS)
 		plan.handle(this('n'), decodeSliceNS)
-		plan.handle(this('_'), decodeInvalid("slice"))
 	case reflect.Array:
 		plan.learn(rt.Elem())
 		plan.handle(this('B'), decodeArrayB)
 		plan.handle(this('L'), decodeArrayL)
-		plan.handle(this('_'), decodeInvalid("array"))
 	case reflect.Interface:
 		// interface{}
 		if rt.NumMethod() == 0 {
 			plan.handle(this('_'), decodeAny)
-		} else {
-			// plan.handle(this('_'), func(plan *decodePlan, flags encodeFlags, av *dynamodb.AttributeValue, rv reflect.Value) error {
-			// 	return fmt.Errorf("cannot unmarshal to type: %v", rt)
-			// })
 		}
 	}
 }
@@ -311,11 +303,12 @@ func shouldBypassDecodeItem(rt reflect.Type) bool {
 	return false
 }
 
-// const logging = false
-
 // func debugf(format string, args ...any) {
-// 	if !logging {
-// 		return
+// 	for i := range args {
+// 		rv := reflect.ValueOf(args[i])
+// 		if rv.Kind() == reflect.Func {
+// 			args[i] = runtime.FuncForPC(rv.Pointer()).Name()
+// 		}
 // 	}
 // 	fmt.Println("・", fmt.Sprintf(format, args...))
 // }

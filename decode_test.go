@@ -341,15 +341,6 @@ var exampleWant = widget{
 	},
 }
 
-func TestX(t *testing.T) {
-	plan, err := getDecodePlan(reflect.TypeOf(veryComplexObject))
-	if err != nil {
-		t.Fatal(err)
-	}
-	plan.dump()
-	t.Fail()
-}
-
 func TestEncode2(t *testing.T) {
 	plan, err := getDecodePlan(reflect.TypeOf(veryComplexObject))
 	if err != nil {
@@ -369,5 +360,5 @@ func TestEncode2(t *testing.T) {
 	}
 
 	plan.dump()
-	t.Fail()
+	// t.Fail()
 }

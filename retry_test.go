@@ -13,6 +13,10 @@ import (
 )
 
 func TestRetryMax(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	test := func(max int) (string, func(t *testing.T)) {
 		name := fmt.Sprintf("max(%d)", max)
 		return name, func(t *testing.T) {

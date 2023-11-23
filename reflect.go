@@ -35,8 +35,10 @@ var (
 
 // special item encoders
 var (
-	rtypeItem            = reflect.TypeOf((*map[string]*dynamodb.AttributeValue)(nil))
+	rtypeItemPtr         = reflect.TypeOf((*map[string]*dynamodb.AttributeValue)(nil))
+	rtypeItem            = rtypeItemPtr.Elem()
 	rtypeItemUnmarshaler = reflect.TypeOf((*ItemUnmarshaler)(nil)).Elem()
+	rtypeItemMarshaler   = reflect.TypeOf((*ItemMarshaler)(nil)).Elem()
 	rtypeAWSBypass       = reflect.TypeOf(awsEncoder{})
 )
 

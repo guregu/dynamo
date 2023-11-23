@@ -354,6 +354,9 @@ func encodeMapSet(rt /* map[T]bool | map[T]struct{} */ reflect.Type, flags encod
 				str := string(text)
 				ss = append(ss, &str)
 			}
+			if len(ss) == 0 {
+				return nil, nil
+			}
 			return &dynamodb.AttributeValue{SS: ss}, nil
 		}, nil
 	}

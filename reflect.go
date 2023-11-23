@@ -270,34 +270,33 @@ func emptylike(rt reflect.Type) bool {
 }
 
 func truthy(rt reflect.Type) reflect.Value {
+	elemt := rt.Elem()
 	switch {
-	case rt.Elem().Kind() == reflect.Bool:
-		return reflect.ValueOf(true).Convert(rt.Elem())
-	case rt.Elem() == emptyStructType:
-		fallthrough
-	case rt.Elem().Kind() == reflect.Struct && rt.Elem().NumField() == 0:
-		return reflect.ValueOf(struct{}{}).Convert(rt.Elem())
+	case elemt.Kind() == reflect.Bool:
+		return reflect.ValueOf(true).Convert(elemt)
+	case emptylike(elemt):
+		return reflect.ValueOf(struct{}{}).Convert(elemt)
 	}
 	return reflect.Value{}
 }
 
-func deref(rv reflect.Value, depth int) reflect.Value {
-	switch {
-	case depth < 0:
-		for i := 0; i >= depth; i-- {
-			if !rv.CanAddr() {
-				return rv
-			}
-			rv = rv.Addr()
-		}
-		return rv
-	case depth > 0:
-		for i := 0; i < depth; i++ {
-			if !rv.IsValid() || rv.IsNil() {
-				return rv
-			}
-			rv = rv.Elem()
-		}
-	}
-	return rv
-}
+// func deref(rv reflect.Value, depth int) reflect.Value {
+// 	switch {
+// 	case depth < 0:
+// 		for i := 0; i >= depth; i-- {
+// 			if !rv.CanAddr() {
+// 				return rv
+// 			}
+// 			rv = rv.Addr()
+// 		}
+// 		return rv
+// 	case depth > 0:
+// 		for i := 0; i < depth; i++ {
+// 			if !rv.IsValid() || rv.IsNil() {
+// 				return rv
+// 			}
+// 			rv = rv.Elem()
+// 		}
+// 	}
+// 	return rv
+// }

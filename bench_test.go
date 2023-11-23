@@ -2,6 +2,7 @@ package dynamo
 
 import (
 	"reflect"
+	"strconv"
 	"testing"
 	"time"
 
@@ -85,6 +86,21 @@ func BenchmarkDecodeSimpleMap(b *testing.B) {
 func BenchmarkEncodeVeryComplex(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		marshalItem(&veryComplexObject)
+	}
+}
+
+func BenchmarkEncodeBigSS(b *testing.B) {
+	obj := struct {
+		SS []string `dynamo:",set"`
+	}{
+		SS: make([]string, 10_000),
+	}
+	for i := 0; i < len(obj.SS); i++ {
+		obj.SS[i] = strconv.Itoa(i)
+	}
+
+	for n := 0; n < b.N; n++ {
+		marshalItem(&obj)
 	}
 }
 

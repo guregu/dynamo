@@ -340,3 +340,34 @@ var exampleWant = widget{
 		"Foo": "1336",
 	},
 }
+
+func TestX(t *testing.T) {
+	plan, err := getDecodePlan(reflect.TypeOf(veryComplexObject))
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan.dump()
+	t.Fail()
+}
+
+func TestEncode2(t *testing.T) {
+	plan, err := getDecodePlan(reflect.TypeOf(veryComplexObject))
+	if err != nil {
+		t.Fatal(err)
+	}
+	old, err := MarshalItem(veryComplexObject)
+	if err != nil {
+		t.Fatal(err)
+	}
+	next, err := plan.encodeItem(reflect.ValueOf(veryComplexObject))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(old, next) {
+		t.Error("not equal:\n", old, "\n", next)
+	}
+
+	plan.dump()
+	t.Fail()
+}

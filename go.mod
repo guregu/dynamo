@@ -6,6 +6,9 @@ require (
 	golang.org/x/sync v0.4.0
 )
 
-require github.com/jmespath/go-jmespath v0.4.0 // indirect
+require (
+	github.com/jmespath/go-jmespath v0.4.0 // indirect
+	golang.org/x/exp v0.0.0-20231110203233-9a3e6036ecaa
+)
 
-go 1.19
+go 1.20

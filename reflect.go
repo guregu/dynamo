@@ -11,12 +11,26 @@ import (
 
 // special attribute encoders
 var (
-	rtypeAttr            = reflect.TypeOf((*dynamodb.AttributeValue)(nil))
-	rtypeTimePtr         = reflect.TypeOf((*time.Time)(nil))
-	rtypeTime            = reflect.TypeOf(time.Time{})
-	rtypeUnmarshaler     = reflect.TypeOf((*Unmarshaler)(nil)).Elem()
-	rtypeAWSUnmarshaler  = reflect.TypeOf((*dynamodbattribute.Unmarshaler)(nil)).Elem()
+	// *dynamodb.AttributeValue
+	rtypeAttr = reflect.TypeOf((*dynamodb.AttributeValue)(nil))
+	// *time.Time
+	rtypeTimePtr = reflect.TypeOf((*time.Time)(nil))
+	// time.Time
+	rtypeTime = reflect.TypeOf(time.Time{})
+
+	// Unmarshaler
+	rtypeUnmarshaler = reflect.TypeOf((*Unmarshaler)(nil)).Elem()
+	// dynamodbattribute.Unmarshaler
+	rtypeAWSUnmarshaler = reflect.TypeOf((*dynamodbattribute.Unmarshaler)(nil)).Elem()
+	// encoding.TextUnmarshaler
 	rtypeTextUnmarshaler = reflect.TypeOf((*encoding.TextUnmarshaler)(nil)).Elem()
+
+	// Marshaler
+	rtypeMarshaler = reflect.TypeOf((*Marshaler)(nil)).Elem()
+	// dynamodbattribute.Marshaler
+	rtypeAWSMarshaler = reflect.TypeOf((*dynamodbattribute.Marshaler)(nil)).Elem()
+	// encoding.TextMarshaler
+	rtypeTextMarshaler = reflect.TypeOf((*encoding.TextMarshaler)(nil)).Elem()
 )
 
 // special item encoders
@@ -51,6 +65,44 @@ func indirectPtr(rv reflect.Value) reflect.Value {
 			return rv
 		}
 		rv = rv.Elem()
+	}
+	return rv
+}
+
+func indirectNoAlloc(rv reflect.Value) reflect.Value {
+	if !rv.IsValid() {
+		return rv
+	}
+	for rv.Kind() == reflect.Pointer {
+		if rv.IsNil() {
+			return reflect.Value{}
+		}
+		rv = rv.Elem()
+	}
+	return rv
+}
+
+func indirectPtrNoAlloc(rv reflect.Value) reflect.Value {
+	for rv.Kind() == reflect.Pointer {
+		if rv.IsNil() {
+			return rv
+		}
+		if rv.Type().Elem().Kind() != reflect.Pointer {
+			return rv
+		}
+		rv = rv.Elem()
+	}
+	return rv
+}
+
+func dig(rv reflect.Value, index []int) reflect.Value {
+	rv = indirectNoAlloc(rv)
+	for i, idx := range index {
+		if i == len(index)-1 {
+			rv = indirectPtrNoAlloc(rv.Field(idx))
+		} else {
+			rv = indirectNoAlloc(rv.Field(idx))
+		}
 	}
 	return rv
 }
@@ -123,7 +175,7 @@ func visitFields(item map[string]*dynamodb.AttributeValue, rv reflect.Value, see
 	return nil
 }
 
-func visitTypeFields(rt reflect.Type, seen map[string]struct{}, fn func(flags encodeFlags, vt reflect.Type) error) error {
+func visitTypeFields(rt reflect.Type, seen map[string]struct{}, trail []int, fn func(name string, index []int, flags encodeFlags, vt reflect.Type) error) error {
 	for rt.Kind() == reflect.Pointer {
 		rt = rt.Elem()
 	}
@@ -153,7 +205,11 @@ func visitTypeFields(rt reflect.Type, seen map[string]struct{}, fn func(flags en
 
 		// embed anonymous structs, they could be pointers so test that too
 		if (ft.Kind() == reflect.Struct || isPtr && ft.Elem().Kind() == reflect.Struct) && field.Anonymous {
-			if err := visitTypeFields(ft, seen, fn); err != nil {
+			index := field.Index
+			if len(trail) > 0 {
+				index = append(trail, field.Index...)
+			}
+			if err := visitTypeFields(ft, seen, index, fn); err != nil {
 				return err
 			}
 			continue
@@ -166,8 +222,11 @@ func visitTypeFields(rt reflect.Type, seen map[string]struct{}, fn func(flags en
 		if seen != nil {
 			seen[name] = struct{}{}
 		}
-
-		if err := fn(flags, ft); err != nil {
+		index := field.Index
+		if len(trail) > 0 {
+			index = append(trail, field.Index...)
+		}
+		if err := fn(name, index, flags, ft); err != nil {
 			return err
 		}
 	}
@@ -201,6 +260,13 @@ func nullish(v reflect.Value) bool {
 	return false
 }
 
+func emptylike(rt reflect.Type) bool {
+	if rt == emptyStructType {
+		return true
+	}
+	return rt.Kind() == reflect.Struct && rt.NumField() == 0
+}
+
 func truthy(rt reflect.Type) reflect.Value {
 	switch {
 	case rt.Elem().Kind() == reflect.Bool:
@@ -211,4 +277,25 @@ func truthy(rt reflect.Type) reflect.Value {
 		return reflect.ValueOf(struct{}{}).Convert(rt.Elem())
 	}
 	return reflect.Value{}
+}
+
+func deref(rv reflect.Value, depth int) reflect.Value {
+	switch {
+	case depth < 0:
+		for i := 0; i >= depth; i-- {
+			if !rv.CanAddr() {
+				return rv
+			}
+			rv = rv.Addr()
+		}
+		return rv
+	case depth > 0:
+		for i := 0; i < depth; i++ {
+			if !rv.IsValid() || rv.IsNil() {
+				return rv
+			}
+			rv = rv.Elem()
+		}
+	}
+	return rv
 }

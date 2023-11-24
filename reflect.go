@@ -236,12 +236,7 @@ func visitTypeFields(rt reflect.Type, seen map[string]struct{}, trail []int, fn 
 }
 
 func reallocSlice(v reflect.Value, size int) {
-	if v.IsNil() || v.Cap() < size {
-		slicev := reflect.MakeSlice(v.Type(), size, size)
-		v.Set(slicev)
-		return
-	}
-	v.Set(v.Slice(0, size))
+	v.Set(reflect.MakeSlice(v.Type(), size, size))
 }
 
 func reallocMap(v reflect.Value, size int) {

@@ -245,9 +245,7 @@ func reallocSlice(v reflect.Value, size int) {
 }
 
 func reallocMap(v reflect.Value, size int) {
-	if v.IsNil() || v.Len() > 0 {
-		v.Set(reflect.MakeMapWithSize(v.Type(), size))
-	}
+	v.Set(reflect.MakeMapWithSize(v.Type(), size))
 }
 
 func nullish(v reflect.Value) bool {

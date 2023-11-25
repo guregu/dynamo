@@ -2,6 +2,7 @@ package dynamo
 
 import (
 	"encoding"
+	"fmt"
 	"reflect"
 	"time"
 
@@ -31,6 +32,8 @@ var (
 	rtypeAWSMarshaler = reflect.TypeOf((*dynamodbattribute.Marshaler)(nil)).Elem()
 	// encoding.TextMarshaler
 	rtypeTextMarshaler = reflect.TypeOf((*encoding.TextMarshaler)(nil)).Elem()
+
+	emptyStructType = reflect.TypeOf(struct{}{})
 )
 
 // special item encoders
@@ -241,6 +244,46 @@ func reallocSlice(v reflect.Value, size int) {
 
 func reallocMap(v reflect.Value, size int) {
 	v.Set(reflect.MakeMapWithSize(v.Type(), size))
+}
+
+type decodeKeyFunc func(reflect.Value, string) error
+
+func decodeMapKeyFunc(rt reflect.Type) decodeKeyFunc {
+	if reflect.PtrTo(rt.Key()).Implements(rtypeTextUnmarshaler) {
+		return func(kv reflect.Value, s string) error {
+			tm := kv.Interface().(encoding.TextUnmarshaler)
+			if err := tm.UnmarshalText([]byte(s)); err != nil {
+				return fmt.Errorf("dynamo: unmarshal map: key error: %w", err)
+			}
+			return nil
+		}
+	}
+	return func(kv reflect.Value, s string) error {
+		kv.Elem().SetString(s)
+		return nil
+	}
+}
+
+type encodeKeyFunc func(k reflect.Value) (string, error)
+
+func encodeMapKeyFunc(rt reflect.Type) encodeKeyFunc {
+	keyt := rt.Key()
+	if keyt.Implements(rtypeTextMarshaler) {
+		return func(rv reflect.Value) (string, error) {
+			tm := rv.Interface().(encoding.TextMarshaler)
+			txt, err := tm.MarshalText()
+			if err != nil {
+				return "", fmt.Errorf("dynamo: marshal map: key error: %v", err)
+			}
+			return string(txt), nil
+		}
+	}
+	if keyt.Kind() == reflect.String {
+		return func(rv reflect.Value) (string, error) {
+			return rv.String(), nil
+		}
+	}
+	return nil
 }
 
 func nullish(v reflect.Value) bool {

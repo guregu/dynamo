@@ -126,7 +126,7 @@ func BenchmarkDecodeVeryComplexMap(b *testing.B) {
 func BenchmarkUnmarshal3(b *testing.B) {
 	var got widget
 	rv := reflect.ValueOf(&got)
-	r, _ := getDecodePlan(rv.Type())
+	r, _ := typedefOf(rv.Type())
 	// x := newRecipe(rv)
 	for i := 0; i < b.N; i++ {
 		if err := r.decodeItem(exampleItem, rv); err != nil {
@@ -145,9 +145,9 @@ func BenchmarkUnmarshalText(b *testing.B) {
 		rv := reflect.ValueOf(&got)
 		// x := newRecipe(rv)
 		for i := 0; i < b.N; i++ {
-			r, _ := getDecodePlan(rv.Type())
+			r, _ := typedefOf(rv.Type())
 			if err := r.decodeItem(map[string]*dynamodb.AttributeValue{
-				"Foo": &dynamodb.AttributeValue{S: aws.String("true")},
+				"Foo": {S: aws.String("true")},
 			}, rv); err != nil {
 				b.Fatal(err)
 			}

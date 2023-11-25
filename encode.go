@@ -2,7 +2,6 @@ package dynamo
 
 import (
 	"encoding"
-	"fmt"
 	"reflect"
 	"strconv"
 
@@ -29,105 +28,12 @@ func MarshalItem(v interface{}) (map[string]*dynamodb.AttributeValue, error) {
 func marshalItem(v interface{}) (map[string]*dynamodb.AttributeValue, error) {
 	rv := reflect.ValueOf(v)
 	rt := rv.Type()
-	plan, err := getDecodePlan(rt)
+	plan, err := typedefOf(rt)
 	if err != nil {
 		return nil, err
 	}
 
 	return plan.encodeItem(rv)
-	// switch x := v.(type) {
-	// case map[string]*dynamodb.AttributeValue:
-	// 	return x, nil
-	// case awsEncoder:
-	// 	// special case for AWSEncoding
-	// 	return dynamodbattribute.MarshalMap(x.iface)
-	// case ItemMarshaler:
-	// 	return x.MarshalDynamoItem()
-	// }
-
-	// rv := reflect.ValueOf(v)
-
-	// switch rv.Type().Kind() {
-	// case reflect.Ptr:
-	// 	return marshalItem(rv.Elem().Interface())
-	// case reflect.Struct:
-	// 	return marshalStruct(rv)
-	// case reflect.Map:
-	// 	return marshalItemMap(rv.Interface())
-	// }
-	// return nil, fmt.Errorf("dynamo: marshal item: unsupported type %T: %v", rv.Interface(), rv.Interface())
-}
-
-func marshalItemMap(v interface{}) (map[string]*dynamodb.AttributeValue, error) {
-	// TODO: maybe unify this with the map stuff in marshal
-	av, err := marshal(v, flagNone)
-	if err != nil {
-		return nil, err
-	}
-	if av.M == nil {
-		return nil, fmt.Errorf("dynamo: internal error: encoding map but M was empty")
-	}
-	return av.M, nil
-}
-
-func marshalStruct(rv reflect.Value) (map[string]*dynamodb.AttributeValue, error) {
-	item := make(map[string]*dynamodb.AttributeValue)
-	var err error
-
-	for i := 0; i < rv.Type().NumField(); i++ {
-		field := rv.Type().Field(i)
-		fv := rv.Field(i)
-
-		name, flags := fieldInfo(field)
-		omitempty := flags&flagOmitEmpty != 0
-		anonStruct := fv.Type().Kind() == reflect.Struct && field.Anonymous
-		pointerAnonStruct := fv.Type().Kind() == reflect.Ptr && fv.Type().Elem().Kind() == reflect.Struct && field.Anonymous
-		switch {
-		case !fv.CanInterface():
-			// skip unexported unembedded fields
-			if !anonStruct && !pointerAnonStruct {
-				continue
-			}
-		case name == "-":
-			continue
-		case omitempty:
-			if isZero(fv) {
-				continue
-			}
-		}
-
-		// embed anonymous structs
-		if anonStruct || pointerAnonStruct {
-			if pointerAnonStruct {
-				if fv.IsNil() {
-					continue
-				}
-				fv = fv.Elem()
-			}
-
-			avs, err := marshalStruct(fv)
-			if err != nil {
-				return nil, err
-			}
-			for k, v := range avs {
-				// don't clobber pre-existing fields
-				if _, exists := item[k]; exists {
-					continue
-				}
-				item[k] = v
-			}
-			continue
-		}
-
-		av, err := marshal(fv.Interface(), flags)
-		if err != nil {
-			return nil, err
-		}
-		if av != nil {
-			item[name] = av
-		}
-	}
-	return item, err
 }
 
 // Marshal converts the given value into a DynamoDB attribute value.
@@ -143,7 +49,7 @@ func marshal(v interface{}, flags encodeFlags) (*dynamodb.AttributeValue, error)
 	}
 
 	rt := rv.Type()
-	enc, err := encoderFor(rt, flags)
+	enc, err := encodeType(rt, flags)
 	if err != nil {
 		return nil, err
 	}
@@ -153,8 +59,6 @@ func marshal(v interface{}, flags encodeFlags) (*dynamodb.AttributeValue, error)
 	}
 	return enc(rv, flags)
 }
-
-var emptyStructType = reflect.TypeOf(struct{}{})
 
 func marshalSliceNoOmit(values []interface{}) ([]*dynamodb.AttributeValue, error) {
 	avs := make([]*dynamodb.AttributeValue, 0, len(values))
@@ -168,62 +72,33 @@ func marshalSliceNoOmit(values []interface{}) ([]*dynamodb.AttributeValue, error
 	return avs, nil
 }
 
-type encodeFlags uint
-
-const (
-	flagSet encodeFlags = 1 << iota
-	flagOmitEmpty
-	flagOmitEmptyElem
-	flagAllowEmpty
-	flagAllowEmptyElem
-	flagNull
-	flagUnixTime
-
-	flagNone encodeFlags = 0
-)
-
-func fieldInfo(field reflect.StructField) (name string, flags encodeFlags) {
-	tag := field.Tag.Get("dynamo")
-	if tag == "" {
-		return field.Name, flagNone
-	}
-
-	begin := 0
-	for i := 0; i <= len(tag); i++ {
-		if !(i == len(tag) || tag[i] == ',') {
+func encodeItem(fields []fieldMeta, rv reflect.Value) (Item, error) {
+	item := make(Item, len(fields))
+	for _, field := range fields {
+		fv := dig(rv, field.index)
+		if !fv.IsValid() {
+			// TODO: encode NULL?
 			continue
 		}
-		part := tag[begin:i]
-		begin = i + 1
 
-		if name == "" {
-			if part == "" {
-				name = field.Name
-			} else {
-				name = part
+		if field.flags&flagOmitEmpty != 0 && isZero(fv) {
+			continue
+		}
+
+		av, err := field.enc(fv, field.flags)
+		if err != nil {
+			return nil, err
+		}
+		if av == nil {
+			if field.flags&flagNull != 0 {
+				null := true
+				item[field.name] = &dynamodb.AttributeValue{NULL: &null}
 			}
 			continue
 		}
-
-		switch part {
-		case "set":
-			flags |= flagSet
-		case "omitempty":
-			flags |= flagOmitEmpty
-		case "omitemptyelem":
-			flags |= flagOmitEmptyElem
-		case "allowempty":
-			flags |= flagAllowEmpty
-		case "allowemptyelem":
-			flags |= flagAllowEmptyElem
-		case "null":
-			flags |= flagNull
-		case "unixtime":
-			flags |= flagUnixTime
-		}
+		item[field.name] = av
 	}
-
-	return
+	return item, nil
 }
 
 type isZeroer interface {

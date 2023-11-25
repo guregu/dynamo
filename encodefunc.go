@@ -13,13 +13,15 @@ import (
 	"golang.org/x/exp/constraints"
 )
 
-func encoderFor(rt reflect.Type, flags encodeFlags) (encodeFunc, error) {
+type encodeFunc func(rv reflect.Value, flags encodeFlags) (*dynamodb.AttributeValue, error)
+
+func encodeType(rt reflect.Type, flags encodeFlags) (encodeFunc, error) {
 	try := rt
 	for {
 		// deref := func()
 		switch try {
 		case rtypeAttr:
-			return encode2[*dynamodb.AttributeValue](func(av *dynamodb.AttributeValue, _ encodeFlags) (*dynamodb.AttributeValue, error) {
+			return encode2(func(av *dynamodb.AttributeValue, _ encodeFlags) (*dynamodb.AttributeValue, error) {
 				if av == nil {
 					return nil, nil
 				}
@@ -32,11 +34,11 @@ func encoderFor(rt reflect.Type, flags encodeFlags) (encodeFunc, error) {
 		}
 		switch {
 		case try.Implements(rtypeMarshaler):
-			return encode2[Marshaler](func(x Marshaler, _ encodeFlags) (*dynamodb.AttributeValue, error) {
+			return encode2(func(x Marshaler, _ encodeFlags) (*dynamodb.AttributeValue, error) {
 				return x.MarshalDynamo()
 			}), nil
 		case try.Implements(rtypeAWSMarshaler):
-			return encode2[dynamodbattribute.Marshaler](func(x dynamodbattribute.Marshaler, _ encodeFlags) (*dynamodb.AttributeValue, error) {
+			return encode2(func(x dynamodbattribute.Marshaler, _ encodeFlags) (*dynamodb.AttributeValue, error) {
 				var av dynamodb.AttributeValue
 				err := x.MarshalDynamoDBAttributeValue(&av)
 				return &av, err
@@ -63,11 +65,11 @@ func encoderFor(rt reflect.Type, flags encodeFlags) (encodeFunc, error) {
 
 	// N
 	case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
-		return encodeN[int64]((reflect.Value).Int, strconv.FormatInt), nil
+		return encodeN((reflect.Value).Int, strconv.FormatInt), nil
 	case reflect.Uint, reflect.Uint64, reflect.Uint32, reflect.Uint16, reflect.Uint8:
-		return encodeN[uint64]((reflect.Value).Uint, strconv.FormatUint), nil
+		return encodeN((reflect.Value).Uint, strconv.FormatUint), nil
 	case reflect.Float32, reflect.Float64:
-		return encodeN[float64]((reflect.Value).Float, formatFloat), nil
+		return encodeN((reflect.Value).Float, formatFloat), nil
 
 	// S
 	case reflect.String:
@@ -106,12 +108,17 @@ func encoderFor(rt reflect.Type, flags encodeFlags) (encodeFunc, error) {
 }
 
 func encode2[T any](fn func(T, encodeFlags) (*dynamodb.AttributeValue, error)) func(rv reflect.Value, flags encodeFlags) (*dynamodb.AttributeValue, error) {
+	target := reflect.TypeOf((*T)(nil)).Elem()
+	interfacing := target.Kind() == reflect.Interface
 	return func(rv reflect.Value, flags encodeFlags) (*dynamodb.AttributeValue, error) {
 		if !rv.IsValid() || !rv.CanInterface() {
 			return nil, nil
 		}
 
-		if (rv.Kind() == reflect.Pointer || rv.Kind() == reflect.Interface) && rv.IsNil() {
+		// emit null if:
+		//	- T is not an interface, concrete type is (*X)(nil)
+		//	- T is an interface implemented by X, but we have (*X)(nil) and calling its methods would panic
+		if rv.Kind() == reflect.Pointer && rv.IsNil() && (!interfacing || rv.Type().Elem().Implements(target)) {
 			if flags&flagNull != 0 {
 				return nullAV, nil
 			}
@@ -143,7 +150,6 @@ var encodeTextMarshaler = encode2[encoding.TextMarshaler](func(x encoding.TextMa
 	case err != nil:
 		return nil, err
 	case len(text) == 0:
-		// if flags&flagOmitEmpty
 		if flags&flagAllowEmpty != 0 {
 			return &dynamodb.AttributeValue{S: new(string)}, nil
 		}
@@ -154,7 +160,7 @@ var encodeTextMarshaler = encode2[encoding.TextMarshaler](func(x encoding.TextMa
 })
 
 func encodePtr(rt reflect.Type, flags encodeFlags) (encodeFunc, error) {
-	elem, err := encoderFor(rt.Elem(), flags)
+	elem, err := encodeType(rt.Elem(), flags)
 	if err != nil {
 		return nil, err
 	}
@@ -185,92 +191,87 @@ func encodeStruct(rt reflect.Type) (encodeFunc, error) {
 
 func encodeSliceSet(rt /* []T */ reflect.Type, flags encodeFlags) (encodeFunc, error) {
 	switch {
+	// SS
 	case rt.Elem().Implements(rtypeTextMarshaler):
-		return func(rv reflect.Value, flags encodeFlags) (*dynamodb.AttributeValue, error) {
-			ss := make([]*string, 0, rv.Len())
-			for i := 0; i < rv.Len(); i++ {
-				tm := rv.Index(i).Interface().(encoding.TextMarshaler)
-				text, err := tm.MarshalText()
-				if err != nil {
-					return nil, err
-				}
-				if flags&flagOmitEmptyElem != 0 && len(text) == 0 {
-					continue
-				}
-				ss = append(ss, aws.String(string(text)))
-			}
-			if len(ss) == 0 {
-				return nil, nil
-			}
-			return &dynamodb.AttributeValue{SS: ss}, nil
-		}, nil
+		return encodeSliceTMSS, nil
 	}
+
 	switch rt.Elem().Kind() {
 	// NS
 	case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
-		return encodeSliceNS[int64]((reflect.Value).Int, strconv.FormatInt), nil
+		return encodeSliceNS((reflect.Value).Int, strconv.FormatInt), nil
 	case reflect.Uint, reflect.Uint64, reflect.Uint32, reflect.Uint16, reflect.Uint8:
-		return encodeSliceNS[uint64]((reflect.Value).Uint, strconv.FormatUint), nil
+		return encodeSliceNS((reflect.Value).Uint, strconv.FormatUint), nil
 	case reflect.Float64, reflect.Float32:
-		return encodeSliceNS[float64]((reflect.Value).Float, formatFloat), nil
+		return encodeSliceNS((reflect.Value).Float, formatFloat), nil
 
 	// SS
 	case reflect.String:
-		return func(rv reflect.Value, flags encodeFlags) (*dynamodb.AttributeValue, error) {
-			ss := make([]*string, 0, rv.Len())
-			for i := 0; i < rv.Len(); i++ {
-				s := rv.Index(i).String()
-				if flags&flagOmitEmptyElem != 0 && s == "" {
-					continue
-				}
-				ss = append(ss, aws.String(s))
-			}
-			if len(ss) == 0 {
-				return nil, nil
-			}
-			return &dynamodb.AttributeValue{SS: ss}, nil
-		}, nil
+		return encodeSliceSS, nil
 
 	// BS
 	case reflect.Slice:
 		if rt.Elem().Elem().Kind() == reflect.Uint8 {
-			return func(rv reflect.Value, flags encodeFlags) (*dynamodb.AttributeValue, error) {
-				bs := make([][]byte, 0, rv.Len())
-				for i := 0; i < rv.Len(); i++ {
-					b := rv.Index(i).Bytes()
-					if flags&flagOmitEmptyElem != 0 && len(b) == 0 {
-						continue
-					}
-					bs = append(bs, b)
-				}
-				if len(bs) == 0 {
-					return nil, nil
-				}
-				return &dynamodb.AttributeValue{BS: bs}, nil
-			}, nil
+			return encodeSliceBS, nil
 		}
 	}
 
 	return nil, fmt.Errorf("dynamo: invalid type for set: %v", rt)
 }
 
+func encodeSliceTMSS(rv reflect.Value, flags encodeFlags) (*dynamodb.AttributeValue, error) {
+	ss := make([]*string, 0, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		tm := rv.Index(i).Interface().(encoding.TextMarshaler)
+		text, err := tm.MarshalText()
+		if err != nil {
+			return nil, err
+		}
+		if flags&flagOmitEmptyElem != 0 && len(text) == 0 {
+			continue
+		}
+		ss = append(ss, aws.String(string(text)))
+	}
+	if len(ss) == 0 {
+		return nil, nil
+	}
+	return &dynamodb.AttributeValue{SS: ss}, nil
+}
+
+func encodeSliceSS(rv reflect.Value, flags encodeFlags) (*dynamodb.AttributeValue, error) {
+	ss := make([]*string, 0, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		s := rv.Index(i).String()
+		if flags&flagOmitEmptyElem != 0 && s == "" {
+			continue
+		}
+		ss = append(ss, aws.String(s))
+	}
+	if len(ss) == 0 {
+		return nil, nil
+	}
+	return &dynamodb.AttributeValue{SS: ss}, nil
+}
+
+func encodeSliceBS(rv reflect.Value, flags encodeFlags) (*dynamodb.AttributeValue, error) {
+	bs := make([][]byte, 0, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		b := rv.Index(i).Bytes()
+		if flags&flagOmitEmptyElem != 0 && len(b) == 0 {
+			continue
+		}
+		bs = append(bs, b)
+	}
+	if len(bs) == 0 {
+		return nil, nil
+	}
+	return &dynamodb.AttributeValue{BS: bs}, nil
+}
+
 func encodeMapM(rt reflect.Type, flags encodeFlags) (encodeFunc, error) {
-	var keyString func(k reflect.Value) (string, error)
-	if ktype := rt.Key(); ktype.Implements(rtypeTextMarshaler) {
-		keyString = func(k reflect.Value) (string, error) {
-			tm := k.Interface().(encoding.TextMarshaler)
-			txt, err := tm.MarshalText()
-			if err != nil {
-				return "", fmt.Errorf("dynamo: marshal map: key error: %v", err)
-			}
-			return string(txt), nil
-		}
-	} else if ktype.Kind() == reflect.String {
-		keyString = func(k reflect.Value) (string, error) {
-			return k.String(), nil
-		}
-	} else {
-		return nil, fmt.Errorf("dynamo marshal: map key must be string, have %v", rt)
+	keyString := encodeMapKeyFunc(rt)
+	if keyString == nil {
+		return nil, fmt.Errorf("dynamo marshal: map key type must be string or encoding.TextMarshaler, have %v", rt)
 	}
 
 	subflags := flagNone
@@ -283,7 +284,7 @@ func encodeMapM(rt reflect.Type, flags encodeFlags) (encodeFunc, error) {
 		subflags |= flagOmitEmpty
 	}
 
-	valueEnc, err := encoderFor(rt.Elem(), subflags)
+	valueEnc, err := encodeType(rt.Elem(), subflags)
 	if err != nil {
 		return nil, err
 	}
@@ -338,7 +339,6 @@ func encodeMapSet(rt /* map[T]bool | map[T]struct{} */ reflect.Type, flags encod
 		return func(rv reflect.Value, flags encodeFlags) (*dynamodb.AttributeValue, error) {
 			length := rv.Len()
 			ss := make([]*string, 0, length)
-			// strs := make([]string, length)
 			iter := rv.MapRange()
 			for iter.Next() {
 				if useBool && !iter.Value().Equal(truthy) {
@@ -491,7 +491,7 @@ func encodeList(rt reflect.Type, flags encodeFlags) (encodeFunc, error) {
 		subflags |= flagAllowEmptyElem
 	}
 
-	valueEnc, err := encoderFor(rt.Elem(), subflags)
+	valueEnc, err := encodeType(rt.Elem(), subflags)
 	if err != nil {
 		return nil, err
 	}
@@ -528,8 +528,7 @@ func encodeAny(rv reflect.Value, flags encodeFlags) (*dynamodb.AttributeValue, e
 		}
 		return nil, nil
 	}
-	// TODO use cache
-	enc, err := encoderFor(rv.Elem().Type(), flags)
+	enc, err := encodeType(rv.Elem().Type(), flags)
 	if err != nil {
 		return nil, err
 	}

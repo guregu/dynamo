@@ -12,14 +12,14 @@ import (
 
 // TODO: delete me
 func DumpType(x any) {
-	plan, err := getDecodePlan(reflect.TypeOf(x))
+	plan, err := typedefOf(reflect.TypeOf(x))
 	if err != nil {
 		panic(err)
 	}
 	plan.dump()
 }
 
-func (plan *decodePlan) dumpDecoders() []unmarshalKey {
+func (plan *typedef) dumpDecoders() []unmarshalKey {
 	keys := make([]unmarshalKey, 0, len(plan.decoders))
 	for key := range plan.decoders {
 		keys = append(keys, key)
@@ -30,7 +30,7 @@ func (plan *decodePlan) dumpDecoders() []unmarshalKey {
 	return keys
 }
 
-func (plan *decodePlan) dump() {
+func (plan *typedef) dump() {
 	funcname := func(f any) string {
 		name := runtime.FuncForPC(reflect.ValueOf(f).Pointer()).Name()
 		if name == "" {

@@ -310,7 +310,7 @@ func TestDecode3(t *testing.T) {
 	want := exampleWant
 	var got widget
 	rv := reflect.ValueOf(&got)
-	r, err := getDecodePlan(rv.Type())
+	r, err := typedefOf(rv.Type())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -342,7 +342,7 @@ var exampleWant = widget{
 }
 
 func TestEncode2(t *testing.T) {
-	plan, err := getDecodePlan(reflect.TypeOf(veryComplexObject))
+	plan, err := typedefOf(reflect.TypeOf(veryComplexObject))
 	if err != nil {
 		t.Fatal(err)
 	}

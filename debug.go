@@ -51,7 +51,7 @@ func (plan *typedef) dump() {
 	w = tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 	fmt.Fprintf(os.Stdout, "ENCODERS (%d)\n", len(plan.fields))
 	for _, field := range plan.fields {
-		fmt.Fprintf(w, "%s\t%v\t->\t%v\n", field.name, field.index, funcname(field.enc))
+		fmt.Fprintf(w, "%s\t%v\t->\t%v\t%v\n", field.name, field.index, funcname(field.enc), funcname(field.isZero))
 	}
 	w.Flush()
 }

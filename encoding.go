@@ -35,10 +35,11 @@ type typedef struct {
 }
 
 type fieldMeta struct {
-	index []int
-	name  string
-	flags encodeFlags
-	enc   encodeFunc
+	index  []int
+	name   string
+	flags  encodeFlags
+	enc    encodeFunc
+	isZero func(reflect.Value) bool
 }
 
 func (def *typedef) analyze(rt reflect.Type) {
@@ -67,11 +68,15 @@ func structFields(rt reflect.Type) ([]fieldMeta, error) {
 			return err
 		}
 		field := fieldMeta{
-			index: index,
-			name:  name,
-			flags: flags,
-			enc:   enc,
+			index:  index,
+			name:   name,
+			flags:  flags,
+			enc:    enc,
+			isZero: isZeroFunc(vt),
 		}
+		// if flags&flagOmitEmpty != 0 {
+		// 	field.isZero = isZeroFunc(rt)
+		// }
 		fields = append(fields, field)
 		return nil
 	})

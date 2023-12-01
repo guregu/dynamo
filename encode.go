@@ -42,7 +42,6 @@ func Marshal(v interface{}) (*dynamodb.AttributeValue, error) {
 }
 
 func marshal(v interface{}, flags encodeFlags) (*dynamodb.AttributeValue, error) {
-	// TODO
 	rv := reflect.ValueOf(v)
 	if !rv.IsValid() {
 		return nil, nil
@@ -53,6 +52,7 @@ func marshal(v interface{}, flags encodeFlags) (*dynamodb.AttributeValue, error)
 	if err != nil {
 		return nil, err
 	}
+
 	rv = indirectPtrNoAlloc(rv)
 	if !rv.IsValid() {
 		return nil, nil
@@ -81,8 +81,10 @@ func encodeItem(fields []fieldMeta, rv reflect.Value) (Item, error) {
 			continue
 		}
 
-		if field.flags&flagOmitEmpty != 0 && isZero(fv) {
-			continue
+		if field.flags&flagOmitEmpty != 0 && field.isZero != nil {
+			if field.isZero(fv) {
+				continue
+			}
 		}
 
 		av, err := field.enc(fv, field.flags)
@@ -91,8 +93,7 @@ func encodeItem(fields []fieldMeta, rv reflect.Value) (Item, error) {
 		}
 		if av == nil {
 			if field.flags&flagNull != 0 {
-				null := true
-				item[field.name] = &dynamodb.AttributeValue{NULL: &null}
+				item[field.name] = nullAV
 			}
 			continue
 		}
@@ -105,48 +106,102 @@ type isZeroer interface {
 	IsZero() bool
 }
 
-// thanks James Henstridge
-func isZero(rv reflect.Value) bool {
-	// use IsZero for supported types
-	if rv.CanInterface() {
-		if zeroer, ok := rv.Interface().(isZeroer); ok {
-			if rv.Kind() == reflect.Ptr && rv.IsNil() {
-				if _, cantCall := rv.Type().Elem().MethodByName("IsZero"); cantCall {
-					// can't call a value method on a nil pointer type
-					return true
-				}
-			}
-			return zeroer.IsZero()
-		}
+func isZeroFunc(rt reflect.Type) func(rv reflect.Value) bool {
+	if rt.Implements(rtypeIsZeroer) {
+		return isZeroIface(rt, func(v isZeroer) bool {
+			return v.IsZero()
+		})
 	}
 
-	// always return false for certain interfaces, check these later
-	iface := rv.Interface()
-	switch iface.(type) {
-	case Marshaler:
-		return false
-	case encoding.TextMarshaler:
-		return false
+	// simplified check for certain interfaces
+	// their output will be checked during encoding process
+	switch {
+	case rt.Implements(rtypeMarshaler):
+		return isZeroIface(rt, func(v Marshaler) bool {
+			return false
+		})
+	case rt.Implements(rtypeTextMarshaler):
+		return isZeroIface(rt, func(v encoding.TextMarshaler) bool {
+			return false
+		})
 	}
 
-	switch rv.Kind() {
-	case reflect.Func, reflect.Map, reflect.Slice:
-		return rv.IsNil()
+	switch rt.Kind() {
+	case reflect.Map, reflect.Slice:
+		return isNil
+
 	case reflect.Array:
-		z := true
-		for i := 0; i < rv.Len(); i++ {
-			z = z && isZero(rv.Index(i))
-		}
-		return z
+		return isZeroArray(rt)
+
 	case reflect.Struct:
-		z := true
-		for i := 0; i < rv.NumField(); i++ {
-			z = z && isZero(rv.Field(i))
-		}
-		return z
+		return isZeroStruct(rt)
 	}
-	// Compare other types directly:
+
+	return isZeroValue
+}
+
+func isZeroIface[T any](rt reflect.Type, isZero func(v T) bool) func(rv reflect.Value) bool {
+	ifaceType := reflect.TypeOf((*T)(nil)).Elem()
+	// use IsZero for supported types
+	if (rt.Kind() == reflect.Pointer && rt.Elem().Implements(ifaceType)) || rt.Kind() == reflect.Interface {
+		// avoid calling IsZero if it would panic
+		return func(rv reflect.Value) bool {
+			if rv.IsNil() || !rv.CanInterface() {
+				return true
+			}
+			return isZero(rv.Interface().(T))
+		}
+	}
+	return func(rv reflect.Value) bool {
+		if !rv.CanInterface() {
+			return true
+		}
+		return isZero(rv.Interface().(T))
+	}
+}
+
+func isZeroStruct(rt reflect.Type) func(rv reflect.Value) bool {
+	fields, err := structFields(rt)
+	if err != nil {
+		return nil
+	}
+	return func(rv reflect.Value) bool {
+		for _, info := range fields {
+			if info.isZero == nil {
+				continue
+			}
+
+			field := dig(rv, info.index)
+			if !field.IsValid() {
+				return true
+			}
+
+			if !info.isZero(field) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
+func isZeroArray(rt reflect.Type) func(reflect.Value) bool {
+	elemIsZero := isZeroFunc(rt.Elem())
+	return func(rv reflect.Value) bool {
+		for i := 0; i < rv.Len(); i++ {
+			if !elemIsZero(rv.Index(i)) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
+func isZeroValue(rv reflect.Value) bool {
 	return rv.IsZero()
+}
+
+func isNil(rv reflect.Value) bool {
+	return rv.IsNil()
 }
 
 func formatFloat(f float64, _ int) string {

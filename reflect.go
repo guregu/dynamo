@@ -33,7 +33,10 @@ var (
 	// encoding.TextMarshaler
 	rtypeTextMarshaler = reflect.TypeOf((*encoding.TextMarshaler)(nil)).Elem()
 
-	emptyStructType = reflect.TypeOf(struct{}{})
+	// interface{ IsZero() bool } (time.Time, etc.)
+	rtypeIsZeroer = reflect.TypeOf((*isZeroer)(nil)).Elem()
+	// struct{}
+	rtypeEmptyStruct = reflect.TypeOf(struct{}{})
 )
 
 // special item encoders
@@ -299,7 +302,7 @@ func nullish(v reflect.Value) bool {
 }
 
 func emptylike(rt reflect.Type) bool {
-	if rt == emptyStructType {
+	if rt == rtypeEmptyStruct {
 		return true
 	}
 	return rt.Kind() == reflect.Struct && rt.NumField() == 0

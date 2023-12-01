@@ -15,33 +15,49 @@ type shapeKey byte
 func (sk shapeKey) String() string   { return string(rune(sk)) }
 func (sk shapeKey) GoString() string { return fmt.Sprintf("shape(%s)", sk.String()) }
 
+const (
+	shapeB    shapeKey = 'B'
+	shapeBOOL shapeKey = 'T'
+	shapeN    shapeKey = 'N'
+	shapeS    shapeKey = 'S'
+	shapeL    shapeKey = 'L'
+	shapeM    shapeKey = 'M'
+	shapeBS   shapeKey = 'b'
+	shapeNS   shapeKey = 'n'
+	shapeSS   shapeKey = 's'
+	shapeNULL shapeKey = '0'
+
+	shapeAny     shapeKey = '_'
+	shapeInvalid shapeKey = 0
+)
+
 func shapeOf(av *dynamodb.AttributeValue) shapeKey {
 	if av == nil {
-		return 0
+		return shapeInvalid
 	}
 	switch {
 	case av.B != nil:
-		return 'B'
+		return shapeB
 	case av.BS != nil:
-		return 'b'
+		return shapeBS
 	case av.BOOL != nil:
-		return 'T'
+		return shapeBOOL
 	case av.N != nil:
-		return 'N'
+		return shapeN
 	case av.S != nil:
-		return 'S'
+		return shapeS
 	case av.L != nil:
-		return 'L'
+		return shapeL
 	case av.NS != nil:
-		return 'n'
+		return shapeNS
 	case av.SS != nil:
-		return 's'
+		return shapeSS
 	case av.M != nil:
-		return 'M'
+		return shapeM
 	case av.NULL != nil:
-		return '0'
+		return shapeNULL
 	}
-	return '_'
+	return shapeAny
 }
 
 // av2iface converts an av into interface{}.

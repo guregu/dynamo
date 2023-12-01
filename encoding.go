@@ -274,7 +274,7 @@ func (plan *typedef) learn(rt reflect.Type) {
 		return
 	}
 
-	plan.handle(this('0'), decodeNull)
+	plan.handle(this(shapeNULL), decodeNull)
 
 	try := rt
 	if try.Kind() != reflect.Pointer {
@@ -283,31 +283,31 @@ func (plan *typedef) learn(rt reflect.Type) {
 	for {
 		switch try {
 		case rtypeAttr:
-			plan.handle(this('_'), decode2[*dynamodb.AttributeValue](func(dst *dynamodb.AttributeValue, src *dynamodb.AttributeValue) error {
+			plan.handle(this(shapeAny), decode2(func(dst *dynamodb.AttributeValue, src *dynamodb.AttributeValue) error {
 				*dst = *src
 				return nil
 			}))
 			return
 		case rtypeTimePtr, rtypeTime:
-			plan.handle(this('N'), decodeUnixTime)
-			plan.handle(this('S'), decode2[encoding.TextUnmarshaler](func(t encoding.TextUnmarshaler, av *dynamodb.AttributeValue) error {
+			plan.handle(this(shapeN), decodeUnixTime)
+			plan.handle(this(shapeS), decode2(func(t encoding.TextUnmarshaler, av *dynamodb.AttributeValue) error {
 				return t.UnmarshalText([]byte(*av.S))
 			}))
 			return
 		}
 		switch {
 		case try.Implements(rtypeUnmarshaler):
-			plan.handle(this('_'), decode2[Unmarshaler](func(t Unmarshaler, av *dynamodb.AttributeValue) error {
+			plan.handle(this(shapeAny), decode2(func(t Unmarshaler, av *dynamodb.AttributeValue) error {
 				return t.UnmarshalDynamo(av)
 			}))
 			return
 		case try.Implements(rtypeAWSUnmarshaler):
-			plan.handle(this('_'), decode2[dynamodbattribute.Unmarshaler](func(t dynamodbattribute.Unmarshaler, av *dynamodb.AttributeValue) error {
+			plan.handle(this(shapeAny), decode2(func(t dynamodbattribute.Unmarshaler, av *dynamodb.AttributeValue) error {
 				return t.UnmarshalDynamoDBAttributeValue(av)
 			}))
 			return
 		case try.Implements(rtypeTextUnmarshaler):
-			plan.handle(this('S'), decode2[encoding.TextUnmarshaler](func(t encoding.TextUnmarshaler, av *dynamodb.AttributeValue) error {
+			plan.handle(this(shapeS), decode2(func(t encoding.TextUnmarshaler, av *dynamodb.AttributeValue) error {
 				return t.UnmarshalText([]byte(*av.S))
 			}))
 			return
@@ -323,73 +323,73 @@ func (plan *typedef) learn(rt reflect.Type) {
 	switch rt.Kind() {
 	case reflect.Ptr:
 		plan.learn(rt.Elem())
-		plan.handle(this('_'), decodePtr)
+		plan.handle(this(shapeAny), decodePtr)
 
 	case reflect.Bool:
-		plan.handle(this('T'), decodeBool)
+		plan.handle(this(shapeBOOL), decodeBool)
 
 	case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
-		plan.handle(this('N'), decodeInt)
+		plan.handle(this(shapeN), decodeInt)
 
 	case reflect.Uint, reflect.Uint64, reflect.Uint32, reflect.Uint16, reflect.Uint8:
-		plan.handle(this('N'), decodeUint)
+		plan.handle(this(shapeN), decodeUint)
 
 	case reflect.Float64, reflect.Float32:
-		plan.handle(this('N'), decodeFloat)
+		plan.handle(this(shapeN), decodeFloat)
 
 	case reflect.String:
-		plan.handle(this('S'), decodeString)
+		plan.handle(this(shapeS), decodeString)
 
 	case reflect.Struct:
 		visitTypeFields(rt, nil, nil, func(_ string, _ []int, flags encodeFlags, vt reflect.Type) error {
 			plan.learn(vt)
 			return nil
 		})
-		plan.handle(this('M'), decodeStruct)
+		plan.handle(this(shapeM), decodeStruct)
 
 	case reflect.Map:
 		plan.learn(rt.Key())
 		plan.learn(rt.Elem())
 
 		decodeKey := decodeMapKeyFunc(rt)
-		plan.handle(this('M'), decodeMap(decodeKey))
+		plan.handle(this(shapeM), decodeMap(decodeKey))
 
 		truthy := truthy(rt)
 		if !truthy.IsValid() {
 			bad := func(plan *typedef, flags encodeFlags, av *dynamodb.AttributeValue, rv reflect.Value) error {
 				return fmt.Errorf("dynamo: unmarshal map set: value type must be struct{} or bool, got %v", rt)
 			}
-			plan.handle(this('s'), bad)
-			plan.handle(this('n'), bad)
-			plan.handle(this('b'), bad)
+			plan.handle(this(shapeSS), bad)
+			plan.handle(this(shapeNS), bad)
+			plan.handle(this(shapeBS), bad)
 			return
 		}
 
-		plan.handle(this('s'), decodeMapSS(decodeKey, truthy))
-		plan.handle(this('n'), decodeMapNS(decodeKey, truthy))
-		plan.handle(this('b'), decodeMapBS(decodeKey, truthy))
+		plan.handle(this(shapeSS), decodeMapSS(decodeKey, truthy))
+		plan.handle(this(shapeNS), decodeMapNS(decodeKey, truthy))
+		plan.handle(this(shapeBS), decodeMapBS(decodeKey, truthy))
 	case reflect.Slice:
 		plan.learn(rt.Elem())
 		if rt.Elem().Kind() == reflect.Uint8 {
-			plan.handle(this('B'), decodeBytes)
+			plan.handle(this(shapeB), decodeBytes)
 		}
 		/*
 			else {
-				plan.handle(this('B'), decodeSliceB)
+				plan.handle(this(shapeB), decodeSliceB)
 			}
 		*/
-		plan.handle(this('L'), decodeSliceL)
-		plan.handle(this('b'), decodeSliceBS)
-		plan.handle(this('s'), decodeSliceSS)
-		plan.handle(this('n'), decodeSliceNS)
+		plan.handle(this(shapeL), decodeSliceL)
+		plan.handle(this(shapeBS), decodeSliceBS)
+		plan.handle(this(shapeSS), decodeSliceSS)
+		plan.handle(this(shapeNS), decodeSliceNS)
 	case reflect.Array:
 		plan.learn(rt.Elem())
-		plan.handle(this('B'), decodeArrayB)
-		plan.handle(this('L'), decodeArrayL)
+		plan.handle(this(shapeB), decodeArrayB)
+		plan.handle(this(shapeL), decodeArrayL)
 	case reflect.Interface:
 		// interface{}
 		if rt.NumMethod() == 0 {
-			plan.handle(this('_'), decodeAny)
+			plan.handle(this(shapeAny), decodeAny)
 		}
 	}
 }

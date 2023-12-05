@@ -178,7 +178,7 @@ func TestUpdateNil(t *testing.T) {
 		Meta: map[string]string{
 			"abc": "123",
 		},
-		// Count: 100,
+		Count: 100,
 	}
 	err := table.Put(item).Run()
 	if err != nil {
@@ -197,7 +197,7 @@ func TestUpdateNil(t *testing.T) {
 		Set("Msg", "").
 		Set("Meta.'abc'", nil).
 		Set("Meta.'ok'", (*ptrTextMarshaler)(nil)).
-		// SetExpr("'Count' = ?", (*textMarshaler)(nil)).
+		SetExpr("'Count' = ?", (*textMarshaler)(nil)).
 		SetExpr("MsgPtr = ?", "").
 		Value(&result)
 	if err != nil {

@@ -10,7 +10,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
-	"golang.org/x/exp/constraints"
 )
 
 type encodeFunc func(rv reflect.Value, flags encodeFlags) (*dynamodb.AttributeValue, error)
@@ -137,7 +136,7 @@ func encodeString(rv reflect.Value, flags encodeFlags) (*dynamodb.AttributeValue
 			return &dynamodb.AttributeValue{S: &s}, nil
 		}
 		if flags&flagNull != 0 {
-			return &dynamodb.AttributeValue{NULL: aws.Bool(true)}, nil
+			return nullAV, nil
 		}
 		return nil, nil
 	}
@@ -295,7 +294,7 @@ func encodeMapM(rt reflect.Type, flags encodeFlags) (encodeFunc, error) {
 				return &dynamodb.AttributeValue{M: map[string]*dynamodb.AttributeValue{}}, nil
 			}
 			if flags&flagNull != 0 {
-				return &dynamodb.AttributeValue{NULL: aws.Bool(true)}, nil
+				return nullAV, nil
 			}
 			return nil, nil
 		}
@@ -418,14 +417,18 @@ func encodeMapSet(rt /* map[T]bool | map[T]struct{} */ reflect.Type, flags encod
 	return nil, fmt.Errorf("dynamo: invalid type for set: %v", rt)
 }
 
-func encodeN[T constraints.Integer | constraints.Float](get func(reflect.Value) T, format func(T, int) string) encodeFunc {
+type numberType interface {
+	~int64 | ~uint64 | ~float64
+}
+
+func encodeN[T numberType](get func(reflect.Value) T, format func(T, int) string) encodeFunc {
 	return func(rv reflect.Value, flags encodeFlags) (*dynamodb.AttributeValue, error) {
 		str := format(get(rv), 10)
 		return &dynamodb.AttributeValue{N: &str}, nil
 	}
 }
 
-func encodeSliceNS[T constraints.Integer | constraints.Float](get func(reflect.Value) T, format func(T, int) string) encodeFunc {
+func encodeSliceNS[T numberType](get func(reflect.Value) T, format func(T, int) string) encodeFunc {
 	return func(rv reflect.Value, flags encodeFlags) (*dynamodb.AttributeValue, error) {
 		ns := make([]*string, 0, rv.Len())
 		for i := 0; i < rv.Len(); i++ {
@@ -443,7 +446,7 @@ func encodeSliceNS[T constraints.Integer | constraints.Float](get func(reflect.V
 	}
 }
 
-func encodeMapNS[T constraints.Integer | constraints.Float](truthy reflect.Value, get func(reflect.Value) T, format func(T, int) string) encodeFunc {
+func encodeMapNS[T numberType](truthy reflect.Value, get func(reflect.Value) T, format func(T, int) string) encodeFunc {
 	useBool := truthy.Kind() == reflect.Bool
 	return func(rv reflect.Value, flags encodeFlags) (*dynamodb.AttributeValue, error) {
 		ns := make([]*string, 0, rv.Len())

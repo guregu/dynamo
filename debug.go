@@ -1,3 +1,5 @@
+//go:build debug
+
 package dynamo
 
 import (

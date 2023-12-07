@@ -515,6 +515,8 @@ func (ps *parallelScan) run(ctx context.Context) {
 				case <-ctx.Done():
 					return ctx.Err()
 				case ps.items <- item:
+					// reset the map, so we don't overwrite the one we've already sent
+					item = nil
 				}
 
 				if ps.leks != nil {

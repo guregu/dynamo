@@ -290,16 +290,6 @@ func TestUnmarshalClearFields(t *testing.T) {
 }
 
 func BenchmarkUnmarshalReflect(b *testing.B) {
-	// av := &dynamodb.AttributeValue{
-	// 	L: []*dynamodb.AttributeValue{
-	// 		{S: aws.String("fooooooooo")},
-	// 	},
-	// }
-	// for i := 0; i < b.N; i++ {
-	// 	var list []string
-	// 	unmarshalReflect(av, reflect.ValueOf(&list))
-	// }
-
 	var got widget
 	for i := 0; i < b.N; i++ {
 		unmarshalItem(exampleItem, &got)
@@ -339,26 +329,4 @@ var exampleWant = widget{
 	Meta: map[string]string{
 		"Foo": "1336",
 	},
-}
-
-func TestEncode2(t *testing.T) {
-	plan, err := typedefOf(reflect.TypeOf(veryComplexObject))
-	if err != nil {
-		t.Fatal(err)
-	}
-	old, err := MarshalItem(veryComplexObject)
-	if err != nil {
-		t.Fatal(err)
-	}
-	next, err := plan.encodeItem(reflect.ValueOf(veryComplexObject))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !reflect.DeepEqual(old, next) {
-		t.Error("not equal:\n", old, "\n", next)
-	}
-
-	plan.dump()
-	// t.Fail()
 }

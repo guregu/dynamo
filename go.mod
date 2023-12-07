@@ -1,10 +1,11 @@
 module github.com/guregu/dynamo
 
 require (
-	github.com/aws/aws-sdk-go v1.45.28
+	github.com/aws/aws-sdk-go v1.48.10
 	github.com/cenkalti/backoff/v4 v4.2.1
-	golang.org/x/net v0.17.0 // indirect
-	golang.org/x/sync v0.4.0
+	golang.org/x/sync v0.5.0
 )
 
-go 1.13
+require github.com/jmespath/go-jmespath v0.4.0 // indirect
+
+go 1.20

@@ -20,6 +20,7 @@ var dummyCreds = credentials.NewStaticCredentials("dummy", "dummy", "")
 const offlineSkipMsg = "DYNAMO_TEST_REGION not set"
 
 func init() {
+	// os.Setenv("DYNAMO_TEST_REGION", "us-west-2")
 	if region := os.Getenv("DYNAMO_TEST_REGION"); region != "" {
 		var endpoint *string
 		if dte := os.Getenv("DYNAMO_TEST_ENDPOINT"); dte != "" {

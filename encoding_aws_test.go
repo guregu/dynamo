@@ -49,9 +49,9 @@ func TestAWSEncoding(t *testing.T) {
 	}
 	w.SecretKey = ""
 
-	if !reflect.DeepEqual(w, blank) {
+	if !reflect.DeepEqual(blank, w) {
 		t.Error("AWS unmarshal not equal")
-		t.Logf("%#v != %#v", w, blank)
+		t.Logf("%#v != %#v", blank, w)
 	}
 }
 

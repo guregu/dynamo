@@ -15,6 +15,9 @@ func TestTableLifecycle(t *testing.T) {
 	if testDB == nil {
 		t.Skip(offlineSkipMsg)
 	}
+	if testing.Short() {
+		t.SkipNow()
+	}
 
 	now := time.Now().UTC()
 	name := fmt.Sprintf("TestDB-%d", now.UnixNano())

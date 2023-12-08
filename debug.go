@@ -12,7 +12,11 @@ import (
 	"text/tabwriter"
 )
 
-// TODO: delete me
+// debugging tools for dynamo developers
+// disabled by default, use `go build -tags debug` to enable
+// warning: not covered by API stability guarantees
+
+// DumpType dumps a description of x's typedef to stdout.
 func DumpType(x any) {
 	plan, err := typedefOf(reflect.TypeOf(x))
 	if err != nil {

@@ -106,6 +106,22 @@ func encodeType(rt reflect.Type, flags encodeFlags) (encodeFunc, error) {
 	return nil, fmt.Errorf("dynamo marshal: unsupported type %s", rt.String())
 }
 
+func encodePtr(rt reflect.Type, flags encodeFlags) (encodeFunc, error) {
+	elem, err := encodeType(rt.Elem(), flags)
+	if err != nil {
+		return nil, err
+	}
+	return func(rv reflect.Value, flags encodeFlags) (*dynamodb.AttributeValue, error) {
+		if rv.IsNil() {
+			if flags&flagNull != 0 {
+				return nullAV, nil
+			}
+			return nil, nil
+		}
+		return elem(rv.Elem(), flags)
+	}, nil
+}
+
 func encode2[T any](fn func(T, encodeFlags) (*dynamodb.AttributeValue, error)) func(rv reflect.Value, flags encodeFlags) (*dynamodb.AttributeValue, error) {
 	target := reflect.TypeOf((*T)(nil)).Elem()
 	interfacing := target.Kind() == reflect.Interface
@@ -133,7 +149,7 @@ func encodeString(rv reflect.Value, flags encodeFlags) (*dynamodb.AttributeValue
 	s := rv.String()
 	if len(s) == 0 {
 		if flags&flagAllowEmpty != 0 {
-			return &dynamodb.AttributeValue{S: &s}, nil
+			return emptyS, nil
 		}
 		if flags&flagNull != 0 {
 			return nullAV, nil
@@ -158,11 +174,25 @@ var encodeTextMarshaler = encode2[encoding.TextMarshaler](func(x encoding.TextMa
 	return &dynamodb.AttributeValue{S: &str}, nil
 })
 
-func encodePtr(rt reflect.Type, flags encodeFlags) (encodeFunc, error) {
-	elem, err := encodeType(rt.Elem(), flags)
-	if err != nil {
-		return nil, err
+func encodeBytes(rt reflect.Type, flags encodeFlags) encodeFunc {
+	if rt.Kind() == reflect.Array {
+		size := rt.Len()
+		return func(rv reflect.Value, flags encodeFlags) (*dynamodb.AttributeValue, error) {
+			if rv.IsZero() {
+				switch {
+				case flags&flagNull != 0:
+					return nullAV, nil
+				case flags&flagAllowEmpty != 0:
+					return emptyB, nil
+				}
+				return nil, nil
+			}
+			data := make([]byte, size)
+			reflect.Copy(reflect.ValueOf(data), rv)
+			return &dynamodb.AttributeValue{B: data}, nil
+		}
 	}
+
 	return func(rv reflect.Value, flags encodeFlags) (*dynamodb.AttributeValue, error) {
 		if rv.IsNil() {
 			if flags&flagNull != 0 {
@@ -170,8 +200,14 @@ func encodePtr(rt reflect.Type, flags encodeFlags) (encodeFunc, error) {
 			}
 			return nil, nil
 		}
-		return elem(rv.Elem(), flags)
-	}, nil
+		if rv.Len() == 0 {
+			if flags&flagAllowEmpty != 0 {
+				return emptyB, nil
+			}
+			return nil, nil
+		}
+		return &dynamodb.AttributeValue{B: rv.Bytes()}, nil
+	}
 }
 
 func encodeStruct(rt reflect.Type) (encodeFunc, error) {

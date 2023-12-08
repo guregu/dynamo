@@ -72,7 +72,7 @@ func marshalSliceNoOmit(values []interface{}) ([]*dynamodb.AttributeValue, error
 	return avs, nil
 }
 
-func encodeItem(fields []fieldMeta, rv reflect.Value) (Item, error) {
+func encodeItem(fields []structField, rv reflect.Value) (Item, error) {
 	item := make(Item, len(fields))
 	for _, field := range fields {
 		fv := dig(rv, field.index)

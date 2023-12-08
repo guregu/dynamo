@@ -182,7 +182,7 @@ func decodeMap(decodeKey func(reflect.Value, string) error) func(plan *typedef, 
 			for name, av := range item {
 				vp := new(V)
 				decodeKey(kp, name)
-				decodeAttr(av, vp) // TODO fix order
+				decodeAttr(av, vp) // TODO: make argument order consistent
 				out[*kp] = *vp
 			}
 	*/

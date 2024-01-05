@@ -205,6 +205,7 @@ func TestTxRetry(t *testing.T) {
 				Range("Time", widget1.Time).
 				Add("Count", 1))
 			if err := tx.Run(); err != nil {
+				// spew.Dump(err)
 				panic(err)
 			}
 		}()

@@ -5,9 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 type UserAction struct {
@@ -24,8 +25,8 @@ type embeddedWithKeys struct {
 }
 
 type Metric struct {
-	ID    uint64                     `dynamo:"ID,hash"`
-	Time  dynamodbattribute.UnixTime `dynamo:",range"`
+	ID    uint64                  `dynamo:"ID,hash"`
+	Time  attributevalue.UnixTime `dynamo:",range"`
 	Value uint64
 }
 
@@ -51,73 +52,73 @@ func TestCreateTable(t *testing.T) {
 		input()
 
 	expected := &dynamodb.CreateTableInput{
-		AttributeDefinitions: []*dynamodb.AttributeDefinition{
+		AttributeDefinitions: []types.AttributeDefinition{
 			{
 				AttributeName: aws.String("ID"),
-				AttributeType: aws.String("S"),
+				AttributeType: types.ScalarAttributeTypeS,
 			},
 			{
 				AttributeName: aws.String("Time"),
-				AttributeType: aws.String("S"),
+				AttributeType: types.ScalarAttributeTypeS,
 			},
 			{
 				AttributeName: aws.String("Seq"),
-				AttributeType: aws.String("N"),
+				AttributeType: types.ScalarAttributeTypeN,
 			},
 			{
 				AttributeName: aws.String("Embedded"),
-				AttributeType: aws.String("B"),
+				AttributeType: types.ScalarAttributeTypeB,
 			},
 		},
-		GlobalSecondaryIndexes: []*dynamodb.GlobalSecondaryIndex{{
+		GlobalSecondaryIndexes: []types.GlobalSecondaryIndex{{
 			IndexName: aws.String("Embedded-index"),
-			KeySchema: []*dynamodb.KeySchemaElement{{
+			KeySchema: []types.KeySchemaElement{{
 				AttributeName: aws.String("Embedded"),
-				KeyType:       aws.String("HASH"),
+				KeyType:       types.KeyTypeHash,
 			}},
-			Projection: &dynamodb.Projection{
-				ProjectionType: aws.String("ALL"),
+			Projection: &types.Projection{
+				ProjectionType: types.ProjectionTypeAll,
 			},
-			ProvisionedThroughput: &dynamodb.ProvisionedThroughput{
+			ProvisionedThroughput: &types.ProvisionedThroughput{
 				ReadCapacityUnits:  aws.Int64(1),
 				WriteCapacityUnits: aws.Int64(2),
 			},
 		}},
-		KeySchema: []*dynamodb.KeySchemaElement{{
+		KeySchema: []types.KeySchemaElement{{
 			AttributeName: aws.String("ID"),
-			KeyType:       aws.String("HASH"),
+			KeyType:       types.KeyTypeHash,
 		}, {
 			AttributeName: aws.String("Time"),
-			KeyType:       aws.String("RANGE"),
+			KeyType:       types.KeyTypeRange,
 		}},
-		LocalSecondaryIndexes: []*dynamodb.LocalSecondaryIndex{{
+		LocalSecondaryIndexes: []types.LocalSecondaryIndex{{
 			IndexName: aws.String("ID-Seq-index"),
-			KeySchema: []*dynamodb.KeySchemaElement{{
+			KeySchema: []types.KeySchemaElement{{
 				AttributeName: aws.String("ID"),
-				KeyType:       aws.String("HASH"),
+				KeyType:       types.KeyTypeHash,
 			}, {
 				AttributeName: aws.String("Seq"),
-				KeyType:       aws.String("RANGE"),
+				KeyType:       types.KeyTypeRange,
 			}},
-			Projection: &dynamodb.Projection{
-				ProjectionType:   aws.String("INCLUDE"),
-				NonKeyAttributes: []*string{aws.String("UUID"), aws.String("Name")},
+			Projection: &types.Projection{
+				ProjectionType:   types.ProjectionTypeInclude,
+				NonKeyAttributes: []string{"UUID", "Name"},
 			},
 		}},
-		ProvisionedThroughput: &dynamodb.ProvisionedThroughput{
+		ProvisionedThroughput: &types.ProvisionedThroughput{
 			ReadCapacityUnits:  aws.Int64(4),
 			WriteCapacityUnits: aws.Int64(2),
 		},
-		Tags: []*dynamodb.Tag{
+		Tags: []types.Tag{
 			{
 				Key:   aws.String("Tag-Key"),
 				Value: aws.String("Tag-Value"),
 			},
 		},
-		SSESpecification: &dynamodb.SSESpecification{
+		SSESpecification: &types.SSESpecification{
 			Enabled:        aws.Bool(true),
 			KMSMasterKeyId: aws.String("alias/key"),
-			SSEType:        aws.String("KMS"),
+			SSEType:        types.SSEType("KMS"),
 		},
 		TableName: aws.String("UserActions"),
 	}
@@ -135,24 +136,24 @@ func TestCreateTableUintUnixTime(t *testing.T) {
 		OnDemand(true).
 		input()
 	expected := &dynamodb.CreateTableInput{
-		AttributeDefinitions: []*dynamodb.AttributeDefinition{
+		AttributeDefinitions: []types.AttributeDefinition{
 			{
 				AttributeName: aws.String("ID"),
-				AttributeType: aws.String("N"),
+				AttributeType: types.ScalarAttributeTypeN,
 			},
 			{
 				AttributeName: aws.String("Time"),
-				AttributeType: aws.String("N"),
+				AttributeType: types.ScalarAttributeTypeN,
 			},
 		},
-		KeySchema: []*dynamodb.KeySchemaElement{{
+		KeySchema: []types.KeySchemaElement{{
 			AttributeName: aws.String("ID"),
-			KeyType:       aws.String("HASH"),
+			KeyType:       types.KeyTypeHash,
 		}, {
 			AttributeName: aws.String("Time"),
-			KeyType:       aws.String("RANGE"),
+			KeyType:       types.KeyTypeRange,
 		}},
-		BillingMode: aws.String(dynamodb.BillingModePayPerRequest),
+		BillingMode: types.BillingModePayPerRequest,
 		TableName:   aws.String("Metrics"),
 	}
 	if !reflect.DeepEqual(input, expected) {

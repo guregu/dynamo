@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 // Delete is a request to delete an item.
@@ -15,10 +15,10 @@ type Delete struct {
 	returnType string
 
 	hashKey   string
-	hashValue *dynamodb.AttributeValue
+	hashValue types.AttributeValue
 
 	rangeKey   string
-	rangeValue *dynamodb.AttributeValue
+	rangeValue types.AttributeValue
 
 	subber
 	condition string
@@ -119,7 +119,7 @@ func (d *Delete) run(ctx context.Context) (*dynamodb.DeleteItemOutput, error) {
 	var output *dynamodb.DeleteItemOutput
 	err := d.table.db.retry(ctx, func() error {
 		var err error
-		output, err = d.table.db.client.DeleteItemWithContext(ctx, input)
+		output, err = d.table.db.client.DeleteItem(ctx, input)
 		return err
 	})
 	if d.cc != nil {
@@ -132,7 +132,7 @@ func (d *Delete) deleteInput() *dynamodb.DeleteItemInput {
 	input := &dynamodb.DeleteItemInput{
 		TableName:                 &d.table.name,
 		Key:                       d.key(),
-		ReturnValues:              &d.returnType,
+		ReturnValues:              types.ReturnValue(d.returnType),
 		ExpressionAttributeNames:  d.nameExpr,
 		ExpressionAttributeValues: d.valueExpr,
 	}
@@ -140,18 +140,18 @@ func (d *Delete) deleteInput() *dynamodb.DeleteItemInput {
 		input.ConditionExpression = &d.condition
 	}
 	if d.cc != nil {
-		input.ReturnConsumedCapacity = aws.String(dynamodb.ReturnConsumedCapacityIndexes)
+		input.ReturnConsumedCapacity = types.ReturnConsumedCapacityIndexes
 	}
 	return input
 }
 
-func (d *Delete) writeTxItem() (*dynamodb.TransactWriteItem, error) {
+func (d *Delete) writeTxItem() (*types.TransactWriteItem, error) {
 	if d.err != nil {
 		return nil, d.err
 	}
 	input := d.deleteInput()
-	item := &dynamodb.TransactWriteItem{
-		Delete: &dynamodb.Delete{
+	item := &types.TransactWriteItem{
+		Delete: &types.Delete{
 			TableName:                 input.TableName,
 			Key:                       input.Key,
 			ExpressionAttributeNames:  input.ExpressionAttributeNames,
@@ -162,8 +162,8 @@ func (d *Delete) writeTxItem() (*dynamodb.TransactWriteItem, error) {
 	return item, nil
 }
 
-func (d *Delete) key() map[string]*dynamodb.AttributeValue {
-	key := map[string]*dynamodb.AttributeValue{
+func (d *Delete) key() Item {
+	key := Item{
 		d.hashKey: d.hashValue,
 	}
 	if d.rangeKey != "" {

@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 // Item is a type alias for the raw DynamoDB item type.
-type Item = map[string]*dynamodb.AttributeValue
+type Item = map[string]types.AttributeValue
 
 type shapeKey byte
 
@@ -31,51 +31,51 @@ const (
 	shapeInvalid shapeKey = 0
 )
 
-func shapeOf(av *dynamodb.AttributeValue) shapeKey {
+func shapeOf(av types.AttributeValue) shapeKey {
 	if av == nil {
 		return shapeInvalid
 	}
-	switch {
-	case av.B != nil:
+	switch av.(type) {
+	case *types.AttributeValueMemberB:
 		return shapeB
-	case av.BS != nil:
+	case *types.AttributeValueMemberBS:
 		return shapeBS
-	case av.BOOL != nil:
+	case *types.AttributeValueMemberBOOL:
 		return shapeBOOL
-	case av.N != nil:
+	case *types.AttributeValueMemberN:
 		return shapeN
-	case av.S != nil:
+	case *types.AttributeValueMemberS:
 		return shapeS
-	case av.L != nil:
+	case *types.AttributeValueMemberL:
 		return shapeL
-	case av.NS != nil:
+	case *types.AttributeValueMemberNS:
 		return shapeNS
-	case av.SS != nil:
+	case *types.AttributeValueMemberSS:
 		return shapeSS
-	case av.M != nil:
+	case *types.AttributeValueMemberM:
 		return shapeM
-	case av.NULL != nil:
+	case *types.AttributeValueMemberNULL:
 		return shapeNULL
 	}
 	return shapeAny
 }
 
 // av2iface converts an av into interface{}.
-func av2iface(av *dynamodb.AttributeValue) (interface{}, error) {
-	switch {
-	case av.B != nil:
-		return av.B, nil
-	case av.BS != nil:
-		return av.BS, nil
-	case av.BOOL != nil:
-		return *av.BOOL, nil
-	case av.N != nil:
-		return strconv.ParseFloat(*av.N, 64)
-	case av.S != nil:
-		return *av.S, nil
-	case av.L != nil:
-		list := make([]interface{}, 0, len(av.L))
-		for _, item := range av.L {
+func av2iface(av types.AttributeValue) (interface{}, error) {
+	switch v := av.(type) {
+	case *types.AttributeValueMemberB:
+		return v.Value, nil
+	case *types.AttributeValueMemberBS:
+		return v.Value, nil
+	case *types.AttributeValueMemberBOOL:
+		return v.Value, nil
+	case *types.AttributeValueMemberN:
+		return strconv.ParseFloat(v.Value, 64)
+	case *types.AttributeValueMemberS:
+		return v.Value, nil
+	case *types.AttributeValueMemberL:
+		list := make([]interface{}, 0, len(v.Value))
+		for _, item := range v.Value {
 			iface, err := av2iface(item)
 			if err != nil {
 				return nil, err
@@ -83,25 +83,21 @@ func av2iface(av *dynamodb.AttributeValue) (interface{}, error) {
 			list = append(list, iface)
 		}
 		return list, nil
-	case av.NS != nil:
-		set := make([]float64, 0, len(av.NS))
-		for _, n := range av.NS {
-			f, err := strconv.ParseFloat(*n, 64)
+	case *types.AttributeValueMemberNS:
+		set := make([]float64, 0, len(v.Value))
+		for _, n := range v.Value {
+			f, err := strconv.ParseFloat(n, 64)
 			if err != nil {
 				return nil, err
 			}
 			set = append(set, f)
 		}
 		return set, nil
-	case av.SS != nil:
-		set := make([]string, 0, len(av.SS))
-		for _, s := range av.SS {
-			set = append(set, *s)
-		}
-		return set, nil
-	case av.M != nil:
-		m := make(map[string]interface{}, len(av.M))
-		for k, v := range av.M {
+	case *types.AttributeValueMemberSS:
+		return v.Value, nil
+	case *types.AttributeValueMemberM:
+		m := make(map[string]interface{}, len(v.Value))
+		for k, v := range v.Value {
 			iface, err := av2iface(v)
 			if err != nil {
 				return nil, err
@@ -109,36 +105,36 @@ func av2iface(av *dynamodb.AttributeValue) (interface{}, error) {
 			m[k] = iface
 		}
 		return m, nil
-	case av.NULL != nil:
+	case *types.AttributeValueMemberNULL:
 		return nil, nil
 	}
-	return nil, fmt.Errorf("dynamo: unsupported AV: %#v", *av)
+	return nil, fmt.Errorf("dynamo: unsupported AV: %#v", av)
 }
 
-func avTypeName(av *dynamodb.AttributeValue) string {
+func avTypeName(av types.AttributeValue) string {
 	if av == nil {
 		return "<nil>"
 	}
-	switch {
-	case av.B != nil:
+	switch av.(type) {
+	case *types.AttributeValueMemberB:
 		return "binary"
-	case av.BS != nil:
+	case *types.AttributeValueMemberBS:
 		return "binary set"
-	case av.BOOL != nil:
+	case *types.AttributeValueMemberBOOL:
 		return "boolean"
-	case av.N != nil:
+	case *types.AttributeValueMemberN:
 		return "number"
-	case av.S != nil:
+	case *types.AttributeValueMemberS:
 		return "string"
-	case av.L != nil:
+	case *types.AttributeValueMemberL:
 		return "list"
-	case av.NS != nil:
+	case *types.AttributeValueMemberNS:
 		return "number set"
-	case av.SS != nil:
+	case *types.AttributeValueMemberSS:
 		return "string set"
-	case av.M != nil:
+	case *types.AttributeValueMemberM:
 		return "map"
-	case av.NULL != nil:
+	case *types.AttributeValueMemberNULL:
 		return "null"
 	}
 	return "<empty>"

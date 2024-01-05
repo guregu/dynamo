@@ -4,14 +4,14 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 var itemEncodeOnlyTests = []struct {
 	name string
 	in   interface{}
-	out  map[string]*dynamodb.AttributeValue
+	out  Item
 }{
 	{
 		name: "omitemptyelem",
@@ -26,10 +26,10 @@ var itemEncodeOnlyTests = []struct {
 			M:     map[string]string{"test": ""},
 			Other: true,
 		},
-		out: map[string]*dynamodb.AttributeValue{
-			"L":     {L: []*dynamodb.AttributeValue{}},
-			"M":     {M: map[string]*dynamodb.AttributeValue{}},
-			"Other": {BOOL: aws.Bool(true)},
+		out: Item{
+			"L":     &types.AttributeValueMemberL{Value: []types.AttributeValue{}},
+			"M":     &types.AttributeValueMemberM{Value: Item{}},
+			"Other": &types.AttributeValueMemberBOOL{Value: true},
 		},
 	},
 	{
@@ -43,8 +43,8 @@ var itemEncodeOnlyTests = []struct {
 			M:     map[string]string{"test": ""},
 			Other: true,
 		},
-		out: map[string]*dynamodb.AttributeValue{
-			"Other": {BOOL: aws.Bool(true)},
+		out: Item{
+			"Other": &types.AttributeValueMemberBOOL{Value: (true)},
 		},
 	},
 	{
@@ -62,14 +62,20 @@ var itemEncodeOnlyTests = []struct {
 				},
 			},
 		},
-		out: map[string]*dynamodb.AttributeValue{
-			"M": {M: map[string]*dynamodb.AttributeValue{
-				"struct": {M: map[string]*dynamodb.AttributeValue{
-					"InnerMap": {M: map[string]*dynamodb.AttributeValue{
-						// expected empty inside
-					}},
-				}},
-			}},
+		out: Item{
+			"M": &types.AttributeValueMemberM{
+				Value: Item{
+					"struct": &types.AttributeValueMemberM{
+						Value: Item{
+							"InnerMap": &types.AttributeValueMemberM{
+								Value: Item{
+									// expected empty inside
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 	},
 	{
@@ -83,8 +89,8 @@ var itemEncodeOnlyTests = []struct {
 			private:  1337,
 			private2: new(int),
 		},
-		out: map[string]*dynamodb.AttributeValue{
-			"Public": {N: aws.String("555")},
+		out: Item{
+			"Public": &types.AttributeValueMemberN{Value: ("555")},
 		},
 	},
 }

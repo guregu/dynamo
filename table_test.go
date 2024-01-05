@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 func TestTableLifecycle(t *testing.T) {
@@ -65,7 +65,7 @@ func TestTableLifecycle(t *testing.T) {
 				RangeKeyType:      NumberType,
 				Throughput:        Throughput{Read: 1, Write: 1},
 				ProjectionType:    AllProjection,
-				ProjectionAttribs: []string{},
+				ProjectionAttribs: []string(nil),
 			},
 			{
 				Name: "Seq-ID-index",
@@ -77,7 +77,7 @@ func TestTableLifecycle(t *testing.T) {
 				RangeKeyType:      StringType,
 				Throughput:        Throughput{Read: 1, Write: 1},
 				ProjectionType:    AllProjection,
-				ProjectionAttribs: []string{},
+				ProjectionAttribs: []string(nil),
 			},
 			{
 				Name: "UUID-index",
@@ -87,7 +87,7 @@ func TestTableLifecycle(t *testing.T) {
 				HashKeyType:       StringType,
 				Throughput:        Throughput{Read: 1, Write: 1},
 				ProjectionType:    AllProjection,
-				ProjectionAttribs: []string{},
+				ProjectionAttribs: []string(nil),
 			},
 		},
 		LSI: []Index{
@@ -103,7 +103,7 @@ func TestTableLifecycle(t *testing.T) {
 				RangeKeyType:      NumberType,
 				Throughput:        Throughput{Read: 1, Write: 1},
 				ProjectionType:    AllProjection,
-				ProjectionAttribs: []string{},
+				ProjectionAttribs: []string(nil),
 			},
 		},
 	}
@@ -125,21 +125,21 @@ func TestTableLifecycle(t *testing.T) {
 }
 
 func TestAddConsumedCapacity(t *testing.T) {
-	raw := &dynamodb.ConsumedCapacity{
+	raw := &types.ConsumedCapacity{
 		TableName: aws.String("TestTable"),
-		Table: &dynamodb.Capacity{
+		Table: &types.Capacity{
 			CapacityUnits:      aws.Float64(9),
 			ReadCapacityUnits:  aws.Float64(4),
 			WriteCapacityUnits: aws.Float64(5),
 		},
-		GlobalSecondaryIndexes: map[string]*dynamodb.Capacity{
+		GlobalSecondaryIndexes: map[string]types.Capacity{
 			"TestGSI": {
 				CapacityUnits:      aws.Float64(3),
 				ReadCapacityUnits:  aws.Float64(1),
 				WriteCapacityUnits: aws.Float64(2),
 			},
 		},
-		LocalSecondaryIndexes: map[string]*dynamodb.Capacity{
+		LocalSecondaryIndexes: map[string]types.Capacity{
 			"TestLSI": {
 				CapacityUnits:      aws.Float64(30),
 				ReadCapacityUnits:  aws.Float64(10),
@@ -150,7 +150,7 @@ func TestAddConsumedCapacity(t *testing.T) {
 		ReadCapacityUnits:  aws.Float64(15),
 		WriteCapacityUnits: aws.Float64(27),
 	}
-	expected := ConsumedCapacity{
+	expected := &ConsumedCapacity{
 		TableName:  *raw.TableName,
 		Table:      *raw.Table.CapacityUnits,
 		TableRead:  *raw.Table.ReadCapacityUnits,
@@ -166,8 +166,8 @@ func TestAddConsumedCapacity(t *testing.T) {
 		Write:      *raw.WriteCapacityUnits,
 	}
 
-	var cc ConsumedCapacity
-	addConsumedCapacity(&cc, raw)
+	var cc = new(ConsumedCapacity)
+	addConsumedCapacity(cc, raw)
 
 	if !reflect.DeepEqual(cc, expected) {
 		t.Error("bad ConsumedCapacity:", cc, "≠", expected)

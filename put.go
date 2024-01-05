@@ -3,8 +3,8 @@ package dynamo
 import (
 	"context"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 // Put is a request to create or replace an item.
@@ -13,7 +13,7 @@ type Put struct {
 	table      Table
 	returnType string
 
-	item map[string]*dynamodb.AttributeValue
+	item Item
 	subber
 	condition string
 
@@ -95,7 +95,7 @@ func (p *Put) run(ctx context.Context) (output *dynamodb.PutItemOutput, err erro
 
 	req := p.input()
 	p.table.db.retry(ctx, func() error {
-		output, err = p.table.db.client.PutItemWithContext(ctx, req)
+		output, err = p.table.db.client.PutItem(ctx, req)
 		return err
 	})
 	if p.cc != nil {
@@ -108,7 +108,7 @@ func (p *Put) input() *dynamodb.PutItemInput {
 	input := &dynamodb.PutItemInput{
 		TableName:                 &p.table.name,
 		Item:                      p.item,
-		ReturnValues:              &p.returnType,
+		ReturnValues:              types.ReturnValue(p.returnType),
 		ExpressionAttributeNames:  p.nameExpr,
 		ExpressionAttributeValues: p.valueExpr,
 	}
@@ -116,18 +116,18 @@ func (p *Put) input() *dynamodb.PutItemInput {
 		input.ConditionExpression = &p.condition
 	}
 	if p.cc != nil {
-		input.ReturnConsumedCapacity = aws.String(dynamodb.ReturnConsumedCapacityIndexes)
+		input.ReturnConsumedCapacity = types.ReturnConsumedCapacityIndexes
 	}
 	return input
 }
 
-func (p *Put) writeTxItem() (*dynamodb.TransactWriteItem, error) {
+func (p *Put) writeTxItem() (*types.TransactWriteItem, error) {
 	if p.err != nil {
 		return nil, p.err
 	}
 	input := p.input()
-	item := &dynamodb.TransactWriteItem{
-		Put: &dynamodb.Put{
+	item := &types.TransactWriteItem{
+		Put: &types.Put{
 			TableName:                 input.TableName,
 			Item:                      input.Item,
 			ExpressionAttributeNames:  input.ExpressionAttributeNames,

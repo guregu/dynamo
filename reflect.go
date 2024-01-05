@@ -6,14 +6,25 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 // special attribute encoders
 var (
-	// *dynamodb.AttributeValue
-	rtypeAttr = reflect.TypeOf((*dynamodb.AttributeValue)(nil))
+	// types.AttributeValue
+	rtypeAttr     = reflect.TypeOf((*types.AttributeValue)(nil)).Elem()
+	rtypeAttrB    = reflect.TypeOf((*types.AttributeValueMemberB)(nil))
+	rtypeAttrBS   = reflect.TypeOf((*types.AttributeValueMemberBS)(nil))
+	rtypeAttrBOOL = reflect.TypeOf((*types.AttributeValueMemberBOOL)(nil))
+	rtypeAttrN    = reflect.TypeOf((*types.AttributeValueMemberN)(nil))
+	rtypeAttrS    = reflect.TypeOf((*types.AttributeValueMemberS)(nil))
+	rtypeAttrL    = reflect.TypeOf((*types.AttributeValueMemberL)(nil))
+	rtypeAttrNS   = reflect.TypeOf((*types.AttributeValueMemberNS)(nil))
+	rtypeAttrSS   = reflect.TypeOf((*types.AttributeValueMemberSS)(nil))
+	rtypeAttrM    = reflect.TypeOf((*types.AttributeValueMemberM)(nil))
+	rtypeAttrNULL = reflect.TypeOf((*types.AttributeValueMemberNULL)(nil))
+
 	// *time.Time
 	rtypeTimePtr = reflect.TypeOf((*time.Time)(nil))
 	// time.Time
@@ -22,14 +33,14 @@ var (
 	// Unmarshaler
 	rtypeUnmarshaler = reflect.TypeOf((*Unmarshaler)(nil)).Elem()
 	// dynamodbattribute.Unmarshaler
-	rtypeAWSUnmarshaler = reflect.TypeOf((*dynamodbattribute.Unmarshaler)(nil)).Elem()
+	rtypeAWSUnmarshaler = reflect.TypeOf((*attributevalue.Unmarshaler)(nil)).Elem()
 	// encoding.TextUnmarshaler
 	rtypeTextUnmarshaler = reflect.TypeOf((*encoding.TextUnmarshaler)(nil)).Elem()
 
 	// Marshaler
 	rtypeMarshaler = reflect.TypeOf((*Marshaler)(nil)).Elem()
-	// dynamodbattribute.Marshaler
-	rtypeAWSMarshaler = reflect.TypeOf((*dynamodbattribute.Marshaler)(nil)).Elem()
+	// attributevalue.Marshaler
+	rtypeAWSMarshaler = reflect.TypeOf((*attributevalue.Marshaler)(nil)).Elem()
 	// encoding.TextMarshaler
 	rtypeTextMarshaler = reflect.TypeOf((*encoding.TextMarshaler)(nil)).Elem()
 
@@ -41,7 +52,7 @@ var (
 
 // special item encoders
 var (
-	rtypeItemPtr         = reflect.TypeOf((*map[string]*dynamodb.AttributeValue)(nil))
+	rtypeItemPtr         = reflect.TypeOf((*map[string]types.AttributeValue)(nil))
 	rtypeItem            = rtypeItemPtr.Elem()
 	rtypeItemUnmarshaler = reflect.TypeOf((*ItemUnmarshaler)(nil)).Elem()
 	rtypeItemMarshaler   = reflect.TypeOf((*ItemMarshaler)(nil)).Elem()
@@ -115,7 +126,7 @@ func dig(rv reflect.Value, index []int) reflect.Value {
 	return rv
 }
 
-func visitFields(item map[string]*dynamodb.AttributeValue, rv reflect.Value, seen map[string]struct{}, fn func(av *dynamodb.AttributeValue, flags encodeFlags, v reflect.Value) error) error {
+func visitFields(item map[string]types.AttributeValue, rv reflect.Value, seen map[string]struct{}, fn func(av types.AttributeValue, flags encodeFlags, v reflect.Value) error) error {
 	for rv.Kind() == reflect.Pointer {
 		if rv.IsNil() {
 			if !rv.CanSet() {

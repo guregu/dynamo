@@ -5,19 +5,21 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/client"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go/aws/request"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
+	"github.com/aws/smithy-go"
+	"github.com/aws/smithy-go/logging"
+	"github.com/guregu/dynamo/dynamodbiface"
 )
 
 // DB is a DynamoDB client.
 type DB struct {
 	client   dynamodbiface.DynamoDBAPI
-	logger   aws.Logger
+	logger   logging.Logger
 	retryer  request.Retryer
 	retryMax int
 }
@@ -27,16 +29,32 @@ type DB struct {
 // If MaxRetries is configured, the maximum number of retry attempts will be limited to the specified value
 // (0 for no retrying, -1 for default behavior of unlimited retries).
 // MaxRetries is ignored if Retryer is set.
-func New(p client.ConfigProvider, cfgs ...*aws.Config) *DB {
-	cfg := p.ClientConfig(dynamodb.EndpointsID, cfgs...)
-	return newDB(dynamodb.New(p, cfgs...), cfg.Config)
+// func New(p client.ConfigProvider, cfgs ...*aws.Config) *DB {
+// 	cfg := p.ClientConfig(dynamodb.EndpointsID, cfgs...)
+// 	return newDB(dynamodb.New(p, cfgs...), cfg.Config)
+// 	client dynamodbiface.DynamoDBAPI
+// 	logger logging.Logger
+// }
+// TODO ^^^^^
+
+// New creates a new client with the given configuration.
+func New(cfg aws.Config) *DB {
+	db := &DB{
+		client: dynamodb.NewFromConfig(cfg),
+		logger: cfg.Logger,
+	}
+	if db.logger == nil {
+		db.logger = logging.NewStandardLogger(os.Stdout)
+	}
+	return db
 }
 
 // NewFromIface creates a new client with the given interface.
 func NewFromIface(client dynamodbiface.DynamoDBAPI) *DB {
-	if c, ok := client.(*dynamodb.DynamoDB); ok {
-		return newDB(c, &c.Config)
-	}
+	// TODO: FIX vvvv
+	// if c, ok := client.(*dynamodb.DynamoDB); ok {
+	// 	return newDB(c, &c.Config)
+	// }
 	return newDB(client, &aws.Config{})
 }
 
@@ -48,14 +66,15 @@ func newDB(client dynamodbiface.DynamoDBAPI, cfg *aws.Config) *DB {
 	}
 
 	if db.logger == nil {
-		db.logger = aws.NewDefaultLogger()
+		db.logger = logging.NewStandardLogger(os.Stdout)
 	}
 
-	if retryer, ok := cfg.Retryer.(request.Retryer); ok {
-		db.retryer = retryer
-	} else if cfg.MaxRetries != nil {
-		db.retryMax = *cfg.MaxRetries
-	}
+	// TODO: FIX vvvvvv
+	// if retryer, ok := cfg.Retryer.(request.Retryer); ok {
+	// 	db.retryer = retryer
+	// } else if cfg.MaxRetries != nil {
+	// 	db.retryMax = *cfg.MaxRetries
+	// }
 
 	return db
 }
@@ -88,8 +107,8 @@ func (db *DB) Client() dynamodbiface.DynamoDBAPI {
 // 	return db
 // }
 
-func (db *DB) log(v ...interface{}) {
-	db.logger.Log(v...)
+func (db *DB) log(format string, v ...interface{}) {
+	db.logger.Logf(logging.Debug, format, v...)
 }
 
 // ListTables is a request to list tables.
@@ -155,7 +174,7 @@ func (itr *ltIter) NextWithContext(ctx context.Context, out interface{}) bool {
 
 	if itr.result != nil {
 		if itr.idx < len(itr.result.TableNames) {
-			*out.(*string) = *itr.result.TableNames[itr.idx]
+			*out.(*string) = itr.result.TableNames[itr.idx]
 			itr.idx++
 			return true
 		}
@@ -167,7 +186,7 @@ func (itr *ltIter) NextWithContext(ctx context.Context, out interface{}) bool {
 	}
 
 	itr.err = itr.lt.db.retry(ctx, func() error {
-		res, err := itr.lt.db.client.ListTablesWithContext(ctx, itr.input())
+		res, err := itr.lt.db.client.ListTables(ctx, itr.input())
 		if err != nil {
 			return err
 		}
@@ -182,7 +201,7 @@ func (itr *ltIter) NextWithContext(ctx context.Context, out interface{}) bool {
 		return false
 	}
 
-	*out.(*string) = *itr.result.TableNames[0]
+	*out.(*string) = itr.result.TableNames[0]
 	itr.idx = 1
 	return true
 }
@@ -231,13 +250,13 @@ type ParallelIter interface {
 
 // PagingKey is a key used for splitting up partial results.
 // Get a PagingKey from a PagingIter and pass it to StartFrom in Query or Scan.
-type PagingKey map[string]*dynamodb.AttributeValue
+type PagingKey Item
 
 // IsCondCheckFailed returns true if the given error is a "conditional check failed" error.
 // This corresponds with a ConditionalCheckFailedException in most APIs,
 // or a TransactionCanceledException with a ConditionalCheckFailed cancellation reason in transactions.
 func IsCondCheckFailed(err error) bool {
-	var txe *dynamodb.TransactionCanceledException
+	var txe *types.TransactionCanceledException
 	if errors.As(err, &txe) {
 		for _, cr := range txe.CancellationReasons {
 			if cr.Code != nil && *cr.Code == "ConditionalCheckFailed" {
@@ -247,8 +266,8 @@ func IsCondCheckFailed(err error) bool {
 		return false
 	}
 
-	var ae awserr.Error
-	if errors.As(err, &ae) && ae.Code() == "ConditionalCheckFailedException" {
+	var ae smithy.APIError
+	if errors.As(err, &ae) && ae.ErrorCode() == "ConditionalCheckFailedException" {
 		return true
 	}
 

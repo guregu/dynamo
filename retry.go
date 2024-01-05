@@ -6,8 +6,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/cenkalti/backoff/v4"
 )
 
@@ -58,37 +56,5 @@ func (db *DB) retry(ctx context.Context, f func() error) error {
 var errRetry = errors.New("dynamo: retry")
 
 func canRetry(err error) bool {
-	if errors.Is(err, errRetry) {
-		return true
-	}
-
-	if txe, ok := err.(*dynamodb.TransactionCanceledException); ok && txe.StatusCode() == 400 {
-		retry := false
-		for _, reason := range txe.CancellationReasons {
-			if reason.Code == nil {
-				continue
-			}
-			switch *reason.Code {
-			case "ValidationError", "ConditionalCheckFailed", "ItemCollectionSizeLimitExceeded":
-				return false
-			case "ThrottlingError", "ProvisionedThroughputExceeded", "TransactionConflict":
-				retry = true
-			}
-		}
-		return retry
-	}
-
-	if ae, ok := err.(awserr.RequestFailure); ok {
-		switch ae.StatusCode() {
-		case 500, 503:
-			return true
-		case 400:
-			switch ae.Code() {
-			case "ProvisionedThroughputExceededException",
-				"ThrottlingException":
-				return true
-			}
-		}
-	}
-	return false
+	return errors.Is(err, errRetry)
 }

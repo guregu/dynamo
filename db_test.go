@@ -1,13 +1,15 @@
 package dynamo
 
 import (
+	"context"
+	"log"
 	"os"
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 )
 
 var (
@@ -15,7 +17,7 @@ var (
 	testTable = "TestDB"
 )
 
-var dummyCreds = credentials.NewStaticCredentials("dummy", "dummy", "")
+var dummyCreds = credentials.NewStaticCredentialsProvider("dummy", "dummy", "")
 
 const offlineSkipMsg = "DYNAMO_TEST_REGION not set"
 
@@ -26,11 +28,21 @@ func init() {
 		if dte := os.Getenv("DYNAMO_TEST_ENDPOINT"); dte != "" {
 			endpoint = aws.String(dte)
 		}
-		testDB = New(session.Must(session.NewSession()), &aws.Config{
-			Region:   aws.String(region),
-			Endpoint: endpoint,
-			// LogLevel: aws.LogLevel(aws.LogDebugWithHTTPBody),
-		})
+		cfg, err := config.LoadDefaultConfig(
+			context.Background(),
+			config.WithRegion(region),
+			config.WithEndpointResolverWithOptions(
+				aws.EndpointResolverWithOptionsFunc(
+					func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+						return aws.Endpoint{URL: *endpoint}, nil
+					},
+				),
+			),
+		)
+		if err != nil {
+			log.Fatal(err)
+		}
+		testDB = New(cfg)
 	}
 	if table := os.Getenv("DYNAMO_TEST_TABLE"); table != "" {
 		testTable = table

@@ -5,8 +5,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -14,17 +14,17 @@ import (
 // See: http://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_Scan.html
 type Scan struct {
 	table    Table
-	startKey map[string]*dynamodb.AttributeValue
+	startKey Item
 	index    string
 
 	projection  string
 	filters     []string
 	consistent  bool
-	limit       int64
-	searchLimit int64
+	limit       int
+	searchLimit int32
 
-	segment       int64
-	totalSegments int64
+	segment       int32
+	totalSegments int32
 
 	subber
 
@@ -56,16 +56,16 @@ func (s *Scan) Index(name string) *Scan {
 // Segment specifies the Segment and Total Segments to operate on in a manual parallel scan.
 // This is useful if you want to control the parallel scans by yourself instead of using ParallelIter.
 // Ignored by ParallelIter and friends.
-func (s *Scan) Segment(segment int64, totalSegments int64) *Scan {
-	s.segment = segment
-	s.totalSegments = totalSegments
+func (s *Scan) Segment(segment int, totalSegments int) *Scan {
+	s.segment = int32(segment)
+	s.totalSegments = int32(totalSegments)
 	return s
 }
 
-func (s *Scan) newSegments(segments int64, leks []PagingKey) []*scanIter {
+func (s *Scan) newSegments(segments int, leks []PagingKey) []*scanIter {
 	iters := make([]*scanIter, segments)
-	lekLen := int64(len(leks))
-	for i := int64(0); i < segments; i++ {
+	lekLen := len(leks)
+	for i := int(0); i < segments; i++ {
 		seg := *s
 		var cc *ConsumedCapacity
 		if s.cc != nil {
@@ -115,7 +115,7 @@ func (s *Scan) Consistent(on bool) *Scan {
 }
 
 // Limit specifies the maximum amount of results to return.
-func (s *Scan) Limit(limit int64) *Scan {
+func (s *Scan) Limit(limit int) *Scan {
 	s.limit = limit
 	return s
 }
@@ -123,8 +123,8 @@ func (s *Scan) Limit(limit int64) *Scan {
 // SearchLimit specifies a maximum amount of results to evaluate.
 // Use this along with StartFrom and Iter's LastEvaluatedKey to split up results.
 // Note that DynamoDB limits result sets to 1MB.
-func (s *Scan) SearchLimit(limit int64) *Scan {
-	s.searchLimit = limit
+func (s *Scan) SearchLimit(limit int) *Scan {
+	s.searchLimit = int32(limit)
 	return s
 }
 
@@ -145,7 +145,7 @@ func (s *Scan) Iter() PagingIter {
 
 // IterParallel returns a results iterator for this request, running the given number of segments in parallel.
 // Canceling the context given here will cancel the processing of all segments.
-func (s *Scan) IterParallel(ctx context.Context, segments int64) ParallelIter {
+func (s *Scan) IterParallel(ctx context.Context, segments int) ParallelIter {
 	iters := s.newSegments(segments, nil)
 	ps := newParallelScan(iters, s.cc, false, unmarshalItem)
 	go ps.run(ctx)
@@ -155,7 +155,7 @@ func (s *Scan) IterParallel(ctx context.Context, segments int64) ParallelIter {
 // IterParallelFrom returns a results iterator continued from a previous ParallelIter's LastEvaluatedKeys.
 // Canceling the context given here will cancel the processing of all segments.
 func (s *Scan) IterParallelStartFrom(ctx context.Context, keys []PagingKey) ParallelIter {
-	iters := s.newSegments(int64(len(keys)), keys)
+	iters := s.newSegments(len(keys), keys)
 	ps := newParallelScan(iters, s.cc, false, unmarshalItem)
 	go ps.run(ctx)
 	return ps
@@ -202,7 +202,7 @@ func (s *Scan) AllWithLastEvaluatedKeyContext(ctx context.Context, out interface
 }
 
 // AllParallel executes this request by running the given number of segments in parallel, then unmarshaling all results to out, which must be a pointer to a slice.
-func (s *Scan) AllParallel(ctx context.Context, segments int64, out interface{}) error {
+func (s *Scan) AllParallel(ctx context.Context, segments int, out interface{}) error {
 	iters := s.newSegments(segments, nil)
 	ps := newParallelScan(iters, s.cc, true, unmarshalAppendTo(out))
 	go ps.run(ctx)
@@ -213,7 +213,7 @@ func (s *Scan) AllParallel(ctx context.Context, segments int64, out interface{})
 
 // AllParallelWithLastEvaluatedKeys executes this request by running the given number of segments in parallel, then unmarshaling all results to out, which must be a pointer to a slice.
 // Returns a slice of LastEvalutedKeys that can be used to continue the query later.
-func (s *Scan) AllParallelWithLastEvaluatedKeys(ctx context.Context, segments int64, out interface{}) ([]PagingKey, error) {
+func (s *Scan) AllParallelWithLastEvaluatedKeys(ctx context.Context, segments int, out interface{}) ([]PagingKey, error) {
 	iters := s.newSegments(segments, nil)
 	ps := newParallelScan(iters, s.cc, false, unmarshalAppendTo(out))
 	go ps.run(ctx)
@@ -225,7 +225,7 @@ func (s *Scan) AllParallelWithLastEvaluatedKeys(ctx context.Context, segments in
 // AllParallelStartFrom executes this request by continuing parallel scans from the given LastEvaluatedKeys, then unmarshaling all results to out, which must be a pointer to a slice.
 // Returns a new slice of LastEvaluatedKeys after the scan finishes.
 func (s *Scan) AllParallelStartFrom(ctx context.Context, keys []PagingKey, out interface{}) ([]PagingKey, error) {
-	iters := s.newSegments(int64(len(keys)), keys)
+	iters := s.newSegments(len(keys), keys)
 	ps := newParallelScan(iters, s.cc, false, unmarshalAppendTo(out))
 	go ps.run(ctx)
 	for ps.NextWithContext(ctx, out) {
@@ -236,7 +236,7 @@ func (s *Scan) AllParallelStartFrom(ctx context.Context, keys []PagingKey, out i
 // Count executes this request and returns the number of items matching the scan.
 // It takes into account the filter, limit, search limit, and all other parameters given.
 // It may return a higher count than the limits.
-func (s *Scan) Count() (int64, error) {
+func (s *Scan) Count() (int, error) {
 	ctx, cancel := defaultContext()
 	defer cancel()
 	return s.CountWithContext(ctx)
@@ -245,26 +245,27 @@ func (s *Scan) Count() (int64, error) {
 // CountWithContext executes this request and returns the number of items matching the scan.
 // It takes into account the filter, limit, search limit, and all other parameters given.
 // It may return a higher count than the limits.
-func (s *Scan) CountWithContext(ctx context.Context) (int64, error) {
+func (s *Scan) CountWithContext(ctx context.Context) (int, error) {
 	if s.err != nil {
 		return 0, s.err
 	}
-	var count, scanned int64
+	var count int
+	var scanned int32
 	input := s.scanInput()
-	input.Select = aws.String(dynamodb.SelectCount)
+	input.Select = types.SelectCount
 	for {
 		var out *dynamodb.ScanOutput
 		err := s.table.db.retry(ctx, func() error {
 			var err error
-			out, err = s.table.db.client.ScanWithContext(ctx, input)
+			out, err = s.table.db.client.Scan(ctx, input)
 			return err
 		})
 		if err != nil {
 			return count, err
 		}
 
-		count += *out.Count
-		scanned += *out.ScannedCount
+		count += int(out.Count)
+		scanned += out.ScannedCount
 
 		if s.cc != nil {
 			addConsumedCapacity(s.cc, out.ConsumedCapacity)
@@ -299,7 +300,8 @@ func (s *Scan) scanInput() *dynamodb.ScanInput {
 	}
 	if s.limit > 0 {
 		if len(s.filters) == 0 {
-			input.Limit = &s.limit
+			limit := int32(s.limit)
+			input.Limit = &limit
 		}
 	}
 	if s.searchLimit > 0 {
@@ -316,7 +318,7 @@ func (s *Scan) scanInput() *dynamodb.ScanInput {
 		input.FilterExpression = &filter
 	}
 	if s.cc != nil {
-		input.ReturnConsumedCapacity = aws.String(dynamodb.ReturnConsumedCapacityIndexes)
+		input.ReturnConsumedCapacity = types.ReturnConsumedCapacityIndexes
 	}
 	return input
 }
@@ -334,15 +336,15 @@ type scanIter struct {
 	output *dynamodb.ScanOutput
 	err    error
 	idx    int
-	n      int64
+	n      int
 
 	// last item evaluated
-	last map[string]*dynamodb.AttributeValue
+	last Item
 	// cache of primary keys, used for generating LEKs
 	keys map[string]struct{}
 	// example LastEvaluatedKey and ExclusiveStartKey, used to lazily evaluate the primary keys if possible
-	exLEK  map[string]*dynamodb.AttributeValue
-	exESK  map[string]*dynamodb.AttributeValue
+	exLEK  Item
+	exESK  Item
 	keyErr error
 
 	unmarshal unmarshalFunc
@@ -403,7 +405,7 @@ redo:
 
 	itr.err = itr.scan.table.db.retry(ctx, func() error {
 		var err error
-		itr.output, err = itr.scan.table.db.client.ScanWithContext(ctx, itr.input)
+		itr.output, err = itr.scan.table.db.client.Scan(ctx, itr.input)
 		return err
 	})
 
@@ -477,7 +479,7 @@ func (itr *scanIter) LastEvaluatedKey() PagingKey {
 
 type parallelScan struct {
 	iters []*scanIter
-	items chan map[string]*dynamodb.AttributeValue
+	items chan Item
 
 	leks []PagingKey
 	cc   *ConsumedCapacity
@@ -490,7 +492,7 @@ type parallelScan struct {
 func newParallelScan(iters []*scanIter, cc *ConsumedCapacity, skipLEK bool, unmarshal unmarshalFunc) *parallelScan {
 	ps := &parallelScan{
 		iters:     iters,
-		items:     make(chan map[string]*dynamodb.AttributeValue),
+		items:     make(chan Item),
 		cc:        cc,
 		mu:        new(sync.Mutex),
 		unmarshal: unmarshal,
@@ -509,7 +511,7 @@ func (ps *parallelScan) run(ctx context.Context) {
 			continue
 		}
 		grp.Go(func() error {
-			var item map[string]*dynamodb.AttributeValue
+			var item Item
 			for iter.NextWithContext(ctx, &item) {
 				select {
 				case <-ctx.Done():

@@ -24,20 +24,18 @@ const offlineSkipMsg = "DYNAMO_TEST_REGION not set"
 func init() {
 	// os.Setenv("DYNAMO_TEST_REGION", "us-west-2")
 	if region := os.Getenv("DYNAMO_TEST_REGION"); region != "" {
-		var endpoint *string
+		var endpoint aws.EndpointResolverWithOptions
 		if dte := os.Getenv("DYNAMO_TEST_ENDPOINT"); dte != "" {
-			endpoint = aws.String(dte)
+			endpoint = aws.EndpointResolverWithOptionsFunc(
+				func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+					return aws.Endpoint{URL: dte}, nil
+				},
+			)
 		}
 		cfg, err := config.LoadDefaultConfig(
 			context.Background(),
 			config.WithRegion(region),
-			config.WithEndpointResolverWithOptions(
-				aws.EndpointResolverWithOptionsFunc(
-					func(service, region string, options ...interface{}) (aws.Endpoint, error) {
-						return aws.Endpoint{URL: *endpoint}, nil
-					},
-				),
-			),
+			config.WithEndpointResolverWithOptions(endpoint),
 		)
 		if err != nil {
 			log.Fatal(err)

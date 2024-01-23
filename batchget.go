@@ -42,10 +42,11 @@ func (table Table) Batch(hashAndRangeKeyName ...string) Batch {
 
 // BatchGet is a BatchGetItem operation.
 type BatchGet struct {
-	batch      Batch
-	reqs       []*Query
-	projection string
-	consistent bool
+	batch       Batch
+	reqs        []*Query
+	projections map[string][]string // table → paths
+	projection  []string            // default paths
+	consistent  bool
 
 	subber
 	err error
@@ -62,17 +63,29 @@ func (b Batch) Get(keys ...Keyed) *BatchGet {
 		batch: b,
 		err:   b.err,
 	}
-	bg.add(keys)
-	return bg
+	return bg.And(keys...)
 }
 
-// And adds more keys to be gotten.
+// And adds more keys to be gotten from the default table.
+// To get items from other tables, use [BatchGet.From] or [BatchGet.FromRange].
 func (bg *BatchGet) And(keys ...Keyed) *BatchGet {
-	bg.add(keys)
-	return bg
+	return bg.add(bg.batch.table, bg.batch.hashKey, bg.batch.rangeKey, keys...)
 }
 
-func (bg *BatchGet) add(keys []Keyed) {
+// From adds more keys to be gotten from the given table.
+// The given table's primary key must be a hash key (partition key) only.
+// For tables with a range key (sort key) primary key, use [BatchGet.FromRange].
+func (bg *BatchGet) From(table Table, hashKey string, keys ...Keyed) *BatchGet {
+	return bg.add(table, hashKey, "", keys...)
+}
+
+// FromRange adds more keys to be gotten from the given table.
+// For tables without a range key (sort key) primary key, use [BatchGet.From].
+func (bg *BatchGet) FromRange(table Table, hashKey, rangeKey string, keys ...Keyed) *BatchGet {
+	return bg.add(table, hashKey, rangeKey, keys...)
+}
+
+func (bg *BatchGet) add(table Table, hashKey string, rangeKey string, keys ...Keyed) *BatchGet {
 	for _, key := range keys {
 		if key == nil {
 			bg.setError(errors.New("dynamo: batch: the Keyed interface must not be nil"))
@@ -85,21 +98,37 @@ func (bg *BatchGet) add(keys []Keyed) {
 		}
 		bg.reqs = append(bg.reqs, get)
 	}
+	return bg
 }
 
 // Project limits the result attributes to the given paths.
+// This will apply to all tables, but can be overriden by [BatchGet.ProjectTable] to set specific per-table projections.
 func (bg *BatchGet) Project(paths ...string) *BatchGet {
-	var expr string
-	for i, p := range paths {
-		if i != 0 {
-			expr += ", "
-		}
-		name, err := bg.escape(p)
-		bg.setError(err)
-		expr += name
-	}
-	bg.projection = expr
+	bg.projection = paths
 	return bg
+}
+
+// Project limits the result attributes to the given paths for the given table.
+func (bg *BatchGet) ProjectTable(table Table, paths ...string) *BatchGet {
+	return bg.project(table.Name(), paths...)
+}
+
+func (bg *BatchGet) project(table string, paths ...string) *BatchGet {
+	if bg.projections == nil {
+		bg.projections = make(map[string][]string)
+	}
+	bg.projections[table] = paths
+	return bg
+}
+
+func (bg *BatchGet) projectionFor(table string) []string {
+	if proj := bg.projections[table]; proj != nil {
+		return proj
+	}
+	if bg.projection != nil {
+		return bg.projection
+	}
+	return nil
 }
 
 // Consistent will, if on is true, make this batch use a strongly consistent read.
@@ -118,7 +147,7 @@ func (bg *BatchGet) ConsumedCapacity(cc *ConsumedCapacity) *BatchGet {
 
 // All executes this request and unmarshals all results to out, which must be a pointer to a slice.
 func (bg *BatchGet) All(out interface{}) error {
-	iter := newBGIter(bg, unmarshalAppendTo(out), bg.err)
+	iter := newBGIter(bg, unmarshalAppendTo(out), nil, bg.err)
 	for iter.Next(out) {
 	}
 	return iter.Err()
@@ -126,7 +155,7 @@ func (bg *BatchGet) All(out interface{}) error {
 
 // AllWithContext executes this request and unmarshals all results to out, which must be a pointer to a slice.
 func (bg *BatchGet) AllWithContext(ctx context.Context, out interface{}) error {
-	iter := newBGIter(bg, unmarshalAppendTo(out), bg.err)
+	iter := newBGIter(bg, unmarshalAppendTo(out), nil, bg.err)
 	for iter.NextWithContext(ctx, out) {
 	}
 	return iter.Err()
@@ -134,7 +163,13 @@ func (bg *BatchGet) AllWithContext(ctx context.Context, out interface{}) error {
 
 // Iter returns a results iterator for this batch.
 func (bg *BatchGet) Iter() Iter {
-	return newBGIter(bg, unmarshalItem, bg.err)
+	return newBGIter(bg, unmarshalItem, nil, bg.err)
+}
+
+// IterWithTable is like [BatchGet.Iter], but will update the value pointed by tablePtr after each iteration.
+// This can be useful when getting from multiple tables to determine which table the latest item came from.
+func (bg *BatchGet) IterWithTable(tablePtr *string) Iter {
+	return newBGIter(bg, unmarshalItem, tablePtr, bg.err)
 }
 
 func (bg *BatchGet) input(start int) *dynamodb.BatchGetItemInput {
@@ -147,12 +182,12 @@ func (bg *BatchGet) input(start int) *dynamodb.BatchGetItemInput {
 	}
 
 	in := &dynamodb.BatchGetItemInput{
-		RequestItems: make(map[string]*dynamodb.KeysAndAttributes, 1),
+		RequestItems: make(map[string]*dynamodb.KeysAndAttributes),
 	}
 
-	if bg.projection != "" {
-		for _, get := range bg.reqs[start:end] {
-			get.Project(get.projection)
+	for _, get := range bg.reqs[start:end] {
+		if proj := bg.projectionFor(get.table.Name()); proj != nil {
+			get.Project(proj...)
 			bg.setError(get.err)
 		}
 	}
@@ -160,22 +195,19 @@ func (bg *BatchGet) input(start int) *dynamodb.BatchGetItemInput {
 		in.ReturnConsumedCapacity = aws.String(dynamodb.ReturnConsumedCapacityIndexes)
 	}
 
-	var kas *dynamodb.KeysAndAttributes
 	for _, get := range bg.reqs[start:end] {
+		table := get.table.Name()
+		kas := in.RequestItems[table]
 		if kas == nil {
 			kas = get.keysAndAttribs()
+			if bg.consistent {
+				kas.ConsistentRead = &bg.consistent
+			}
+			in.RequestItems[table] = kas
 			continue
 		}
 		kas.Keys = append(kas.Keys, get.keys())
 	}
-	if bg.projection != "" {
-		kas.ProjectionExpression = &bg.projection
-		kas.ExpressionAttributeNames = bg.nameExpr
-	}
-	if bg.consistent {
-		kas.ConsistentRead = &bg.consistent
-	}
-	in.RequestItems[bg.batch.table.Name()] = kas
 	return in
 }
 
@@ -188,8 +220,10 @@ func (bg *BatchGet) setError(err error) {
 // bgIter is the iterator for Batch Get operations
 type bgIter struct {
 	bg        *BatchGet
+	track     *string // table out value
 	input     *dynamodb.BatchGetItemInput
 	output    *dynamodb.BatchGetItemOutput
+	got       []batchGot
 	err       error
 	idx       int
 	total     int
@@ -198,13 +232,19 @@ type bgIter struct {
 	unmarshal unmarshalFunc
 }
 
-func newBGIter(bg *BatchGet, fn unmarshalFunc, err error) *bgIter {
+type batchGot struct {
+	table string
+	item  Item
+}
+
+func newBGIter(bg *BatchGet, fn unmarshalFunc, track *string, err error) *bgIter {
 	if err == nil && len(bg.reqs) == 0 {
 		err = ErrNoInput
 	}
 
 	iter := &bgIter{
 		bg:        bg,
+		track:     track,
 		err:       err,
 		backoff:   backoff.NewExponentialBackOff(),
 		unmarshal: fn,
@@ -230,16 +270,14 @@ func (itr *bgIter) NextWithContext(ctx context.Context, out interface{}) bool {
 		return false
 	}
 
-	tableName := itr.bg.batch.table.Name()
-
 redo:
 	// can we use results we already have?
-	if itr.output != nil && itr.idx < len(itr.output.Responses[tableName]) {
-		items := itr.output.Responses[tableName]
-		item := items[itr.idx]
-		itr.err = itr.unmarshal(item, out)
+	if itr.output != nil && itr.idx < len(itr.got) {
+		got := itr.got[itr.idx]
+		itr.err = itr.unmarshal(got.item, out)
 		itr.idx++
 		itr.total++
+		itr.trackTable(got.table)
 		return itr.err == nil
 	}
 
@@ -248,12 +286,15 @@ redo:
 		itr.input = itr.bg.input(itr.processed)
 	}
 
-	if itr.output != nil && itr.idx >= len(itr.output.Responses[tableName]) {
-		var unprocessed int
-		if itr.output.UnprocessedKeys != nil && itr.output.UnprocessedKeys[tableName] != nil {
-			unprocessed = len(itr.output.UnprocessedKeys[tableName].Keys)
+	if itr.output != nil && itr.idx >= len(itr.got) {
+		for _, req := range itr.input.RequestItems {
+			itr.processed += len(req.Keys)
 		}
-		itr.processed += len(itr.input.RequestItems[tableName].Keys) - unprocessed
+		if itr.output.UnprocessedKeys != nil {
+			for _, keys := range itr.output.UnprocessedKeys {
+				itr.processed -= len(keys.Keys)
+			}
+		}
 		// have we exhausted all results?
 		if len(itr.output.UnprocessedKeys) == 0 {
 			// yes, try to get next inner batch of 100 items
@@ -291,8 +332,25 @@ redo:
 		}
 	}
 
+	itr.got = itr.got[:0]
+	for table, resp := range itr.output.Responses {
+		for _, item := range resp {
+			itr.got = append(itr.got, batchGot{
+				table: table,
+				item:  item,
+			})
+		}
+	}
+
 	// we've got unprocessed results, marshal one
 	goto redo
+}
+
+func (itr *bgIter) trackTable(next string) {
+	if itr.track == nil {
+		return
+	}
+	*itr.track = next
 }
 
 // Err returns the error encountered, if any.

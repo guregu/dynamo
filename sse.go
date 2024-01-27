@@ -18,7 +18,7 @@ const (
 
 type SSEDescription struct {
 	InaccessibleEncryptionDateTime time.Time
-	KMSMasterKeyArn                string
+	KMSMasterKeyARN                string
 	SSEType                        types.SSEType
 	Status                         types.SSEStatus
 }

@@ -198,7 +198,7 @@ func newDescription(table *types.TableDescription) Description {
 			sseDesc.InaccessibleEncryptionDateTime = *table.SSEDescription.InaccessibleEncryptionDateTime
 		}
 		if table.SSEDescription.KMSMasterKeyArn != nil {
-			sseDesc.KMSMasterKeyArn = *table.SSEDescription.KMSMasterKeyArn
+			sseDesc.KMSMasterKeyARN = *table.SSEDescription.KMSMasterKeyArn
 		}
 		if table.SSEDescription.SSEType != "" {
 			sseDesc.SSEType = table.SSEDescription.SSEType

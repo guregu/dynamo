@@ -36,6 +36,7 @@ func init() {
 			context.Background(),
 			config.WithRegion(region),
 			config.WithEndpointResolverWithOptions(endpoint),
+			config.WithRetryer(nil),
 		)
 		if err != nil {
 			log.Fatal(err)

@@ -10,7 +10,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/logging"
 	"github.com/guregu/dynamo/dynamodbiface"
@@ -20,7 +19,7 @@ import (
 type DB struct {
 	client   dynamodbiface.DynamoDBAPI
 	logger   logging.Logger
-	retryer  request.Retryer
+	retryer  func() aws.Retryer
 	retryMax int
 }
 
@@ -28,37 +27,17 @@ type DB struct {
 // If Retryer is configured, retrying responsibility will be delegated to it.
 // If MaxRetries is configured, the maximum number of retry attempts will be limited to the specified value
 // (0 for no retrying, -1 for default behavior of unlimited retries).
-// MaxRetries is ignored if Retryer is set.
-// func New(p client.ConfigProvider, cfgs ...*aws.Config) *DB {
-// 	cfg := p.ClientConfig(dynamodb.EndpointsID, cfgs...)
-// 	return newDB(dynamodb.New(p, cfgs...), cfg.Config)
-// 	client dynamodbiface.DynamoDBAPI
-// 	logger logging.Logger
-// }
-// TODO ^^^^^
-
-// New creates a new client with the given configuration.
-func New(cfg aws.Config) *DB {
-	db := &DB{
-		client: dynamodb.NewFromConfig(cfg),
-		logger: cfg.Logger,
-	}
-	if db.logger == nil {
-		db.logger = logging.NewStandardLogger(os.Stdout)
-	}
-	return db
+func New(cfg aws.Config, options ...func(*dynamodb.Options)) *DB {
+	client := dynamodb.NewFromConfig(cfg, options...)
+	return newDB(client, cfg)
 }
 
 // NewFromIface creates a new client with the given interface.
 func NewFromIface(client dynamodbiface.DynamoDBAPI) *DB {
-	// TODO: FIX vvvv
-	// if c, ok := client.(*dynamodb.DynamoDB); ok {
-	// 	return newDB(c, &c.Config)
-	// }
-	return newDB(client, &aws.Config{})
+	return newDB(client, aws.Config{})
 }
 
-func newDB(client dynamodbiface.DynamoDBAPI, cfg *aws.Config) *DB {
+func newDB(client dynamodbiface.DynamoDBAPI, cfg aws.Config) *DB {
 	db := &DB{
 		client:   client,
 		logger:   cfg.Logger,
@@ -69,12 +48,11 @@ func newDB(client dynamodbiface.DynamoDBAPI, cfg *aws.Config) *DB {
 		db.logger = logging.NewStandardLogger(os.Stdout)
 	}
 
-	// TODO: FIX vvvvvv
-	// if retryer, ok := cfg.Retryer.(request.Retryer); ok {
-	// 	db.retryer = retryer
-	// } else if cfg.MaxRetries != nil {
-	// 	db.retryMax = *cfg.MaxRetries
-	// }
+	if cfg.Retryer != nil {
+		db.retryer = cfg.Retryer
+	} else if cfg.RetryMaxAttempts > 0 {
+		db.retryMax = cfg.RetryMaxAttempts
+	}
 
 	return db
 }

@@ -1,12 +1,13 @@
 package dynamo
 
 import (
+	"context"
 	"reflect"
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	"github.com/aws/aws-sdk-go/aws"
 )
 
 func TestGetAllCount(t *testing.T) {
@@ -239,7 +240,7 @@ func TestQueryMagicLEK(t *testing.T) {
 	})
 
 	t.Run("table cache", func(t *testing.T) {
-		pk, err := table.primaryKeys(aws.BackgroundContext(), nil, nil, "")
+		pk, err := table.primaryKeys(context.Background(), nil, nil, "")
 		if err != nil {
 			t.Fatal(err)
 		}

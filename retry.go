@@ -5,24 +5,14 @@ import (
 	"errors"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/smithy-go"
 	"github.com/cenkalti/backoff/v4"
 )
 
-// RetryTimeout defines the maximum amount of time that requests will
-// attempt to automatically retry for. In other words, this is the maximum
-// amount of time that dynamo operations will block.
-// RetryTimeout is only considered by methods that do not take a context.
-// Higher values are better when using tables with lower throughput.
-var RetryTimeout = 1 * time.Minute
-
 func defaultContext() (context.Context, context.CancelFunc) {
-	if RetryTimeout == 0 {
-		return aws.BackgroundContext(), (func() {})
-	}
-	return context.WithDeadline(aws.BackgroundContext(), time.Now().Add(RetryTimeout))
+	return context.Background(), func() {}
 }
 
 func (db *DB) retry(ctx context.Context, f func() error) error {
@@ -46,8 +36,7 @@ func (db *DB) retry(ctx context.Context, f func() error) error {
 		if next = b.NextBackOff(); next == backoff.Stop {
 			return err
 		}
-
-		if err := aws.SleepWithContext(ctx, next); err != nil {
+		if err := sleep(ctx, next); err != nil {
 			return err
 		}
 	}
@@ -62,7 +51,6 @@ func canRetry(err error) bool {
 		return true
 	}
 
-	// TODO: seems to be broken?
 	var txe *types.TransactionCanceledException
 	if errors.As(err, &txe) {
 		retry := false
@@ -80,18 +68,33 @@ func canRetry(err error) bool {
 		return retry
 	}
 
-	// TODO: fix
-	if ae, ok := err.(awserr.RequestFailure); ok {
-		switch ae.StatusCode() {
-		case 500, 503:
+	var aerr smithy.APIError
+	if errors.As(err, &aerr) {
+		switch aerr.ErrorCode() {
+		case "ProvisionedThroughputExceededException",
+			"ThrottlingException":
 			return true
-		case 400:
-			switch ae.Code() {
-			case "ProvisionedThroughputExceededException",
-				"ThrottlingException":
-				return true
-			}
 		}
 	}
+
+	var rerr *http.ResponseError
+	if errors.As(err, &rerr) {
+		switch rerr.HTTPStatusCode() {
+		case 500, 503:
+			return true
+		}
+	}
+
 	return false
+}
+
+func sleep(ctx context.Context, dur time.Duration) error {
+	timer := time.NewTimer(dur)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+	case <-timer.C:
+	}
+	return ctx.Err()
 }

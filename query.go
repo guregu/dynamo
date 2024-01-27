@@ -424,39 +424,32 @@ func (itr *queryIter) Err() error {
 	return itr.err
 }
 
-func (itr *queryIter) LastEvaluatedKey() PagingKey {
+func (itr *queryIter) LastEvaluatedKey(ctx context.Context) (PagingKey, error) {
 	if itr.output != nil {
 		// if we've hit the end of our results, we can use the real LEK
 		if itr.idx == len(itr.output.Items) {
-			return itr.output.LastEvaluatedKey
+			return itr.output.LastEvaluatedKey, nil
 		}
 
 		// figure out the primary keys if needed
 		if itr.keys == nil && itr.keyErr == nil {
-			ctx, _ := defaultContext() // TODO(v2): take context instead of using the default
 			itr.keys, itr.keyErr = itr.query.table.primaryKeys(ctx, itr.exLEK, itr.exESK, itr.query.index)
 		}
 		if itr.keyErr != nil {
 			// primaryKeys can fail if the credentials lack DescribeTable permissions
 			// in order to preserve backwards compatibility, we fall back to the old behavior and warn
 			// see: https://github.com/guregu/dynamo/pull/187#issuecomment-1045183901
-			// TODO(v2): rejigger this API.
-			itr.query.table.db.log("dynamo: Warning:", itr.keyErr, "Returning a later LastEvaluatedKey.")
-			return itr.output.LastEvaluatedKey
+			return itr.output.LastEvaluatedKey, fmt.Errorf("dynamo: failed to determine LastEvaluatedKey in query: %w", itr.keyErr)
 		}
 
 		// we can't use the real LEK, so we need to infer the LEK from the last item we saw
 		lek, err := lekify(itr.last, itr.keys)
-		// unfortunately, this API can't return an error so a warning is the best we can do...
-		// this matches old behavior before the LEK was automatically generated
-		// TODO(v2): fix this.
 		if err != nil {
-			itr.query.table.db.log("dynamo: Warning:", err, "Returning a later LastEvaluatedKey.")
-			return itr.output.LastEvaluatedKey
+			return itr.output.LastEvaluatedKey, fmt.Errorf("dynamo: failed to infer LastEvaluatedKey in query: %w", err)
 		}
-		return lek
+		return lek, nil
 	}
-	return nil
+	return nil, nil
 }
 
 // All executes this request and unmarshals all results to out, which must be a pointer to a slice.
@@ -493,7 +486,8 @@ func (q *Query) AllWithLastEvaluatedKeyContext(ctx context.Context, out interfac
 	}
 	for iter.NextWithContext(ctx, out) {
 	}
-	return iter.LastEvaluatedKey(), iter.Err()
+	lek, err := iter.LastEvaluatedKey(ctx)
+	return lek, errors.Join(iter.Err(), err)
 }
 
 // Iter returns a results iterator for this request.
@@ -503,7 +497,6 @@ func (q *Query) Iter() PagingIter {
 		unmarshal: unmarshalItem,
 		err:       q.err,
 	}
-
 	return iter
 }
 

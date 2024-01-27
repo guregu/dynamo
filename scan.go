@@ -2,6 +2,8 @@ package dynamo
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
 	"sync"
 
@@ -198,7 +200,8 @@ func (s *Scan) AllWithLastEvaluatedKeyContext(ctx context.Context, out interface
 	}
 	for itr.NextWithContext(ctx, out) {
 	}
-	return itr.LastEvaluatedKey(), itr.Err()
+	lek, err := itr.LastEvaluatedKey(ctx)
+	return lek, errors.Join(itr.Err(), err)
 }
 
 // AllParallel executes this request by running the given number of segments in parallel, then unmarshaling all results to out, which must be a pointer to a slice.
@@ -219,7 +222,8 @@ func (s *Scan) AllParallelWithLastEvaluatedKeys(ctx context.Context, segments in
 	go ps.run(ctx)
 	for ps.NextWithContext(ctx, out) {
 	}
-	return ps.LastEvaluatedKeys(), ps.Err()
+	leks, err := ps.LastEvaluatedKeys(ctx)
+	return leks, errors.Join(ps.Err(), err)
 }
 
 // AllParallelStartFrom executes this request by continuing parallel scans from the given LastEvaluatedKeys, then unmarshaling all results to out, which must be a pointer to a slice.
@@ -230,7 +234,8 @@ func (s *Scan) AllParallelStartFrom(ctx context.Context, keys []PagingKey, out i
 	go ps.run(ctx)
 	for ps.NextWithContext(ctx, out) {
 	}
-	return ps.LastEvaluatedKeys(), ps.Err()
+	leks, err := ps.LastEvaluatedKeys(ctx)
+	return leks, errors.Join(ps.Err(), err)
 }
 
 // Count executes this request and returns the number of items matching the scan.
@@ -442,49 +447,44 @@ func (itr *scanIter) Err() error {
 
 // LastEvaluatedKey returns a key that can be used to continue this scan.
 // Use with SearchLimit for best results.
-func (itr *scanIter) LastEvaluatedKey() PagingKey {
+func (itr *scanIter) LastEvaluatedKey(ctx context.Context) (PagingKey, error) {
 	if itr.output != nil {
 		// if we've hit the end of our results, we can use the real LEK
 		if itr.idx == len(itr.output.Items) {
-			return itr.output.LastEvaluatedKey
+			return itr.output.LastEvaluatedKey, nil
 		}
 
 		// figure out the primary keys if needed
 		if itr.keys == nil && itr.keyErr == nil {
-			ctx, _ := defaultContext() // TODO(v2): take context instead of using the default
 			itr.keys, itr.keyErr = itr.scan.table.primaryKeys(ctx, itr.exLEK, itr.exESK, itr.scan.index)
 		}
 		if itr.keyErr != nil {
 			// primaryKeys can fail if the credentials lack DescribeTable permissions
 			// in order to preserve backwards compatibility, we fall back to the old behavior and warn
 			// see: https://github.com/guregu/dynamo/pull/187#issuecomment-1045183901
-			// TODO(v2): rejigger this API.
-			itr.scan.table.db.log("dynamo: Warning:", itr.keyErr, "Returning a later LastEvaluatedKey.")
-			return itr.output.LastEvaluatedKey
+			return itr.output.LastEvaluatedKey, fmt.Errorf("dynamo: failed to determine LastEvaluatedKey in scan: %w", itr.keyErr)
 		}
 
 		// we can't use the real LEK, so we need to infer the LEK from the last item we saw
 		lek, err := lekify(itr.last, itr.keys)
-		// unfortunately, this API can't return an error so a warning is the best we can do...
-		// this matches old behavior before the LEK was automatically generated
-		// TODO(v2): fix this.
 		if err != nil {
-			itr.scan.table.db.log("dynamo: Warning:", err, "Returning a later LastEvaluatedKey.")
-			return itr.output.LastEvaluatedKey
+			return itr.output.LastEvaluatedKey, fmt.Errorf("dynamo: failed to infer LastEvaluatedKey in scan: %w", err)
 		}
-		return lek
+		return lek, nil
 	}
-	return nil
+	return nil, nil
 }
 
 type parallelScan struct {
 	iters []*scanIter
 	items chan Item
 
-	leks []PagingKey
-	cc   *ConsumedCapacity
-	err  error
-	mu   *sync.Mutex
+	leks   []PagingKey
+	lekErr error
+
+	cc  *ConsumedCapacity
+	err error
+	mu  *sync.Mutex
 
 	unmarshal unmarshalFunc
 }
@@ -522,9 +522,12 @@ func (ps *parallelScan) run(ctx context.Context) {
 				}
 
 				if ps.leks != nil {
-					lek := iter.LastEvaluatedKey()
+					lek, err := iter.LastEvaluatedKey(ctx)
 					ps.mu.Lock()
 					ps.leks[i] = lek
+					if err != nil && ps.lekErr == nil {
+						ps.lekErr = err
+					}
 					ps.mu.Unlock()
 				}
 			}
@@ -582,10 +585,10 @@ func (ps *parallelScan) Err() error {
 	return ps.err
 }
 
-func (ps *parallelScan) LastEvaluatedKeys() []PagingKey {
+func (ps *parallelScan) LastEvaluatedKeys(_ context.Context) ([]PagingKey, error) {
 	keys := make([]PagingKey, len(ps.leks))
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
 	copy(keys, ps.leks)
-	return keys
+	return keys, ps.lekErr
 }

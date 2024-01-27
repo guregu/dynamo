@@ -131,7 +131,11 @@ func TestScanPaging(t *testing.T) {
 			if !more {
 				break
 			}
-			itr = table.Scan().StartFrom(itr.LastEvaluatedKey()).SearchLimit(1).Iter()
+			lek, err := itr.LastEvaluatedKey(context.Background())
+			if err != nil {
+				t.Error("LEK error", err)
+			}
+			itr = table.Scan().StartFrom(lek).SearchLimit(1).Iter()
 		}
 		for i, w := range widgets {
 			if w.UserID == 0 && w.Time.IsZero() {
@@ -159,7 +163,11 @@ func TestScanPaging(t *testing.T) {
 			if !more {
 				break
 			}
-			itr = table.Scan().SearchLimit(1).IterParallelStartFrom(ctx, itr.LastEvaluatedKeys())
+			leks, err := itr.LastEvaluatedKeys(context.Background())
+			if err != nil {
+				t.Error("LEK error", err)
+			}
+			itr = table.Scan().SearchLimit(1).IterParallelStartFrom(ctx, leks)
 		}
 		for i, w := range widgets {
 			if w.UserID == 0 && w.Time.IsZero() {
@@ -205,7 +213,11 @@ func TestScanMagicLEK(t *testing.T) {
 			if itr.Err() != nil {
 				t.Error("unexpected error", itr.Err())
 			}
-			itr = table.Scan().Filter("'Msg' = ?", "TestScanMagicLEK").StartFrom(itr.LastEvaluatedKey()).Limit(2).Iter()
+			lek, err := itr.LastEvaluatedKey(context.Background())
+			if err != nil {
+				t.Error("LEK error", err)
+			}
+			itr = table.Scan().Filter("'Msg' = ?", "TestScanMagicLEK").StartFrom(lek).Limit(2).Iter()
 		}
 	})
 
@@ -217,7 +229,11 @@ func TestScanMagicLEK(t *testing.T) {
 			if itr.Err() != nil {
 				t.Error("unexpected error", itr.Err())
 			}
-			itr = table.Scan().Index("Msg-Time-index").Filter("UserID = ?", 2069).StartFrom(itr.LastEvaluatedKey()).Limit(2).Iter()
+			lek, err := itr.LastEvaluatedKey(context.Background())
+			if err != nil {
+				t.Error("LEK error", err)
+			}
+			itr = table.Scan().Index("Msg-Time-index").Filter("UserID = ?", 2069).StartFrom(lek).Limit(2).Iter()
 		}
 	})
 

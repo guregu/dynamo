@@ -66,7 +66,6 @@ func newDB(client dynamodbiface.DynamoDBAPI, cfg aws.Config) *DB {
 	} else if cfg.RetryMaxAttempts > 0 {
 		db.retryMax = cfg.RetryMaxAttempts
 	}
-
 	// }
 
 	return db
@@ -230,7 +229,7 @@ type PagingIter interface {
 	Iter
 	// LastEvaluatedKey returns a key that can be passed to StartFrom in Query or Scan.
 	// Combined with SearchLimit, it is useful for paginating partial results.
-	LastEvaluatedKey() PagingKey
+	LastEvaluatedKey(context.Context) (PagingKey, error)
 }
 
 // PagingIter is an iterator of combined request results from multiple iterators running in parallel.
@@ -238,7 +237,7 @@ type ParallelIter interface {
 	Iter
 	// LastEvaluatedKeys returns each parallel segment's last evaluated key in order of segment number.
 	// The slice will be the same size as the number of segments, and the keys can be nil.
-	LastEvaluatedKeys() []PagingKey
+	LastEvaluatedKeys(context.Context) ([]PagingKey, error)
 }
 
 // PagingKey is a key used for splitting up partial results.

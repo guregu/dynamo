@@ -186,7 +186,11 @@ func TestQueryPaging(t *testing.T) {
 		if more {
 			t.Error("unexpected more", more)
 		}
-		itr = table.Get("UserID", 1969).StartFrom(itr.LastEvaluatedKey()).SearchLimit(1).Iter()
+		lek, err := itr.LastEvaluatedKey(context.Background())
+		if err != nil {
+			t.Error("LEK error", err)
+		}
+		itr = table.Get("UserID", 1969).StartFrom(lek).SearchLimit(1).Iter()
 	}
 }
 
@@ -235,7 +239,11 @@ func TestQueryMagicLEK(t *testing.T) {
 			if more {
 				t.Error("unexpected more", more)
 			}
-			itr = table.Get("UserID", 1970).StartFrom(itr.LastEvaluatedKey()).Limit(1).Iter()
+			lek, err := itr.LastEvaluatedKey(context.Background())
+			if err != nil {
+				t.Error("LEK error", lek)
+			}
+			itr = table.Get("UserID", 1970).StartFrom(lek).Limit(1).Iter()
 		}
 	})
 
@@ -268,7 +276,11 @@ func TestQueryMagicLEK(t *testing.T) {
 			if more {
 				t.Error("unexpected more", more)
 			}
-			itr = table.Get("Msg", "TestQueryMagicLEK").Index("Msg-Time-index").Filter("UserID = ?", 1970).StartFrom(itr.LastEvaluatedKey()).Limit(1).Iter()
+			lek, err := itr.LastEvaluatedKey(context.Background())
+			if err != nil {
+				t.Error("LEK error", err)
+			}
+			itr = table.Get("Msg", "TestQueryMagicLEK").Index("Msg-Time-index").Filter("UserID = ?", 1970).StartFrom(lek).Limit(1).Iter()
 		}
 	})
 }

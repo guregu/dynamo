@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
@@ -48,7 +49,6 @@ type BatchGet struct {
 	projection  []string            // default paths
 	consistent  bool
 
-	subber
 	err error
 	cc  *ConsumedCapacity
 }
@@ -129,6 +129,36 @@ func (bg *BatchGet) projectionFor(table string) []string {
 		return bg.projection
 	}
 	return nil
+}
+
+// Merge copies operations and settings from src to this batch get.
+func (bg *BatchGet) Merge(src *BatchGet) *BatchGet {
+	bg.reqs = append(bg.reqs, src.reqs...)
+	bg.consistent = bg.consistent || src.consistent
+	this := bg.batch.table.Name()
+	for table, proj := range src.projections {
+		if this == table {
+			continue
+		}
+		bg.mergeProjection(table, proj)
+	}
+	if len(src.projection) > 0 {
+		if that := src.batch.table.Name(); that != this {
+			bg.mergeProjection(that, src.projection)
+		}
+	}
+	return bg
+}
+
+func (bg *BatchGet) mergeProjection(table string, proj []string) {
+	current := bg.projections[table]
+	merged := current
+	for _, path := range proj {
+		if !slices.Contains(current, path) {
+			merged = append(merged, path)
+		}
+	}
+	bg.project(table, merged...)
 }
 
 // Consistent will, if on is true, make this batch use a strongly consistent read.

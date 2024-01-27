@@ -95,6 +95,12 @@ func (bw *BatchWrite) deleteIn(table Table, hashKey, rangeKey string, keys ...Ke
 	return bw
 }
 
+// Merge copies operations from src to this batch.
+func (bw *BatchWrite) Merge(src *BatchWrite) *BatchWrite {
+	bw.ops = append(bw.ops, src.ops...)
+	return bw
+}
+
 // ConsumedCapacity will measure the throughput capacity consumed by this operation and add it to cc.
 func (bw *BatchWrite) ConsumedCapacity(cc *ConsumedCapacity) *BatchWrite {
 	bw.cc = cc
@@ -111,6 +117,10 @@ func (bw *BatchWrite) Run() (wrote int, err error) {
 	return bw.RunWithContext(ctx)
 }
 
+// RunWithContext executes this batch.
+// For batches with more than 25 operations, an error could indicate that
+// some records have been written and some have not. Consult the wrote
+// return amount to figure out which operations have succeeded.
 func (bw *BatchWrite) RunWithContext(ctx context.Context) (wrote int, err error) {
 	if bw.err != nil {
 		return 0, bw.err

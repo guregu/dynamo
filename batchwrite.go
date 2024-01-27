@@ -67,13 +67,7 @@ func (bw *BatchWrite) ConsumedCapacity(cc *ConsumedCapacity) *BatchWrite {
 // For batches with more than 25 operations, an error could indicate that
 // some records have been written and some have not. Consult the wrote
 // return amount to figure out which operations have succeeded.
-func (bw *BatchWrite) Run() (wrote int, err error) {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return bw.RunWithContext(ctx)
-}
-
-func (bw *BatchWrite) RunWithContext(ctx context.Context) (wrote int, err error) {
+func (bw *BatchWrite) Run(ctx context.Context) (wrote int, err error) {
 	if bw.err != nil {
 		return 0, bw.err
 	}

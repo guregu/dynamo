@@ -164,41 +164,26 @@ func (s *Scan) IterParallelStartFrom(ctx context.Context, keys []PagingKey) Para
 }
 
 // All executes this request and unmarshals all results to out, which must be a pointer to a slice.
-func (s *Scan) All(out interface{}) error {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return s.AllWithContext(ctx, out)
-}
-
-// AllWithContext executes this request and unmarshals all results to out, which must be a pointer to a slice.
-func (s *Scan) AllWithContext(ctx context.Context, out interface{}) error {
+func (s *Scan) All(ctx context.Context, out interface{}) error {
 	itr := &scanIter{
 		scan:      s,
 		unmarshal: unmarshalAppendTo(out),
 		err:       s.err,
 	}
-	for itr.NextWithContext(ctx, out) {
+	for itr.Next(ctx, out) {
 	}
 	return itr.Err()
 }
 
 // AllWithLastEvaluatedKey executes this request and unmarshals all results to out, which must be a pointer to a slice.
 // It returns a key you can use with StartWith to continue this query.
-func (s *Scan) AllWithLastEvaluatedKey(out interface{}) (PagingKey, error) {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return s.AllWithLastEvaluatedKeyContext(ctx, out)
-}
-
-// AllWithLastEvaluatedKeyContext executes this request and unmarshals all results to out, which must be a pointer to a slice.
-// It returns a key you can use with StartWith to continue this query.
-func (s *Scan) AllWithLastEvaluatedKeyContext(ctx context.Context, out interface{}) (PagingKey, error) {
+func (s *Scan) AllWithLastEvaluatedKey(ctx context.Context, out interface{}) (PagingKey, error) {
 	itr := &scanIter{
 		scan:      s,
 		unmarshal: unmarshalAppendTo(out),
 		err:       s.err,
 	}
-	for itr.NextWithContext(ctx, out) {
+	for itr.Next(ctx, out) {
 	}
 	lek, err := itr.LastEvaluatedKey(ctx)
 	return lek, errors.Join(itr.Err(), err)
@@ -209,7 +194,7 @@ func (s *Scan) AllParallel(ctx context.Context, segments int, out interface{}) e
 	iters := s.newSegments(segments, nil)
 	ps := newParallelScan(iters, s.cc, true, unmarshalAppendTo(out))
 	go ps.run(ctx)
-	for ps.NextWithContext(ctx, out) {
+	for ps.Next(ctx, out) {
 	}
 	return ps.Err()
 }
@@ -220,7 +205,7 @@ func (s *Scan) AllParallelWithLastEvaluatedKeys(ctx context.Context, segments in
 	iters := s.newSegments(segments, nil)
 	ps := newParallelScan(iters, s.cc, false, unmarshalAppendTo(out))
 	go ps.run(ctx)
-	for ps.NextWithContext(ctx, out) {
+	for ps.Next(ctx, out) {
 	}
 	leks, err := ps.LastEvaluatedKeys(ctx)
 	return leks, errors.Join(ps.Err(), err)
@@ -232,7 +217,7 @@ func (s *Scan) AllParallelStartFrom(ctx context.Context, keys []PagingKey, out i
 	iters := s.newSegments(len(keys), keys)
 	ps := newParallelScan(iters, s.cc, false, unmarshalAppendTo(out))
 	go ps.run(ctx)
-	for ps.NextWithContext(ctx, out) {
+	for ps.Next(ctx, out) {
 	}
 	leks, err := ps.LastEvaluatedKeys(ctx)
 	return leks, errors.Join(ps.Err(), err)
@@ -241,16 +226,7 @@ func (s *Scan) AllParallelStartFrom(ctx context.Context, keys []PagingKey, out i
 // Count executes this request and returns the number of items matching the scan.
 // It takes into account the filter, limit, search limit, and all other parameters given.
 // It may return a higher count than the limits.
-func (s *Scan) Count() (int, error) {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return s.CountWithContext(ctx)
-}
-
-// CountWithContext executes this request and returns the number of items matching the scan.
-// It takes into account the filter, limit, search limit, and all other parameters given.
-// It may return a higher count than the limits.
-func (s *Scan) CountWithContext(ctx context.Context) (int, error) {
+func (s *Scan) Count(ctx context.Context) (int, error) {
 	if s.err != nil {
 		return 0, s.err
 	}
@@ -357,13 +333,7 @@ type scanIter struct {
 
 // Next tries to unmarshal the next result into out.
 // Returns false when it is complete or if it runs into an error.
-func (itr *scanIter) Next(out interface{}) bool {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return itr.NextWithContext(ctx, out)
-}
-
-func (itr *scanIter) NextWithContext(ctx context.Context, out interface{}) bool {
+func (itr *scanIter) Next(ctx context.Context, out interface{}) bool {
 redo:
 	// stop if we have an error
 	if ctx.Err() != nil {
@@ -512,7 +482,7 @@ func (ps *parallelScan) run(ctx context.Context) {
 		}
 		grp.Go(func() error {
 			var item Item
-			for iter.NextWithContext(ctx, &item) {
+			for iter.Next(ctx, &item) {
 				select {
 				case <-ctx.Done():
 					return ctx.Err()
@@ -548,13 +518,7 @@ func (ps *parallelScan) run(ctx context.Context) {
 	close(ps.items)
 }
 
-func (ps *parallelScan) Next(out interface{}) bool {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return ps.NextWithContext(ctx, out)
-}
-
-func (ps *parallelScan) NextWithContext(ctx context.Context, out interface{}) bool {
+func (ps *parallelScan) Next(ctx context.Context, out interface{}) bool {
 	select {
 	case <-ctx.Done():
 		ps.setError(ctx.Err())

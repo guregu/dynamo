@@ -54,15 +54,7 @@ func (table Table) Name() string {
 
 // Wait blocks until this table's status matches any status provided by want.
 // If no statuses are specified, the active status is used.
-func (table Table) Wait(want ...Status) error {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return table.WaitWithContext(ctx, want...)
-}
-
-// Wait blocks until this table's status matches any status provided by want.
-// If no statuses are specified, the active status is used.
-func (table Table) WaitWithContext(ctx context.Context, want ...Status) error {
+func (table Table) Wait(ctx context.Context, want ...Status) error {
 	if len(want) == 0 {
 		want = []Status{ActiveStatus}
 	}
@@ -74,7 +66,7 @@ func (table Table) WaitWithContext(ctx context.Context, want ...Status) error {
 	}
 
 	err := table.db.retry(ctx, func() error {
-		desc, err := table.Describe().RunWithContext(ctx)
+		desc, err := table.Describe().Run(ctx)
 		var aerr smithy.APIError
 		if errors.As(err, &aerr) {
 			if aerr.ErrorCode() == "ResourceNotFoundException" {
@@ -134,7 +126,7 @@ func (table Table) primaryKeys(ctx context.Context, lek, esk Item, index string)
 
 	keys := make(map[string]struct{})
 	err := table.db.retry(ctx, func() error {
-		desc, err := table.Describe().RunWithContext(ctx)
+		desc, err := table.Describe().Run(ctx)
 		if err != nil {
 			return err
 		}
@@ -181,14 +173,7 @@ func (table Table) DeleteTable() *DeleteTable {
 }
 
 // Run executes this request and deletes the table.
-func (dt *DeleteTable) Run() error {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return dt.RunWithContext(ctx)
-}
-
-// RunWithContext executes this request and deletes the table.
-func (dt *DeleteTable) RunWithContext(ctx context.Context) error {
+func (dt *DeleteTable) Run(ctx context.Context) error {
 	input := dt.input()
 	return dt.table.db.retry(ctx, func() error {
 		_, err := dt.table.db.client.DeleteTable(ctx, input)
@@ -197,18 +182,11 @@ func (dt *DeleteTable) RunWithContext(ctx context.Context) error {
 }
 
 // Wait executes this request and blocks until the table is finished deleting.
-func (dt *DeleteTable) Wait() error {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return dt.WaitWithContext(ctx)
-}
-
-// WaitWithContext executes this request and blocks until the table is finished deleting.
-func (dt *DeleteTable) WaitWithContext(ctx context.Context) error {
-	if err := dt.RunWithContext(ctx); err != nil {
+func (dt *DeleteTable) Wait(ctx context.Context) error {
+	if err := dt.Run(ctx); err != nil {
 		return err
 	}
-	return dt.table.WaitWithContext(ctx, NotExistsStatus)
+	return dt.table.Wait(ctx, NotExistsStatus)
 }
 
 func (dt *DeleteTable) input() *dynamodb.DeleteTableInput {

@@ -1,6 +1,7 @@
 package dynamo
 
 import (
+	"context"
 	"reflect"
 	"testing"
 	"time"
@@ -11,6 +12,7 @@ func TestDelete(t *testing.T) {
 		t.Skip(offlineSkipMsg)
 	}
 	table := testDB.Table(testTable)
+	ctx := context.TODO()
 
 	// first, add an item to delete later
 	item := widget{
@@ -21,7 +23,7 @@ func TestDelete(t *testing.T) {
 			"color": "octarine",
 		},
 	}
-	err := table.Put(item).Run()
+	err := table.Put(item).Run(ctx)
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
@@ -31,7 +33,7 @@ func TestDelete(t *testing.T) {
 		Range("Time", item.Time).
 		If("Meta.'color' = ?", "octarine").
 		If("Msg = ?", "wrong msg").
-		Run()
+		Run(ctx)
 	if !IsCondCheckFailed(err) {
 		t.Error("expected ConditionalCheckFailedException, not", err)
 	}
@@ -39,7 +41,7 @@ func TestDelete(t *testing.T) {
 	// delete it
 	var old widget
 	var cc ConsumedCapacity
-	err = table.Delete("UserID", item.UserID).Range("Time", item.Time).ConsumedCapacity(&cc).OldValue(&old)
+	err = table.Delete("UserID", item.UserID).Range("Time", item.Time).ConsumedCapacity(&cc).OldValue(ctx, &old)
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}

@@ -78,13 +78,7 @@ func (d *Delete) ConsumedCapacity(cc *ConsumedCapacity) *Delete {
 }
 
 // Run executes this delete request.
-func (d *Delete) Run() error {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return d.RunWithContext(ctx)
-}
-
-func (d *Delete) RunWithContext(ctx context.Context) error {
+func (d *Delete) Run(ctx context.Context) error {
 	d.returnType = "NONE"
 	_, err := d.run(ctx)
 	return err
@@ -92,13 +86,7 @@ func (d *Delete) RunWithContext(ctx context.Context) error {
 
 // OldValue executes this delete request, unmarshaling the previous value to out.
 // Returns ErrNotFound is there was no previous value.
-func (d *Delete) OldValue(out interface{}) error {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return d.OldValueWithContext(ctx, out)
-}
-
-func (d *Delete) OldValueWithContext(ctx context.Context, out interface{}) error {
+func (d *Delete) OldValue(ctx context.Context, out interface{}) error {
 	d.returnType = "ALL_OLD"
 	output, err := d.run(ctx)
 	switch {

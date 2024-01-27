@@ -32,14 +32,7 @@ func (table Table) UpdateTTL(attribute string, enabled bool) *UpdateTTL {
 }
 
 // Run executes this request.
-func (ttl *UpdateTTL) Run() error {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return ttl.RunWithContext(ctx)
-}
-
-// RunWithContext executes this request.
-func (ttl *UpdateTTL) RunWithContext(ctx context.Context) error {
+func (ttl *UpdateTTL) Run(ctx context.Context) error {
 	input := ttl.input()
 
 	err := ttl.table.db.retry(ctx, func() error {
@@ -70,14 +63,7 @@ func (table Table) DescribeTTL() *DescribeTTL {
 }
 
 // Run executes this request and returns details about time to live, or an error.
-func (d *DescribeTTL) Run() (TTLDescription, error) {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return d.RunWithContext(ctx)
-}
-
-// RunWithContext executes this request and returns details about time to live, or an error.
-func (d *DescribeTTL) RunWithContext(ctx context.Context) (TTLDescription, error) {
+func (d *DescribeTTL) Run(ctx context.Context) (TTLDescription, error) {
 	input := d.input()
 
 	var result *dynamodb.DescribeTimeToLiveOutput

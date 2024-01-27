@@ -197,13 +197,7 @@ func (q *Query) ConsumedCapacity(cc *ConsumedCapacity) *Query {
 
 // One executes this query and retrieves a single result,
 // unmarshaling the result to out.
-func (q *Query) One(out interface{}) error {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return q.OneWithContext(ctx, out)
-}
-
-func (q *Query) OneWithContext(ctx context.Context, out interface{}) error {
+func (q *Query) One(ctx context.Context, out interface{}) error {
 	if q.err != nil {
 		return q.err
 	}
@@ -267,13 +261,7 @@ func (q *Query) OneWithContext(ctx context.Context, out interface{}) error {
 }
 
 // Count executes this request, returning the number of results.
-func (q *Query) Count() (int, error) {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return q.CountWithContext(ctx)
-}
-
-func (q *Query) CountWithContext(ctx context.Context) (int, error) {
+func (q *Query) Count(ctx context.Context) (int, error) {
 	if q.err != nil {
 		return 0, q.err
 	}
@@ -335,13 +323,7 @@ type queryIter struct {
 
 // Next tries to unmarshal the next result into out.
 // Returns false when it is complete or if it runs into an error.
-func (itr *queryIter) Next(out interface{}) bool {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return itr.NextWithContext(ctx, out)
-}
-
-func (itr *queryIter) NextWithContext(ctx context.Context, out interface{}) bool {
+func (itr *queryIter) Next(ctx context.Context, out interface{}) bool {
 	// stop if we have an error
 	if ctx.Err() != nil {
 		itr.err = ctx.Err()
@@ -404,7 +386,7 @@ func (itr *queryIter) NextWithContext(ctx context.Context, out interface{}) bool
 	if len(itr.output.Items) == 0 {
 		if itr.output.LastEvaluatedKey != nil {
 			// we need to retry until we get some data
-			return itr.NextWithContext(ctx, out)
+			return itr.Next(ctx, out)
 		}
 		// we're done
 		return false
@@ -453,38 +435,26 @@ func (itr *queryIter) LastEvaluatedKey(ctx context.Context) (PagingKey, error) {
 }
 
 // All executes this request and unmarshals all results to out, which must be a pointer to a slice.
-func (q *Query) All(out interface{}) error {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return q.AllWithContext(ctx, out)
-}
-
-func (q *Query) AllWithContext(ctx context.Context, out interface{}) error {
+func (q *Query) All(ctx context.Context, out interface{}) error {
 	iter := &queryIter{
 		query:     q,
 		unmarshal: unmarshalAppendTo(out),
 		err:       q.err,
 	}
-	for iter.NextWithContext(ctx, out) {
+	for iter.Next(ctx, out) {
 	}
 	return iter.Err()
 }
 
 // AllWithLastEvaluatedKey executes this request and unmarshals all results to out, which must be a pointer to a slice.
 // This returns a PagingKey you can use with StartFrom to split up results.
-func (q *Query) AllWithLastEvaluatedKey(out interface{}) (PagingKey, error) {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return q.AllWithLastEvaluatedKeyContext(ctx, out)
-}
-
-func (q *Query) AllWithLastEvaluatedKeyContext(ctx context.Context, out interface{}) (PagingKey, error) {
+func (q *Query) AllWithLastEvaluatedKey(ctx context.Context, out interface{}) (PagingKey, error) {
 	iter := &queryIter{
 		query:     q,
 		unmarshal: unmarshalAppendTo(out),
 		err:       q.err,
 	}
-	for iter.NextWithContext(ctx, out) {
+	for iter.Next(ctx, out) {
 	}
 	lek, err := iter.LastEvaluatedKey(ctx)
 	return lek, errors.Join(iter.Err(), err)

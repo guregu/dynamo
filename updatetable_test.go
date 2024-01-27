@@ -1,6 +1,7 @@
 package dynamo
 
 import (
+	"context"
 	"testing"
 )
 
@@ -10,6 +11,7 @@ func _TestUpdateTable(t *testing.T) {
 		t.Skip(offlineSkipMsg)
 	}
 	table := testDB.Table(testTable)
+	ctx := context.TODO()
 
 	desc, err := table.UpdateTable().CreateIndex(Index{
 		Name:              "test123",
@@ -23,7 +25,7 @@ func _TestUpdateTable(t *testing.T) {
 			Read:  1,
 			Write: 1,
 		},
-	}).Run()
+	}).Run(ctx)
 
 	// desc, err := table.UpdateTable().DeleteIndex("test123").Run()
 

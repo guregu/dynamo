@@ -118,17 +118,9 @@ func (bg *BatchGet) ConsumedCapacity(cc *ConsumedCapacity) *BatchGet {
 }
 
 // All executes this request and unmarshals all results to out, which must be a pointer to a slice.
-func (bg *BatchGet) All(out interface{}) error {
+func (bg *BatchGet) All(ctx context.Context, out interface{}) error {
 	iter := newBGIter(bg, unmarshalAppendTo(out), bg.err)
-	for iter.Next(out) {
-	}
-	return iter.Err()
-}
-
-// AllWithContext executes this request and unmarshals all results to out, which must be a pointer to a slice.
-func (bg *BatchGet) AllWithContext(ctx context.Context, out interface{}) error {
-	iter := newBGIter(bg, unmarshalAppendTo(out), bg.err)
-	for iter.NextWithContext(ctx, out) {
+	for iter.Next(ctx, out) {
 	}
 	return iter.Err()
 }
@@ -216,13 +208,7 @@ func newBGIter(bg *BatchGet, fn unmarshalFunc, err error) *bgIter {
 
 // Next tries to unmarshal the next result into out.
 // Returns false when it is complete or if it runs into an error.
-func (itr *bgIter) Next(out interface{}) bool {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return itr.NextWithContext(ctx, out)
-}
-
-func (itr *bgIter) NextWithContext(ctx context.Context, out interface{}) bool {
+func (itr *bgIter) Next(ctx context.Context, out interface{}) bool {
 	// stop if we have an error
 	if ctx.Err() != nil {
 		itr.err = ctx.Err()

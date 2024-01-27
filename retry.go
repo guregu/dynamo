@@ -8,12 +8,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/smithy-go"
+	awstime "github.com/aws/smithy-go/time"
 	"github.com/cenkalti/backoff/v4"
 )
-
-func defaultContext() (context.Context, context.CancelFunc) {
-	return context.Background(), func() {}
-}
 
 func (db *DB) retry(ctx context.Context, f func() error) error {
 	// if a custom retryer has been set, the SDK will retry for us
@@ -36,7 +33,7 @@ func (db *DB) retry(ctx context.Context, f func() error) error {
 		if next = b.NextBackOff(); next == backoff.Stop {
 			return err
 		}
-		if err := sleep(ctx, next); err != nil {
+		if err := awstime.SleepWithContext(ctx, next); err != nil {
 			return err
 		}
 	}
@@ -86,16 +83,4 @@ func canRetry(err error) bool {
 	}
 
 	return false
-}
-
-func sleep(ctx context.Context, dur time.Duration) error {
-	timer := time.NewTimer(dur)
-	defer timer.Stop()
-
-	select {
-	case <-ctx.Done():
-	case <-timer.C:
-	}
-
-	return ctx.Err()
 }

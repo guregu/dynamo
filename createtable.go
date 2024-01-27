@@ -235,14 +235,7 @@ func (ct *CreateTable) SSEEncryption(enabled bool, keyID string, sseType SSEType
 }
 
 // Run creates this table or returns an error.
-func (ct *CreateTable) Run() error {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return ct.RunWithContext(ctx)
-}
-
-// RunWithContext creates this table or returns an error.
-func (ct *CreateTable) RunWithContext(ctx context.Context) error {
+func (ct *CreateTable) Run(ctx context.Context) error {
 	if ct.err != nil {
 		return ct.err
 	}
@@ -255,18 +248,11 @@ func (ct *CreateTable) RunWithContext(ctx context.Context) error {
 }
 
 // Wait creates this table and blocks until it exists and is ready to use.
-func (ct *CreateTable) Wait() error {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return ct.WaitWithContext(ctx)
-}
-
-// WaitWithContext creates this table and blocks until it exists and is ready to use.
-func (ct *CreateTable) WaitWithContext(ctx context.Context) error {
-	if err := ct.RunWithContext(ctx); err != nil {
+func (ct *CreateTable) Wait(ctx context.Context) error {
+	if err := ct.Run(ctx); err != nil {
 		return err
 	}
-	return ct.db.Table(ct.tableName).WaitWithContext(ctx)
+	return ct.db.Table(ct.tableName).Wait(ctx)
 }
 
 func (ct *CreateTable) from(rv reflect.Value) error {

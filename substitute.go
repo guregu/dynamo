@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/guregu/dynamo/internal/exprs"
+	"github.com/guregu/dynamo/v2/internal/exprs"
 )
 
 // subber is a "mixin" for operators for keep track of subtituted keys and values

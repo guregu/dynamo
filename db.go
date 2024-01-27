@@ -12,7 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/logging"
-	"github.com/guregu/dynamo/dynamodbiface"
+	"github.com/guregu/dynamo/v2/dynamodbiface"
 )
 
 // DB is a DynamoDB client.
@@ -99,9 +99,9 @@ func (db *DB) Client() dynamodbiface.DynamoDBAPI {
 // 	return db
 // }
 
-func (db *DB) log(format string, v ...interface{}) {
-	db.logger.Logf(logging.Debug, format, v...)
-}
+// func (db *DB) log(format string, v ...interface{}) {
+// 	db.logger.Logf(logging.Debug, format, v...)
+// }
 
 // ListTables is a request to list tables.
 // See: http://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_ListTables.html
@@ -115,18 +115,11 @@ func (db *DB) ListTables() *ListTables {
 }
 
 // All returns every table or an error.
-func (lt *ListTables) All() ([]string, error) {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return lt.AllWithContext(ctx)
-}
-
-// AllWithContext returns every table or an error.
-func (lt *ListTables) AllWithContext(ctx context.Context) ([]string, error) {
+func (lt *ListTables) All(ctx context.Context) ([]string, error) {
 	var tables []string
 	itr := lt.Iter()
 	var name string
-	for itr.NextWithContext(ctx, &name) {
+	for itr.Next(ctx, &name) {
 		tables = append(tables, name)
 	}
 	return tables, itr.Err()
@@ -145,13 +138,7 @@ func (lt *ListTables) Iter() Iter {
 	return &ltIter{lt: lt}
 }
 
-func (itr *ltIter) Next(out interface{}) bool {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return itr.NextWithContext(ctx, out)
-}
-
-func (itr *ltIter) NextWithContext(ctx context.Context, out interface{}) bool {
+func (itr *ltIter) Next(ctx context.Context, out interface{}) bool {
 	if ctx.Err() != nil {
 		itr.err = ctx.Err()
 	}
@@ -214,10 +201,7 @@ func (itr *ltIter) input() *dynamodb.ListTablesInput {
 type Iter interface {
 	// Next tries to unmarshal the next result into out.
 	// Returns false when it is complete or if it runs into an error.
-	Next(out interface{}) bool
-	// NextWithContext tries to unmarshal the next result into out.
-	// Returns false when it is complete or if it runs into an error.
-	NextWithContext(ctx context.Context, out interface{}) bool
+	Next(ctx context.Context, out interface{}) bool
 	// Err returns the error encountered, if any.
 	// You should check this after Next is finished.
 	Err() error

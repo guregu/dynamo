@@ -1,6 +1,7 @@
 package dynamo
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sort"
@@ -18,6 +19,8 @@ func TestTableLifecycle(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+
+	ctx := context.TODO()
 
 	now := time.Now().UTC()
 	name := fmt.Sprintf("TestDB-%d", now.UnixNano())
@@ -37,11 +40,11 @@ func TestTableLifecycle(t *testing.T) {
 		HashKeyType:  StringType,
 		RangeKey:     "Bar",
 		RangeKeyType: NumberType,
-	}).Wait(); err != nil {
+	}).Wait(ctx); err != nil {
 		t.Fatal(err)
 	}
 
-	desc, err := testDB.Table(name).Describe().Run()
+	desc, err := testDB.Table(name).Describe().Run(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,12 +117,12 @@ func TestTableLifecycle(t *testing.T) {
 
 	// make sure it really works
 	table := testDB.Table(name)
-	if err := table.Put(UserAction{UserID: "test", Time: now, Seq: 1, UUID: "42"}).Run(); err != nil {
+	if err := table.Put(UserAction{UserID: "test", Time: now, Seq: 1, UUID: "42"}).Run(ctx); err != nil {
 		t.Fatal(err)
 	}
 
 	// delete & wait
-	if err := testDB.Table(name).DeleteTable().Wait(); err != nil {
+	if err := testDB.Table(name).DeleteTable().Wait(ctx); err != nil {
 		t.Fatal(err)
 	}
 }

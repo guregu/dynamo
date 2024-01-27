@@ -61,14 +61,7 @@ func (tx *GetTx) ConsumedCapacity(cc *ConsumedCapacity) *GetTx {
 }
 
 // Run executes this transaction and unmarshals everything specified by GetOne.
-func (tx *GetTx) Run() error {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return tx.RunWithContext(ctx)
-}
-
-// RunWithContext executes this transaction and unmarshals everything specified by GetOne.
-func (tx *GetTx) RunWithContext(ctx context.Context) error {
+func (tx *GetTx) Run(ctx context.Context) error {
 	input, err := tx.input()
 	if err != nil {
 		return err
@@ -108,14 +101,7 @@ func (tx *GetTx) unmarshal(resp *dynamodb.TransactGetItemsOutput) error {
 }
 
 // All executes this transaction and unmarshals every value to out, which must be a pointer to a slice.
-func (tx *GetTx) All(out interface{}) error {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return tx.AllWithContext(ctx, out)
-}
-
-// AllWithContext executes this transaction and unmarshals every value to out, which must be a pointer to a slice.
-func (tx *GetTx) AllWithContext(ctx context.Context, out interface{}) error {
+func (tx *GetTx) All(ctx context.Context, out interface{}) error {
 	input, err := tx.input()
 	if err != nil {
 		return err
@@ -260,14 +246,7 @@ func (tx *WriteTx) ConsumedCapacity(cc *ConsumedCapacity) *WriteTx {
 }
 
 // Run executes this transaction.
-func (tx *WriteTx) Run() error {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return tx.RunWithContext(ctx)
-}
-
-// RunWithContext executes this transaction.
-func (tx *WriteTx) RunWithContext(ctx context.Context) error {
+func (tx *WriteTx) Run(ctx context.Context) error {
 	if tx.err != nil {
 		return tx.err
 	}

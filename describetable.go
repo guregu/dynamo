@@ -254,13 +254,7 @@ func (table Table) Describe() *DescribeTable {
 }
 
 // Run executes this request and describe the table.
-func (dt *DescribeTable) Run() (Description, error) {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return dt.RunWithContext(ctx)
-}
-
-func (dt *DescribeTable) RunWithContext(ctx context.Context) (Description, error) {
+func (dt *DescribeTable) Run(ctx context.Context) (Description, error) {
 	input := dt.input()
 
 	var result *dynamodb.DescribeTableOutput

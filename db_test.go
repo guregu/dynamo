@@ -63,7 +63,7 @@ func TestListTables(t *testing.T) {
 		t.Skip(offlineSkipMsg)
 	}
 
-	tables, err := testDB.ListTables().All()
+	tables, err := testDB.ListTables().All(context.TODO())
 	if err != nil {
 		t.Error(err)
 		return

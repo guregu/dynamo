@@ -53,14 +53,7 @@ func (p *Put) ConsumedCapacity(cc *ConsumedCapacity) *Put {
 }
 
 // Run executes this put.
-func (p *Put) Run() error {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return p.RunWithContext(ctx)
-}
-
-// Run executes this put.
-func (p *Put) RunWithContext(ctx context.Context) error {
+func (p *Put) Run(ctx context.Context) error {
 	p.returnType = "NONE"
 	_, err := p.run(ctx)
 	return err
@@ -68,15 +61,7 @@ func (p *Put) RunWithContext(ctx context.Context) error {
 
 // OldValue executes this put, unmarshaling the previous value into out.
 // Returns ErrNotFound is there was no previous value.
-func (p *Put) OldValue(out interface{}) error {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return p.OldValueWithContext(ctx, out)
-}
-
-// OldValueWithContext executes this put, unmarshaling the previous value into out.
-// Returns ErrNotFound is there was no previous value.
-func (p *Put) OldValueWithContext(ctx context.Context, out interface{}) error {
+func (p *Put) OldValue(ctx context.Context, out interface{}) error {
 	p.returnType = "ALL_OLD"
 	output, err := p.run(ctx)
 	switch {

@@ -7,7 +7,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	"github.com/guregu/dynamo"
+	"github.com/guregu/dynamo/v2"
 )
 
 type Coffee struct {

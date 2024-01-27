@@ -107,13 +107,7 @@ func (ut *UpdateTable) DisableStream() *UpdateTable {
 }
 
 // Run executes this request and describes the table.
-func (ut *UpdateTable) Run() (Description, error) {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return ut.RunWithContext(ctx)
-}
-
-func (ut *UpdateTable) RunWithContext(ctx context.Context) (Description, error) {
+func (ut *UpdateTable) Run(ctx context.Context) (Description, error) {
 	if ut.err != nil {
 		return Description{}, ut.err
 	}

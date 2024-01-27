@@ -1,6 +1,7 @@
 package dynamo
 
 import (
+	"context"
 	"testing"
 )
 
@@ -10,7 +11,7 @@ func TestDescribeTable(t *testing.T) {
 	}
 	table := testDB.Table(testTable)
 
-	desc, err := table.Describe().Run()
+	desc, err := table.Describe().Run(context.TODO())
 	if err != nil {
 		t.Error(err)
 		return

@@ -1,6 +1,7 @@
 package dynamo
 
 import (
+	"context"
 	"reflect"
 	"testing"
 	"time"
@@ -13,6 +14,7 @@ func TestPut(t *testing.T) {
 		t.Skip(offlineSkipMsg)
 	}
 	table := testDB.Table(testTable)
+	ctx := context.TODO()
 
 	type widget2 struct {
 		widget
@@ -34,7 +36,7 @@ func TestPut(t *testing.T) {
 		List: []*string{},
 	}
 
-	err := table.Put(item).Run()
+	err := table.Put(item).Run(ctx)
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
@@ -53,7 +55,7 @@ func TestPut(t *testing.T) {
 	}
 	var oldValue widget2
 	var cc ConsumedCapacity
-	err = table.Put(newItem).ConsumedCapacity(&cc).OldValue(&oldValue)
+	err = table.Put(newItem).ConsumedCapacity(&cc).OldValue(ctx, &oldValue)
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
@@ -67,7 +69,7 @@ func TestPut(t *testing.T) {
 	}
 
 	// putting the same item: this should fail
-	err = table.Put(newItem).If("attribute_not_exists(UserID)").If("attribute_not_exists('Time')").Run()
+	err = table.Put(newItem).If("attribute_not_exists(UserID)").If("attribute_not_exists('Time')").Run(ctx)
 	if !IsCondCheckFailed(err) {
 		t.Error("expected ConditionalCheckFailedException, not", err)
 	}
@@ -78,6 +80,7 @@ func TestPutAndQueryAWSEncoding(t *testing.T) {
 		t.Skip(offlineSkipMsg)
 	}
 	table := testDB.Table(testTable)
+	ctx := context.TODO()
 
 	type awsWidget struct {
 		XUserID int               `dynamodbav:"UserID"`
@@ -98,13 +101,13 @@ func TestPutAndQueryAWSEncoding(t *testing.T) {
 		XMsg:    "hello world",
 	}
 
-	err = table.Put(AWSEncoding(item)).Run()
+	err = table.Put(AWSEncoding(item)).Run(ctx)
 	if err != nil {
 		t.Error(err)
 	}
 
 	var result awsWidget
-	err = table.Get("UserID", item.XUserID).Range("Time", Equal, item.XTime).Consistent(true).One(AWSEncoding(&result))
+	err = table.Get("UserID", item.XUserID).Range("Time", Equal, item.XTime).Consistent(true).One(ctx, AWSEncoding(&result))
 	if err != nil {
 		t.Error(err)
 	}
@@ -113,7 +116,7 @@ func TestPutAndQueryAWSEncoding(t *testing.T) {
 	}
 
 	var list []awsWidget
-	err = table.Get("UserID", item.XUserID).Consistent(true).All(AWSEncoding(&list))
+	err = table.Get("UserID", item.XUserID).Consistent(true).All(ctx, AWSEncoding(&list))
 	if err != nil {
 		t.Error(err)
 	}

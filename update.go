@@ -287,14 +287,7 @@ func (u *Update) ConsumedCapacity(cc *ConsumedCapacity) *Update {
 }
 
 // Run executes this update.
-func (u *Update) Run() error {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return u.RunWithContext(ctx)
-}
-
-// RunWithContext executes this update.
-func (u *Update) RunWithContext(ctx context.Context) error {
+func (u *Update) Run(ctx context.Context) error {
 	u.returnType = "NONE"
 	_, err := u.run(ctx)
 	return err
@@ -302,15 +295,7 @@ func (u *Update) RunWithContext(ctx context.Context) error {
 
 // Value executes this update, encoding out with the new value after the update.
 // This is equivalent to ReturnValues = ALL_NEW in the DynamoDB API.
-func (u *Update) Value(out interface{}) error {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return u.ValueWithContext(ctx, out)
-}
-
-// ValueWithContext executes this update, encoding out with the new value after the update.
-// This is equivalent to ReturnValues = ALL_NEW in the DynamoDB API.
-func (u *Update) ValueWithContext(ctx context.Context, out interface{}) error {
+func (u *Update) Value(ctx context.Context, out interface{}) error {
 	u.returnType = "ALL_NEW"
 	output, err := u.run(ctx)
 	if err != nil {
@@ -321,15 +306,7 @@ func (u *Update) ValueWithContext(ctx context.Context, out interface{}) error {
 
 // OldValue executes this update, encoding out with the old value before the update.
 // This is equivalent to ReturnValues = ALL_OLD in the DynamoDB API.
-func (u *Update) OldValue(out interface{}) error {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return u.OldValueWithContext(ctx, out)
-}
-
-// OldValueWithContext executes this update, encoding out with the old value before the update.
-// This is equivalent to ReturnValues = ALL_OLD in the DynamoDB API.
-func (u *Update) OldValueWithContext(ctx context.Context, out interface{}) error {
+func (u *Update) OldValue(ctx context.Context, out interface{}) error {
 	u.returnType = "ALL_OLD"
 	output, err := u.run(ctx)
 	if err != nil {
@@ -340,15 +317,7 @@ func (u *Update) OldValueWithContext(ctx context.Context, out interface{}) error
 
 // OnlyUpdatedValue executes this update, encoding out with only with new values of the attributes that were changed.
 // This is equivalent to ReturnValues = UPDATED_NEW in the DynamoDB API.
-func (u *Update) OnlyUpdatedValue(out interface{}) error {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return u.OnlyUpdatedValueWithContext(ctx, out)
-}
-
-// OnlyUpdatedValueWithContext executes this update, encoding out with only with new values of the attributes that were changed.
-// This is equivalent to ReturnValues = UPDATED_NEW in the DynamoDB API.
-func (u *Update) OnlyUpdatedValueWithContext(ctx context.Context, out interface{}) error {
+func (u *Update) OnlyUpdatedValue(ctx context.Context, out interface{}) error {
 	u.returnType = "UPDATED_NEW"
 	output, err := u.run(ctx)
 	if err != nil {
@@ -359,15 +328,7 @@ func (u *Update) OnlyUpdatedValueWithContext(ctx context.Context, out interface{
 
 // OnlyUpdatedOldValue executes this update, encoding out with only with old values of the attributes that were changed.
 // This is equivalent to ReturnValues = UPDATED_OLD in the DynamoDB API.
-func (u *Update) OnlyUpdatedOldValue(out interface{}) error {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return u.OnlyUpdatedOldValueWithContext(ctx, out)
-}
-
-// OnlyUpdatedOldValueWithContext executes this update, encoding out with only with old values of the attributes that were changed.
-// This is equivalent to ReturnValues = UPDATED_OLD in the DynamoDB API.
-func (u *Update) OnlyUpdatedOldValueWithContext(ctx context.Context, out interface{}) error {
+func (u *Update) OnlyUpdatedOldValue(ctx context.Context, out interface{}) error {
 	u.returnType = "UPDATED_OLD"
 	output, err := u.run(ctx)
 	if err != nil {

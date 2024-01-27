@@ -96,5 +96,6 @@ func sleep(ctx context.Context, dur time.Duration) error {
 	case <-ctx.Done():
 	case <-timer.C:
 	}
+
 	return ctx.Err()
 }

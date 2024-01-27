@@ -1,7 +1,6 @@
 module github.com/guregu/dynamo
 
 require (
-	github.com/aws/aws-sdk-go v1.38.0
 	github.com/aws/aws-sdk-go-v2 v1.24.1
 	github.com/aws/aws-sdk-go-v2/config v1.11.0
 	github.com/aws/aws-sdk-go-v2/credentials v1.6.4

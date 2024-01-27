@@ -48,11 +48,26 @@ func newDB(client dynamodbiface.DynamoDBAPI, cfg aws.Config) *DB {
 		db.logger = logging.NewStandardLogger(os.Stdout)
 	}
 
+	// TODO: replace all of this with AWS Retryer interface
+	/*
+		if real, ok := client.(*dynamodb.Client); ok {
+			if retryer := real.Options().Retryer; retryer != nil {
+				db.retryer = func() aws.Retryer { return retryer }
+				if cfg.Retryer != nil {
+					db.retryer = cfg.Retryer
+				}
+			} else if real.Options().RetryMaxAttempts > 0 {
+				db.retryMax = cfg.RetryMaxAttempts
+			}
+		} else {
+	*/
 	if cfg.Retryer != nil {
 		db.retryer = cfg.Retryer
 	} else if cfg.RetryMaxAttempts > 0 {
 		db.retryMax = cfg.RetryMaxAttempts
 	}
+
+	// }
 
 	return db
 }

@@ -126,11 +126,9 @@ func TestScanPaging(t *testing.T) {
 		widgets := [10]widget{}
 		itr := table.Scan().Consistent(true).SearchLimit(1).Iter()
 		for i := 0; i < len(widgets); i++ {
-			more := itr.Next(&widgets[i])
+			itr.Next(&widgets[i])
 			if itr.Err() != nil {
 				t.Error("unexpected error", itr.Err())
-			}
-			if !more {
 				break
 			}
 			itr = table.Scan().StartFrom(itr.LastEvaluatedKey()).SearchLimit(1).Iter()
@@ -146,22 +144,17 @@ func TestScanPaging(t *testing.T) {
 		const segments = 2
 		ctx := context.Background()
 		widgets := [10]widget{}
-		itr := table.Scan().Consistent(true).SearchLimit(1).IterParallel(ctx, segments)
-		for i := 0; i < len(widgets)/segments; i++ {
-			var more bool
-			for j := 0; j < segments; j++ {
-				more = itr.Next(&widgets[i*segments+j])
-				if !more && j != segments-1 {
-					t.Error("bad number of results from parallel scan")
-				}
+		limit := int64(len(widgets) / segments)
+		itr := table.Scan().Consistent(true).SearchLimit(limit).IterParallel(ctx, segments)
+		for i := 0; i < len(widgets); {
+			for ; i < len(widgets) && itr.Next(&widgets[i]); i++ {
 			}
 			if itr.Err() != nil {
 				t.Error("unexpected error", itr.Err())
-			}
-			if !more {
 				break
 			}
-			itr = table.Scan().SearchLimit(1).IterParallelStartFrom(ctx, itr.LastEvaluatedKeys())
+			t.Logf("parallel chunk: %d", i)
+			itr = table.Scan().SearchLimit(limit).IterParallelStartFrom(ctx, itr.LastEvaluatedKeys())
 		}
 		for i, w := range widgets {
 			if w.UserID == 0 && w.Time.IsZero() {

@@ -10,7 +10,7 @@ func TestDelete(t *testing.T) {
 	if testDB == nil {
 		t.Skip(offlineSkipMsg)
 	}
-	table := testDB.Table(testTable)
+	table := testDB.Table(testTableWidgets)
 
 	// first, add an item to delete later
 	item := widget{

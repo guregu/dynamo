@@ -8,7 +8,7 @@ func TestDescribeTTL(t *testing.T) {
 	if testDB == nil {
 		t.Skip(offlineSkipMsg)
 	}
-	table := testDB.Table(testTable)
+	table := testDB.Table(testTableWidgets)
 
 	desc, err := table.DescribeTTL().Run()
 	if err != nil {

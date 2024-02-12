@@ -13,7 +13,7 @@ func TestScan(t *testing.T) {
 	if testDB == nil {
 		t.Skip(offlineSkipMsg)
 	}
-	table := testDB.Table(testTable)
+	table := testDB.Table(testTableWidgets)
 
 	// first, add an item to make sure there is at least one
 	item := widget{
@@ -107,7 +107,7 @@ func TestScanPaging(t *testing.T) {
 	if testDB == nil {
 		t.Skip(offlineSkipMsg)
 	}
-	table := testDB.Table(testTable)
+	table := testDB.Table(testTableWidgets)
 
 	// prepare data
 	insert := make([]interface{}, 10)
@@ -168,7 +168,7 @@ func TestScanMagicLEK(t *testing.T) {
 	if testDB == nil {
 		t.Skip(offlineSkipMsg)
 	}
-	table := testDB.Table(testTable)
+	table := testDB.Table(testTableWidgets)
 
 	widgets := []interface{}{
 		widget{

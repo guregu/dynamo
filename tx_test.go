@@ -21,7 +21,7 @@ func TestTx(t *testing.T) {
 	widget2 := widget{UserID: 69, Time: date2, Msg: "cat"}
 
 	// basic write & check
-	table := testDB.Table(testTable)
+	table := testDB.Table(testTableWidgets)
 	tx := testDB.WriteTx()
 	var cc, ccold ConsumedCapacity
 	tx.Idempotent(true)
@@ -184,7 +184,7 @@ func TestTxRetry(t *testing.T) {
 	date1 := time.Date(1999, 1, 1, 1, 1, 1, 0, time.UTC)
 	widget1 := widget{UserID: 69, Time: date1, Msg: "dog", Count: 0}
 
-	table := testDB.Table(testTable)
+	table := testDB.Table(testTableWidgets)
 	if err := table.Put(widget1).Run(); err != nil {
 		t.Fatal(err)
 	}

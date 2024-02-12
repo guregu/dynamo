@@ -1,0 +1,25 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+      - name: Start DynamoDB Local
+        run: docker compose -f '.github/docker-compose.yml' up -d
+      - name: Test
+        run: go test -v -race -cover -coverpkg=./... ./...
+        env:
+          DYNAMO_TEST_ENDPOINT: 'http://localhost:8880'
+          DYNAMO_TEST_REGION: local
+          DYNAMO_TEST_TABLE: TestDB
+          AWS_ACCESS_KEY_ID: dummy
+          AWS_SECRET_ACCESS_KEY: dummy
+          AWS_REGION: local

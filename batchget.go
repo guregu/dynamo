@@ -132,19 +132,21 @@ func (bg *BatchGet) projectionFor(table string) []string {
 }
 
 // Merge copies operations and settings from src to this batch get.
-func (bg *BatchGet) Merge(src *BatchGet) *BatchGet {
-	bg.reqs = append(bg.reqs, src.reqs...)
-	bg.consistent = bg.consistent || src.consistent
-	this := bg.batch.table.Name()
-	for table, proj := range src.projections {
-		if this == table {
-			continue
+func (bg *BatchGet) Merge(srcs ...*BatchGet) *BatchGet {
+	for _, src := range srcs {
+		bg.reqs = append(bg.reqs, src.reqs...)
+		bg.consistent = bg.consistent || src.consistent
+		this := bg.batch.table.Name()
+		for table, proj := range src.projections {
+			if this == table {
+				continue
+			}
+			bg.mergeProjection(table, proj)
 		}
-		bg.mergeProjection(table, proj)
-	}
-	if len(src.projection) > 0 {
-		if that := src.batch.table.Name(); that != this {
-			bg.mergeProjection(that, src.projection)
+		if len(src.projection) > 0 {
+			if that := src.batch.table.Name(); that != this {
+				bg.mergeProjection(that, src.projection)
+			}
 		}
 	}
 	return bg

@@ -37,9 +37,7 @@ func TestBatchGetWrite(t *testing.T) {
 		batches = append(batches, b)
 	}
 	batch1 := batches[0]
-	for _, b := range batches[1:] {
-		batch1.Merge(b)
-	}
+	batch1.Merge(batches[1:]...)
 	var wcc ConsumedCapacity
 	wrote, err := batch1.ConsumedCapacity(&wcc).Run()
 	if wrote != totalBatchSize {
@@ -64,9 +62,7 @@ func TestBatchGetWrite(t *testing.T) {
 
 	var cc ConsumedCapacity
 	get1 := gets[0].ConsumedCapacity(&cc)
-	for _, b := range gets[1:] {
-		get1.Merge(b)
-	}
+	get1.Merge(gets[1:]...)
 
 	var results []widget
 	err = get1.All(&results)

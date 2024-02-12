@@ -242,9 +242,10 @@ docker compose -f '.github/docker-compose.yml' up -d
 
 # Run the tests with a fresh table
 # The tables will be created automatically
+# The '%' in the table name will be replaced the current timestamp
 DYNAMO_TEST_ENDPOINT='http://localhost:8880' \
 	DYNAMO_TEST_REGION='local' \
-	DYNAMO_TEST_TABLE='TestDB-%' \ # the % will be replaced the current timestamp
+	DYNAMO_TEST_TABLE='TestDB-%' \
 	AWS_ACCESS_KEY_ID='dummy' \
 	AWS_SECRET_ACCESS_KEY='dummy' \
 	AWS_REGION='local' \

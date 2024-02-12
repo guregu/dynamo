@@ -96,8 +96,10 @@ func (bw *BatchWrite) deleteIn(table Table, hashKey, rangeKey string, keys ...Ke
 }
 
 // Merge copies operations from src to this batch.
-func (bw *BatchWrite) Merge(src *BatchWrite) *BatchWrite {
-	bw.ops = append(bw.ops, src.ops...)
+func (bw *BatchWrite) Merge(srcs ...*BatchWrite) *BatchWrite {
+	for _, src := range srcs {
+		bw.ops = append(bw.ops, src.ops...)
+	}
 	return bw
 }
 

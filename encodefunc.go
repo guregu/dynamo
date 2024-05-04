@@ -14,10 +14,9 @@ import (
 
 type encodeFunc func(rv reflect.Value, flags encodeFlags) (*dynamodb.AttributeValue, error)
 
-func encodeType(rt reflect.Type, flags encodeFlags) (encodeFunc, error) {
+func (def *typedef) encodeType(rt reflect.Type, flags encodeFlags) (encodeFunc, error) {
 	try := rt
 	for {
-		// deref := func()
 		switch try {
 		case rtypeAttr:
 			return encode2(func(av *dynamodb.AttributeValue, _ encodeFlags) (*dynamodb.AttributeValue, error) {
@@ -54,7 +53,7 @@ func encodeType(rt reflect.Type, flags encodeFlags) (encodeFunc, error) {
 
 	switch rt.Kind() {
 	case reflect.Pointer:
-		return encodePtr(rt, flags)
+		return def.encodePtr(rt, flags)
 
 	// BOOL
 	case reflect.Bool:
@@ -84,7 +83,7 @@ func encodeType(rt reflect.Type, flags encodeFlags) (encodeFunc, error) {
 			return encodeSet(rt, flags)
 		}
 		// lists (L)
-		return encodeList(rt, flags)
+		return def.encodeList(rt, flags)
 
 	case reflect.Map:
 		// sets (NS, SS, BS)
@@ -92,22 +91,22 @@ func encodeType(rt reflect.Type, flags encodeFlags) (encodeFunc, error) {
 			return encodeSet(rt, flags)
 		}
 		// M
-		return encodeMapM(rt, flags)
+		return def.encodeMapM(rt, flags)
 
 	// M
 	case reflect.Struct:
-		return encodeStruct(rt)
+		return def.encodeStruct(rt)
 
 	case reflect.Interface:
 		if rt.NumMethod() == 0 {
-			return encodeAny, nil
+			return def.encodeAny, nil
 		}
 	}
 	return nil, fmt.Errorf("dynamo marshal: unsupported type %s", rt.String())
 }
 
-func encodePtr(rt reflect.Type, flags encodeFlags) (encodeFunc, error) {
-	elem, err := encodeType(rt.Elem(), flags)
+func (def *typedef) encodePtr(rt reflect.Type, flags encodeFlags) (encodeFunc, error) {
+	elem, err := def.encodeType(rt.Elem(), flags)
 	if err != nil {
 		return nil, err
 	}
@@ -210,13 +209,24 @@ func encodeBytes(rt reflect.Type, flags encodeFlags) encodeFunc {
 	}
 }
 
-func encodeStruct(rt reflect.Type) (encodeFunc, error) {
-	fields, err := structFields(rt)
+func (def *typedef) encodeStruct(rt reflect.Type) (encodeFunc, error) {
+	var fields *[]structField
+	var err error
+	if def.sameAsRoot(rt) {
+		fields, err = def.structFields(rt, false)
+	} else {
+		var subdef *typedef
+		subdef, err = typedefOf(rt)
+		if subdef != nil {
+			fields = &subdef.fields
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
+
 	return func(rv reflect.Value, flags encodeFlags) (*dynamodb.AttributeValue, error) {
-		item, err := encodeItem(fields, rv)
+		item, err := encodeItem(*fields, rv)
 		if err != nil {
 			return nil, err
 		}
@@ -303,7 +313,7 @@ func encodeSliceBS(rv reflect.Value, flags encodeFlags) (*dynamodb.AttributeValu
 	return &dynamodb.AttributeValue{BS: bs}, nil
 }
 
-func encodeMapM(rt reflect.Type, flags encodeFlags) (encodeFunc, error) {
+func (def *typedef) encodeMapM(rt reflect.Type, flags encodeFlags) (encodeFunc, error) {
 	keyString := encodeMapKeyFunc(rt)
 	if keyString == nil {
 		return nil, fmt.Errorf("dynamo marshal: map key type must be string or encoding.TextMarshaler, have %v", rt)
@@ -319,7 +329,7 @@ func encodeMapM(rt reflect.Type, flags encodeFlags) (encodeFunc, error) {
 		subflags |= flagOmitEmpty
 	}
 
-	valueEnc, err := encodeType(rt.Elem(), subflags)
+	valueEnc, err := def.encodeType(rt.Elem(), subflags)
 	if err != nil {
 		return nil, err
 	}
@@ -516,7 +526,7 @@ func encodeSet(rt /* []T | map[T]bool | map[T]struct{} */ reflect.Type, flags en
 	return nil, fmt.Errorf("dynamo: marshal: invalid type for set %s", rt.String())
 }
 
-func encodeList(rt reflect.Type, flags encodeFlags) (encodeFunc, error) {
+func (def *typedef) encodeList(rt reflect.Type, flags encodeFlags) (encodeFunc, error) {
 	// lists CAN be empty
 	subflags := flagNone
 	if flags&flagOmitEmptyElem == 0 {
@@ -530,7 +540,7 @@ func encodeList(rt reflect.Type, flags encodeFlags) (encodeFunc, error) {
 		subflags |= flagAllowEmptyElem
 	}
 
-	valueEnc, err := encodeType(rt.Elem(), subflags)
+	valueEnc, err := def.encodeType(rt.Elem(), subflags)
 	if err != nil {
 		return nil, err
 	}
@@ -560,14 +570,14 @@ func encodeList(rt reflect.Type, flags encodeFlags) (encodeFunc, error) {
 	}, nil
 }
 
-func encodeAny(rv reflect.Value, flags encodeFlags) (*dynamodb.AttributeValue, error) {
+func (def *typedef) encodeAny(rv reflect.Value, flags encodeFlags) (*dynamodb.AttributeValue, error) {
 	if !rv.CanInterface() || rv.IsNil() {
 		if flags&flagNull != 0 {
 			return nullAV, nil
 		}
 		return nil, nil
 	}
-	enc, err := encodeType(rv.Elem().Type(), flags)
+	enc, err := def.encodeType(rv.Elem().Type(), flags)
 	if err != nil {
 		return nil, err
 	}

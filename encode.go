@@ -48,7 +48,11 @@ func marshal(v interface{}, flags encodeFlags) (*dynamodb.AttributeValue, error)
 	}
 
 	rt := rv.Type()
-	enc, err := encodeType(rt, flags)
+	def, err := typedefOf(rt)
+	if err != nil {
+		return nil, err
+	}
+	enc, err := def.encodeType(rt, flags)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +110,7 @@ type isZeroer interface {
 	IsZero() bool
 }
 
-func isZeroFunc(rt reflect.Type) func(rv reflect.Value) bool {
+func (def *typedef) isZeroFunc(rt reflect.Type) func(rv reflect.Value) bool {
 	if rt.Implements(rtypeIsZeroer) {
 		return isZeroIface(rt, func(v isZeroer) bool {
 			return v.IsZero()
@@ -131,10 +135,10 @@ func isZeroFunc(rt reflect.Type) func(rv reflect.Value) bool {
 		return isNil
 
 	case reflect.Array:
-		return isZeroArray(rt)
+		return def.isZeroArray(rt)
 
 	case reflect.Struct:
-		return isZeroStruct(rt)
+		return def.isZeroStruct(rt)
 	}
 
 	return isZeroValue
@@ -160,13 +164,13 @@ func isZeroIface[T any](rt reflect.Type, isZero func(v T) bool) func(rv reflect.
 	}
 }
 
-func isZeroStruct(rt reflect.Type) func(rv reflect.Value) bool {
-	fields, err := structFields(rt)
+func (def *typedef) isZeroStruct(rt reflect.Type) func(rv reflect.Value) bool {
+	fields, err := def.structFields(rt, false)
 	if err != nil {
 		return nil
 	}
 	return func(rv reflect.Value) bool {
-		for _, info := range fields {
+		for _, info := range *fields {
 			if info.isZero == nil {
 				continue
 			}
@@ -184,8 +188,8 @@ func isZeroStruct(rt reflect.Type) func(rv reflect.Value) bool {
 	}
 }
 
-func isZeroArray(rt reflect.Type) func(reflect.Value) bool {
-	elemIsZero := isZeroFunc(rt.Elem())
+func (def *typedef) isZeroArray(rt reflect.Type) func(reflect.Value) bool {
+	elemIsZero := def.isZeroFunc(rt.Elem())
 	return func(rv reflect.Value) bool {
 		for i := 0; i < rv.Len(); i++ {
 			if !elemIsZero(rv.Index(i)) {

@@ -709,6 +709,75 @@ var itemEncodingTests = []struct {
 			"thing": {N: aws.String("52")},
 		},
 	},
+	{
+		name: "self-recursive struct",
+		in: Person{
+			Spouse: &Person{
+				Name:     "Peggy",
+				Children: []Person{{Name: "Bobby", Children: []Person{}}},
+			},
+			Children: []Person{{Name: "Bobby", Children: []Person{}}},
+			Name:     "Hank",
+		},
+		out: map[string]*dynamodb.AttributeValue{
+			"Name": {S: aws.String("Hank")},
+			"Spouse": {M: map[string]*dynamodb.AttributeValue{
+				"Name": {S: aws.String("Peggy")},
+				"Children": {L: []*dynamodb.AttributeValue{
+					{M: map[string]*dynamodb.AttributeValue{
+						"Name":     {S: aws.String("Bobby")},
+						"Children": {L: []*dynamodb.AttributeValue{}},
+					}},
+				},
+				},
+			}},
+			"Children": {L: []*dynamodb.AttributeValue{
+				{M: map[string]*dynamodb.AttributeValue{
+					"Name":     {S: aws.String("Bobby")},
+					"Children": {L: []*dynamodb.AttributeValue{}},
+				}},
+			}},
+		},
+	},
+	{
+		name: "struct with recursive field",
+		in: Friend{
+			ID: 555,
+			Person: Person{
+				Spouse: &Person{
+					Name:     "Peggy",
+					Children: []Person{{Name: "Bobby", Children: []Person{}}},
+				},
+				Children: []Person{{Name: "Bobby", Children: []Person{}}},
+				Name:     "Hank",
+			},
+			Nickname: "H-Dawg",
+		},
+		out: map[string]*dynamodb.AttributeValue{
+			"ID":       {N: aws.String("555")},
+			"Nickname": {S: aws.String("H-Dawg")},
+			"Person": {M: map[string]*dynamodb.AttributeValue{
+				"Name": {S: aws.String("Hank")},
+				"Spouse": {M: map[string]*dynamodb.AttributeValue{
+					"Name": {S: aws.String("Peggy")},
+					"Children": {L: []*dynamodb.AttributeValue{
+						{M: map[string]*dynamodb.AttributeValue{
+							"Name":     {S: aws.String("Bobby")},
+							"Children": {L: []*dynamodb.AttributeValue{}},
+						}},
+					},
+					},
+				}},
+				"Children": {L: []*dynamodb.AttributeValue{
+					{M: map[string]*dynamodb.AttributeValue{
+						"Name":     {S: aws.String("Bobby")},
+						"Children": {L: []*dynamodb.AttributeValue{}},
+					}},
+				}},
+			},
+			},
+		},
+	},
 }
 
 type embedded struct {
@@ -797,6 +866,18 @@ func (cim *customItemMarshaler) UnmarshalDynamoItem(item map[string]*dynamodb.At
 
 	cim.Thing = thing
 	return nil
+}
+
+type Person struct {
+	Spouse   *Person
+	Children []Person
+	Name     string
+}
+
+type Friend struct {
+	ID       int
+	Person   Person
+	Nickname string
 }
 
 func byteSlicePtr(a []byte) *[]byte {

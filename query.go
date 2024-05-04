@@ -32,6 +32,7 @@ type Query struct {
 	consistent  bool
 	limit       int
 	searchLimit int32
+	reqLimit    int
 	order       *Order
 
 	subber
@@ -178,9 +179,16 @@ func (q *Query) Limit(limit int) *Query {
 // SearchLimit specifies the maximum amount of results to examine.
 // If a filter is not specified, the number of results will be limited.
 // If a filter is specified, the number of results to consider for filtering will be limited.
+// SearchLimit > 0 implies RequestLimit(1).
 // Note: limit will be capped to MaxInt32 as that is the maximum number the DynamoDB API will accept.
 func (q *Query) SearchLimit(limit int) *Query {
 	q.searchLimit = int32(min(limit, math.MaxInt32))
+	return q
+}
+
+// RequestLimit specifies the maximum amount of requests to make against DynamoDB's API.
+func (q *Query) RequestLimit(limit int) *Query {
+	q.reqLimit = limit
 	return q
 }
 
@@ -310,6 +318,7 @@ type queryIter struct {
 	err    error
 	idx    int
 	n      int
+	reqs   int
 
 	// last item evaluated
 	last Item
@@ -363,6 +372,10 @@ func (itr *queryIter) Next(ctx context.Context, out interface{}) bool {
 		if itr.output.LastEvaluatedKey == nil || itr.query.searchLimit > 0 {
 			return false
 		}
+		// have we hit the request limit?
+		if itr.query.reqLimit > 0 && itr.reqs == itr.query.reqLimit {
+			return false
+		}
 
 		// no, prepare next request and reset index
 		itr.input.ExclusiveStartKey = itr.output.LastEvaluatedKey
@@ -384,8 +397,12 @@ func (itr *queryIter) Next(ctx context.Context, out interface{}) bool {
 	if len(itr.output.LastEvaluatedKey) > len(itr.exLEK) {
 		itr.exLEK = itr.output.LastEvaluatedKey
 	}
+	itr.reqs++
 
 	if len(itr.output.Items) == 0 {
+		if itr.query.reqLimit > 0 && itr.reqs == itr.query.reqLimit {
+			return false
+		}
 		if itr.output.LastEvaluatedKey != nil {
 			// we need to retry until we get some data
 			return itr.Next(ctx, out)

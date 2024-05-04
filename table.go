@@ -2,13 +2,12 @@ package dynamo
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync/atomic"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	"github.com/aws/smithy-go"
 )
 
 // Status is an enumeration of table and index statuses.
@@ -65,29 +64,34 @@ func (table Table) Wait(ctx context.Context, want ...Status) error {
 		}
 	}
 
-	err := table.db.retry(ctx, func() error {
-		desc, err := table.Describe().Run(ctx)
-		var aerr smithy.APIError
-		if errors.As(err, &aerr) {
-			if aerr.ErrorCode() == "ResourceNotFoundException" {
-				if wantGone {
-					return nil
-				}
-				return errRetry
-			}
-		}
-		if err != nil {
-			return err
-		}
+	// I don't know why AWS wants a context _and_ a duration param.
+	// Infer it from context; if it's indefinite then set it to something really high (1 day)
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		deadline = time.Now().Add(24 * time.Hour)
+	}
+	maxDur := time.Until(deadline)
 
-		for _, status := range want {
-			if status == desc.Status {
-				return nil
+	if wantGone {
+		waiter := dynamodb.NewTableNotExistsWaiter(table.db.client)
+		return waiter.Wait(ctx, table.Describe().input(), maxDur)
+	}
+
+	waiter := dynamodb.NewTableExistsWaiter(table.db.client, func(opts *dynamodb.TableExistsWaiterOptions) {
+		fallback := opts.Retryable
+		opts.Retryable = func(ctx context.Context, in *dynamodb.DescribeTableInput, out *dynamodb.DescribeTableOutput, err error) (bool, error) {
+			if err == nil && out != nil && out.Table != nil {
+				status := string(out.Table.TableStatus)
+				for _, wantStatus := range want {
+					if status == string(wantStatus) {
+						return false, nil
+					}
+				}
 			}
+			return fallback(ctx, in, out, err)
 		}
-		return errRetry
 	})
-	return err
+	return waiter.Wait(ctx, table.Describe().input(), maxDur)
 }
 
 // primaryKeys attempts to determine this table's primary keys.

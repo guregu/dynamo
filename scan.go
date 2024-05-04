@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"sync"
 
@@ -58,9 +59,13 @@ func (s *Scan) Index(name string) *Scan {
 // Segment specifies the Segment and Total Segments to operate on in a manual parallel scan.
 // This is useful if you want to control the parallel scans by yourself instead of using ParallelIter.
 // Ignored by ParallelIter and friends.
+// totalSegments must be less than MaxInt32 due to API limits.
 func (s *Scan) Segment(segment int, totalSegments int) *Scan {
 	s.segment = int32(segment)
 	s.totalSegments = int32(totalSegments)
+	if totalSegments > math.MaxInt32 {
+		s.setError(fmt.Errorf("dynamo: total segments in Scan must be less than or equal to %d (got %d)", math.MaxInt32, totalSegments))
+	}
 	return s
 }
 
@@ -126,7 +131,7 @@ func (s *Scan) Limit(limit int) *Scan {
 // Use this along with StartFrom and Iter's LastEvaluatedKey to split up results.
 // Note that DynamoDB limits result sets to 1MB.
 func (s *Scan) SearchLimit(limit int) *Scan {
-	s.searchLimit = int32(limit)
+	s.searchLimit = int32(min(limit, math.MaxInt32))
 	return s
 }
 
@@ -281,7 +286,7 @@ func (s *Scan) scanInput() *dynamodb.ScanInput {
 	}
 	if s.limit > 0 {
 		if len(s.filters) == 0 {
-			limit := int32(s.limit)
+			limit := int32(min(s.limit, math.MaxInt32))
 			input.Limit = &limit
 		}
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -29,7 +30,7 @@ type Query struct {
 	projection  string
 	filters     []string
 	consistent  bool
-	limit       int32
+	limit       int
 	searchLimit int32
 	order       *Order
 
@@ -169,7 +170,7 @@ func (q *Query) Consistent(on bool) *Query {
 }
 
 // Limit specifies the maximum amount of results to return.
-func (q *Query) Limit(limit int32) *Query {
+func (q *Query) Limit(limit int) *Query {
 	q.limit = limit
 	return q
 }
@@ -177,8 +178,9 @@ func (q *Query) Limit(limit int32) *Query {
 // SearchLimit specifies the maximum amount of results to examine.
 // If a filter is not specified, the number of results will be limited.
 // If a filter is specified, the number of results to consider for filtering will be limited.
-func (q *Query) SearchLimit(limit int32) *Query {
-	q.searchLimit = limit
+// Note: limit will be capped to MaxInt32 as that is the maximum number the DynamoDB API will accept.
+func (q *Query) SearchLimit(limit int) *Query {
+	q.searchLimit = int32(min(limit, math.MaxInt32))
 	return q
 }
 
@@ -307,7 +309,7 @@ type queryIter struct {
 	output *dynamodb.QueryOutput
 	err    error
 	idx    int
-	n      int32
+	n      int
 
 	// last item evaluated
 	last Item
@@ -498,7 +500,8 @@ func (q *Query) queryInput() *dynamodb.QueryInput {
 	}
 	if q.limit > 0 {
 		if len(q.filters) == 0 {
-			req.Limit = &q.limit
+			limit := int32(min(math.MaxInt32, q.limit))
+			req.Limit = &limit
 		}
 	}
 	if q.searchLimit > 0 {

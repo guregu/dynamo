@@ -25,4 +25,4 @@ require (
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 )
 
-go 1.20
+go 1.21

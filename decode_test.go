@@ -1,7 +1,9 @@
 package dynamo
 
 import (
+	"maps"
 	"reflect"
+	"strconv"
 	"testing"
 	"time"
 
@@ -68,7 +70,7 @@ func TestUnmarshalAsymmetric(t *testing.T) {
 
 func TestUnmarshalAppend(t *testing.T) {
 	var results []struct {
-		User  int `dynamo:"UserID"`
+		User  *int `dynamo:"UserID"`
 		Page  int
 		Limit uint
 		Null  interface{}
@@ -84,16 +86,22 @@ func TestUnmarshalAppend(t *testing.T) {
 		"Null":   {NULL: &null},
 	}
 
-	for range [15]struct{}{} {
-		err := unmarshalAppend(item, &results)
+	do := unmarshalAppendTo(&results)
+
+	for i := range [15]struct{}{} {
+		item2 := maps.Clone(item)
+		id := 12345 + i
+		idstr := strconv.Itoa(id)
+		item2["UserID"] = &dynamodb.AttributeValue{N: &idstr}
+		err := do(item2, &results)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	for _, h := range results {
-		if h.User != 12345 || h.Page != 5 || h.Limit != 20 || h.Null != nil {
-			t.Error("invalid hit", h)
+	for i, h := range results {
+		if *h.User != 12345+i || h.Page != 5 || h.Limit != 20 || h.Null != nil {
+			t.Error("invalid hit", h, *h.User)
 		}
 	}
 

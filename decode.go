@@ -98,14 +98,14 @@ func unmarshalAppendTo(out interface{}) func(item map[string]*dynamodb.Attribute
 
 	/*
 		Like:
-			member := new(T)
 			return func(item, ...) {
+				member := new(T)
 				decode(item, member)
 				*slice = append(*slice, *member)
 			}
 	*/
-	member := reflect.New(membert) // *T of *[]T
 	return func(item map[string]*dynamodb.AttributeValue, _ any) error {
+		member := reflect.New(membert) // *T of *[]T
 		if err := plan.decodeItem(item, member); err != nil {
 			return err
 		}

@@ -9,3 +9,7 @@ require (
 require github.com/jmespath/go-jmespath v0.4.0 // indirect
 
 go 1.20
+
+retract (
+	v1.22.0 // See issues: #228, #230
+)

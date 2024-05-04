@@ -133,3 +133,57 @@ func TestMarshalItemAsymmetric(t *testing.T) {
 		})
 	}
 }
+
+type isValue_Kind interface {
+	isValue_Kind()
+}
+
+type myStruct struct {
+	OK    bool
+	Value isValue_Kind
+}
+
+func (ms *myStruct) MarshalDynamoItem() (map[string]*dynamodb.AttributeValue, error) {
+	world := "world"
+	return map[string]*dynamodb.AttributeValue{
+		"hello": {S: &world},
+	}, nil
+}
+
+func (ms *myStruct) UnmarshalDynamoItem(item map[string]*dynamodb.AttributeValue) error {
+	hello := item["hello"]
+	if hello == nil || hello.S == nil || *hello.S != "world" {
+		ms.OK = false
+	} else {
+		ms.OK = true
+	}
+	return nil
+}
+
+var _ ItemMarshaler = &myStruct{}
+var _ ItemUnmarshaler = &myStruct{}
+
+func TestMarshalItemBypass(t *testing.T) {
+	something := &myStruct{}
+	got, err := MarshalItem(something)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	world := "world"
+	expect := map[string]*dynamodb.AttributeValue{
+		"hello": {S: &world},
+	}
+	if !reflect.DeepEqual(got, expect) {
+		t.Error("bad marshal. want:", expect, "got:", got)
+	}
+
+	var dec myStruct
+	err = UnmarshalItem(got, &dec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !dec.OK {
+		t.Error("bad unmarshal")
+	}
+}

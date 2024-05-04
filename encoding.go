@@ -14,8 +14,9 @@ import (
 var typeCache sync.Map // unmarshalKey → *typedef
 
 type typedef struct {
-	decoders map[unmarshalKey]decodeFunc
-	fields   []structField
+	decoders  map[unmarshalKey]decodeFunc
+	fields    []structField
+	marshaler bool
 }
 
 func newTypedef(rt reflect.Type) (*typedef, error) {
@@ -27,6 +28,7 @@ func newTypedef(rt reflect.Type) (*typedef, error) {
 }
 
 func (def *typedef) init(rt reflect.Type) error {
+	rt0 := rt
 	for rt.Kind() == reflect.Pointer {
 		rt = rt.Elem()
 	}
@@ -34,6 +36,11 @@ func (def *typedef) init(rt reflect.Type) error {
 	def.learn(rt)
 
 	if rt.Kind() != reflect.Struct {
+		return nil
+	}
+
+	// skip visiting struct fields if encoding will be bypassed by a custom marshaler
+	if shouldBypassEncodeItem(rt0) || shouldBypassEncodeItem(rt) {
 		return nil
 	}
 

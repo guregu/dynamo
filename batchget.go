@@ -91,9 +91,9 @@ func (bg *BatchGet) add(table Table, hashKey string, rangeKey string, keys ...Ke
 			bg.setError(errors.New("dynamo: batch: the Keyed interface must not be nil"))
 			break
 		}
-		get := bg.batch.table.Get(bg.batch.hashKey, key.HashKey())
-		if rk := key.RangeKey(); bg.batch.rangeKey != "" && rk != nil {
-			get.Range(bg.batch.rangeKey, Equal, rk)
+		get := table.Get(hashKey, key.HashKey())
+		if rk := key.RangeKey(); rangeKey != "" && rk != nil {
+			get.Range(rangeKey, Equal, rk)
 			bg.setError(get.err)
 		}
 		bg.reqs = append(bg.reqs, get)

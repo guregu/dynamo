@@ -711,6 +711,74 @@ var itemEncodingTests = []struct {
 			"thing": &types.AttributeValueMemberN{Value: "52"},
 		},
 	},
+	{
+		name: "self-recursive struct",
+		in: Person{
+			Spouse: &Person{
+				Name:     "Peggy",
+				Children: []Person{{Name: "Bobby", Children: []Person{}}},
+			},
+			Children: []Person{{Name: "Bobby", Children: []Person{}}},
+			Name:     "Hank",
+		},
+		out: map[string]types.AttributeValue{
+			"Name": &types.AttributeValueMemberS{Value: "Hank"},
+			"Spouse": &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
+				"Name": &types.AttributeValueMemberS{Value: "Peggy"},
+				"Children": &types.AttributeValueMemberL{Value: []types.AttributeValue{
+					&types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
+						"Name":     &types.AttributeValueMemberS{Value: "Bobby"},
+						"Children": &types.AttributeValueMemberL{Value: []types.AttributeValue{}},
+					}},
+				},
+				},
+			}},
+			"Children": &types.AttributeValueMemberL{Value: []types.AttributeValue{
+				&types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
+					"Name":     &types.AttributeValueMemberS{Value: "Bobby"},
+					"Children": &types.AttributeValueMemberL{Value: []types.AttributeValue{}},
+				}},
+			}},
+		},
+	},
+	{
+		name: "struct with recursive field",
+		in: Friend{
+			ID: 555,
+			Person: Person{
+				Spouse: &Person{
+					Name:     "Peggy",
+					Children: []Person{{Name: "Bobby", Children: []Person{}}},
+				},
+				Children: []Person{{Name: "Bobby", Children: []Person{}}},
+				Name:     "Hank",
+			},
+			Nickname: "H-Dawg",
+		},
+		out: map[string]types.AttributeValue{
+			"ID":       &types.AttributeValueMemberN{Value: "555"},
+			"Nickname": &types.AttributeValueMemberS{Value: "H-Dawg"},
+			"Person": &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
+				"Name": &types.AttributeValueMemberS{Value: "Hank"},
+				"Spouse": &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
+					"Name": &types.AttributeValueMemberS{Value: "Peggy"},
+					"Children": &types.AttributeValueMemberL{Value: []types.AttributeValue{
+						&types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
+							"Name":     &types.AttributeValueMemberS{Value: "Bobby"},
+							"Children": &types.AttributeValueMemberL{Value: []types.AttributeValue{}},
+						}},
+					},
+					},
+				}},
+				"Children": &types.AttributeValueMemberL{Value: []types.AttributeValue{
+					&types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
+						"Name":     &types.AttributeValueMemberS{Value: "Bobby"},
+						"Children": &types.AttributeValueMemberL{Value: []types.AttributeValue{}},
+					}},
+				}},
+			}},
+		},
+	},
 }
 
 type embedded struct {
@@ -797,6 +865,18 @@ func (cim *customItemMarshaler) UnmarshalDynamoItem(item Item) error {
 		cim.Thing = thing
 	}
 	return nil
+}
+
+type Person struct {
+	Spouse   *Person
+	Children []Person
+	Name     string
+}
+
+type Friend struct {
+	ID       int
+	Person   Person
+	Nickname string
 }
 
 func byteSlicePtr(a []byte) *[]byte {

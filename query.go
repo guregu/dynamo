@@ -582,8 +582,8 @@ func (q *Query) keys() Item {
 	return keys
 }
 
-func (q *Query) keysAndAttribs() *types.KeysAndAttributes {
-	kas := &types.KeysAndAttributes{
+func (q *Query) keysAndAttribs() types.KeysAndAttributes {
+	kas := types.KeysAndAttributes{
 		Keys:                     []Item{q.keys()},
 		ExpressionAttributeNames: q.nameExpr,
 		ConsistentRead:           &q.consistent,

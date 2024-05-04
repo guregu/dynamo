@@ -237,38 +237,24 @@ err := db.Table("Books").Get("ID", 555).One(dynamo.AWSEncoding(&someBook))
 
 ### Integration tests
 
-By default, tests are run in offline mode. Create a table called `TestDB`, with a number partition key called `UserID` and a string sort key called `Time`. It also needs a Global Secondary Index called `Msg-Time-index` with a string partition key called `Msg` and a string sort key called `Time`.
+By default, tests are run in offline mode. In order to run the integration tests, some environment variables need to be set.
 
-Change the table name with the environment variable `DYNAMO_TEST_TABLE`. You must specify `DYNAMO_TEST_REGION`, setting it to the AWS region where your test table is.
-
-
- ```bash
-DYNAMO_TEST_REGION=us-west-2 go test github.com/guregu/dynamo/... -cover
- ```
-
-If you want to use [DynamoDB Local](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.html) to run local tests, specify `DYNAMO_TEST_ENDPOINT`.
-
- ```bash
-DYNAMO_TEST_REGION=us-west-2 DYNAMO_TEST_ENDPOINT=http://localhost:8000 go test github.com/guregu/dynamo/... -cover
- ```
-
-Example of using [aws-cli](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Tools.CLI.html) to create a table for testing.
+To run the tests against [DynamoDB Local](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.html):
 
 ```bash
-aws dynamodb create-table \
-    --table-name TestDB \
-    --attribute-definitions \
-        AttributeName=UserID,AttributeType=N \
-        AttributeName=Time,AttributeType=S \
-        AttributeName=Msg,AttributeType=S \
-    --key-schema \
-        AttributeName=UserID,KeyType=HASH \
-        AttributeName=Time,KeyType=RANGE \
-    --global-secondary-indexes \
-        IndexName=Msg-Time-index,KeySchema=[{'AttributeName=Msg,KeyType=HASH'},{'AttributeName=Time,KeyType=RANGE'}],Projection={'ProjectionType=ALL'} \
-    --billing-mode PAY_PER_REQUEST \
-    --region us-west-2 \
-    --endpoint-url http://localhost:8000 # using DynamoDB local
+# Use Docker to run DynamoDB local on port 8880
+docker compose -f '.github/docker-compose.yml' up -d
+
+# Run the tests with a fresh table
+# The tables will be created automatically
+# The '%' in the table name will be replaced the current timestamp
+DYNAMO_TEST_ENDPOINT='http://localhost:8880' \
+	DYNAMO_TEST_REGION='local' \
+	DYNAMO_TEST_TABLE='TestDB-%' \
+	AWS_ACCESS_KEY_ID='dummy' \
+	AWS_SECRET_ACCESS_KEY='dummy' \
+	AWS_REGION='local' \
+	go test -v -race ./... -cover -coverpkg=./...
 ```
 
 ### License

@@ -14,7 +14,7 @@ func TestUpdate(t *testing.T) {
 	if testDB == nil {
 		t.Skip(offlineSkipMsg)
 	}
-	table := testDB.Table(testTable)
+	table := testDB.Table(testTableWidgets)
 	ctx := context.TODO()
 
 	type widget2 struct {
@@ -170,7 +170,7 @@ func TestUpdateNil(t *testing.T) {
 	if testDB == nil {
 		t.Skip(offlineSkipMsg)
 	}
-	table := testDB.Table(testTable)
+	table := testDB.Table(testTableWidgets)
 	ctx := context.TODO()
 
 	// first, add an item to make sure there is at least one
@@ -226,7 +226,7 @@ func TestUpdateSetAutoOmit(t *testing.T) {
 	if testDB == nil {
 		t.Skip(offlineSkipMsg)
 	}
-	table := testDB.Table(testTable)
+	table := testDB.Table(testTableWidgets)
 	ctx := context.TODO()
 
 	type widget2 struct {

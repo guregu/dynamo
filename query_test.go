@@ -15,7 +15,7 @@ func TestGetAllCount(t *testing.T) {
 		t.Skip(offlineSkipMsg)
 	}
 	ctx := context.TODO()
-	table := testDB.Table(testTable)
+	table := testDB.Table(testTableWidgets)
 
 	// first, add an item to make sure there is at least one
 	item := widget{
@@ -149,7 +149,7 @@ func TestQueryPaging(t *testing.T) {
 		t.Skip(offlineSkipMsg)
 	}
 	ctx := context.TODO()
-	table := testDB.Table(testTable)
+	table := testDB.Table(testTableWidgets)
 
 	widgets := []interface{}{
 		widget{
@@ -201,7 +201,7 @@ func TestQueryMagicLEK(t *testing.T) {
 		t.Skip(offlineSkipMsg)
 	}
 	ctx := context.Background()
-	table := testDB.Table(testTable)
+	table := testDB.Table(testTableWidgets)
 
 	widgets := []interface{}{
 		widget{
@@ -292,7 +292,7 @@ func TestQueryBadKeys(t *testing.T) {
 	if testDB == nil {
 		t.Skip(offlineSkipMsg)
 	}
-	table := testDB.Table(testTable)
+	table := testDB.Table(testTableWidgets)
 	ctx := context.Background()
 
 	t.Run("hash key", func(t *testing.T) {

@@ -15,17 +15,21 @@ var typeCache sync.Map // unmarshalKey → *typedef
 type typedef struct {
 	decoders map[unmarshalKey]decodeFunc
 	fields   []structField
+	root     reflect.Type
 }
 
 func newTypedef(rt reflect.Type) (*typedef, error) {
 	def := &typedef{
 		decoders: make(map[unmarshalKey]decodeFunc),
+		// encoders: make(map[encodeKey]encodeFunc),
+		root: rt,
 	}
 	err := def.init(rt)
 	return def, err
 }
 
 func (def *typedef) init(rt reflect.Type) error {
+	rt0 := rt
 	for rt.Kind() == reflect.Pointer {
 		rt = rt.Elem()
 	}
@@ -36,8 +40,15 @@ func (def *typedef) init(rt reflect.Type) error {
 		return nil
 	}
 
-	var err error
-	def.fields, err = structFields(rt)
+	// skip visiting struct fields if encoding will be bypassed by a custom marshaler
+	if shouldBypassEncodeItem(rt0) || shouldBypassEncodeItem(rt) {
+		return nil
+	}
+
+	fieldptr, err := def.structFields(rt, true)
+	if fieldptr != nil {
+		def.fields = *fieldptr
+	}
 	return err
 }
 
@@ -87,7 +98,7 @@ func (def *typedef) encodeItem(rv reflect.Value) (Item, error) {
 	case reflect.Struct:
 		return encodeItem(def.fields, rv)
 	case reflect.Map:
-		enc, err := encodeMapM(rv.Type(), flagNone)
+		enc, err := def.encodeMapM(rv.Type(), flagNone)
 		if err != nil {
 			return nil, err
 		}
@@ -437,10 +448,31 @@ type structField struct {
 	isZero func(reflect.Value) bool
 }
 
-func structFields(rt reflect.Type) ([]structField, error) {
+// type encodeKey struct {
+// 	rt    reflect.Type
+// 	flags encodeFlags
+// }
+
+func (def *typedef) sameAsRoot(rt reflect.Type) bool {
+	switch {
+	case rt == def.root:
+		return true
+	case def.root.Kind() == reflect.Pointer && rt.Kind() != reflect.Pointer:
+		return def.root.Elem() == rt
+	case def.root.Kind() != reflect.Pointer && rt.Kind() == reflect.Pointer:
+		return rt.Elem() == def.root
+	}
+	return false
+}
+
+func (def *typedef) structFields(rt reflect.Type, isRoot bool) (*[]structField, error) {
+	if !isRoot && def.sameAsRoot(rt) {
+		return &def.fields, nil
+	}
+
 	var fields []structField
 	err := visitTypeFields(rt, nil, nil, func(name string, index []int, flags encodeFlags, vt reflect.Type) error {
-		enc, err := encodeType(vt, flags)
+		enc, err := def.encodeType(vt, flags)
 		if err != nil {
 			return err
 		}
@@ -449,12 +481,12 @@ func structFields(rt reflect.Type) ([]structField, error) {
 			name:   name,
 			flags:  flags,
 			enc:    enc,
-			isZero: isZeroFunc(vt),
+			isZero: def.isZeroFunc(vt),
 		}
 		fields = append(fields, field)
 		return nil
 	})
-	return fields, err
+	return &fields, err
 }
 
 var (

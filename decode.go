@@ -98,14 +98,14 @@ func unmarshalAppendTo(out interface{}) func(item Item, out interface{}) error {
 
 	/*
 		Like:
-			member := new(T)
 			return func(item, ...) {
+				member := new(T)
 				decode(item, member)
 				*slice = append(*slice, *member)
 			}
 	*/
-	member := reflect.New(membert) // *T of *[]T
-	return func(item Item, _ any) error {
+	return func(item map[string]types.AttributeValue, _ any) error {
+		member := reflect.New(membert) // *T of *[]T
 		if err := plan.decodeItem(item, member); err != nil {
 			return err
 		}

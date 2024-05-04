@@ -13,7 +13,7 @@ func TestPut(t *testing.T) {
 	if testDB == nil {
 		t.Skip(offlineSkipMsg)
 	}
-	table := testDB.Table(testTable)
+	table := testDB.Table(testTableWidgets)
 	ctx := context.TODO()
 
 	type widget2 struct {
@@ -64,7 +64,7 @@ func TestPut(t *testing.T) {
 		t.Errorf("bad old value. %#v ≠ %#v", oldValue, item)
 	}
 
-	if cc.Total < 1 || cc.Table < 1 || cc.TableName != testTable {
+	if cc.Total < 1 || cc.Table < 1 || cc.TableName != testTableWidgets {
 		t.Errorf("bad consumed capacity: %#v", cc)
 	}
 
@@ -79,7 +79,7 @@ func TestPutAndQueryAWSEncoding(t *testing.T) {
 	if testDB == nil {
 		t.Skip(offlineSkipMsg)
 	}
-	table := testDB.Table(testTable)
+	table := testDB.Table(testTableWidgets)
 	ctx := context.TODO()
 
 	type awsWidget struct {

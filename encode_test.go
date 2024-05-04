@@ -139,3 +139,127 @@ func TestMarshalItemAsymmetric(t *testing.T) {
 		})
 	}
 }
+
+type isValue_Kind interface {
+	isValue_Kind()
+}
+
+type myStruct struct {
+	OK    bool
+	Value isValue_Kind
+}
+
+func (ms *myStruct) MarshalDynamoItem() (map[string]types.AttributeValue, error) {
+	world := "world"
+	return map[string]types.AttributeValue{
+		"hello": &types.AttributeValueMemberS{Value: world},
+	}, nil
+}
+
+func (ms *myStruct) UnmarshalDynamoItem(item map[string]types.AttributeValue) error {
+	hello := item["hello"]
+	if h, ok := hello.(*types.AttributeValueMemberS); ok && h.Value == "world" {
+		ms.OK = true
+	} else {
+		ms.OK = false
+	}
+	return nil
+}
+
+var _ ItemMarshaler = &myStruct{}
+var _ ItemUnmarshaler = &myStruct{}
+
+func TestMarshalItemBypass(t *testing.T) {
+	something := &myStruct{}
+	got, err := MarshalItem(something)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	world := "world"
+	expect := map[string]types.AttributeValue{
+		"hello": &types.AttributeValueMemberS{Value: world},
+	}
+	if !reflect.DeepEqual(got, expect) {
+		t.Error("bad marshal. want:", expect, "got:", got)
+	}
+
+	var dec myStruct
+	err = UnmarshalItem(got, &dec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !dec.OK {
+		t.Error("bad unmarshal")
+	}
+}
+
+func TestMarshalRecursive(t *testing.T) {
+	t.SkipNow()
+
+	type Person struct {
+		Spouse   *Person
+		Children []Person
+		Name     string
+	}
+	type Friend struct {
+		ID       int
+		Person   Person
+		Nickname string
+	}
+	children := []Person{
+		{Name: "Bobby"},
+	}
+
+	hank := Person{
+		Spouse: &Person{
+			Name:     "Peggy",
+			Children: children,
+		},
+		Children: children,
+		Name:     "Hank",
+	}
+
+	t.Run("self-recursive", func(t *testing.T) {
+
+		want := map[string]types.AttributeValue{
+			"Name": &types.AttributeValueMemberS{Value: "Hank"},
+			"Spouse": &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
+				"Name": &types.AttributeValueMemberS{Value: "Peggy"},
+				"Children": &types.AttributeValueMemberL{Value: []types.AttributeValue{
+					&types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
+						"Name":     &types.AttributeValueMemberS{Value: "Bobby"},
+						"Children": &types.AttributeValueMemberL{Value: []types.AttributeValue{}},
+					}},
+				},
+				},
+			}},
+			"Children": &types.AttributeValueMemberL{Value: []types.AttributeValue{
+				&types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
+					"Name":     &types.AttributeValueMemberS{Value: "Bobby"},
+					"Children": &types.AttributeValueMemberL{Value: []types.AttributeValue{}},
+				}},
+			}},
+		}
+
+		got, err := MarshalItem(hank)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Error("bad", got)
+		}
+	})
+
+	t.Run("field is recursive", func(t *testing.T) {
+		friend := Friend{
+			Person:   hank,
+			Nickname: "H-Dawg",
+		}
+		got, err := MarshalItem(friend)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Fatal(got)
+	})
+}

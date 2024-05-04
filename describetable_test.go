@@ -9,7 +9,7 @@ func TestDescribeTable(t *testing.T) {
 	if testDB == nil {
 		t.Skip(offlineSkipMsg)
 	}
-	table := testDB.Table(testTable)
+	table := testDB.Table(testTableWidgets)
 
 	desc, err := table.Describe().Run(context.TODO())
 	if err != nil {
@@ -17,8 +17,8 @@ func TestDescribeTable(t *testing.T) {
 		return
 	}
 
-	if desc.Name != testTable {
-		t.Error("wrong name:", desc.Name, "≠", testTable)
+	if desc.Name != testTableWidgets {
+		t.Error("wrong name:", desc.Name, "≠", testTableWidgets)
 	}
 	if desc.HashKey != "UserID" || desc.RangeKey != "Time" {
 		t.Error("bad keys:", desc.HashKey, desc.RangeKey)

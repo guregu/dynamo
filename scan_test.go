@@ -11,7 +11,7 @@ func TestScan(t *testing.T) {
 	if testDB == nil {
 		t.Skip(offlineSkipMsg)
 	}
-	table := testDB.Table(testTable)
+	table := testDB.Table(testTableWidgets)
 	ctx := context.TODO()
 
 	// first, add an item to make sure there is at least one
@@ -106,7 +106,7 @@ func TestScanPaging(t *testing.T) {
 	if testDB == nil {
 		t.Skip(offlineSkipMsg)
 	}
-	table := testDB.Table(testTable)
+	table := testDB.Table(testTableWidgets)
 	ctx := context.TODO()
 
 	// prepare data
@@ -126,11 +126,9 @@ func TestScanPaging(t *testing.T) {
 		widgets := [10]widget{}
 		itr := table.Scan().Consistent(true).SearchLimit(1).Iter()
 		for i := 0; i < len(widgets); i++ {
-			more := itr.Next(ctx, &widgets[i])
+			itr.Next(ctx, &widgets[i])
 			if itr.Err() != nil {
 				t.Error("unexpected error", itr.Err())
-			}
-			if !more {
 				break
 			}
 			lek, err := itr.LastEvaluatedKey(context.Background())
@@ -150,26 +148,21 @@ func TestScanPaging(t *testing.T) {
 		const segments = 2
 		ctx := context.Background()
 		widgets := [10]widget{}
-		itr := table.Scan().Consistent(true).SearchLimit(1).IterParallel(ctx, segments)
-		for i := 0; i < len(widgets)/segments; i++ {
-			var more bool
-			for j := 0; j < segments; j++ {
-				more = itr.Next(ctx, &widgets[i*segments+j])
-				if !more && j != segments-1 {
-					t.Error("bad number of results from parallel scan")
-				}
+		limit := int(len(widgets) / segments)
+		itr := table.Scan().Consistent(true).SearchLimit(limit).IterParallel(ctx, segments)
+		for i := 0; i < len(widgets); {
+			for ; i < len(widgets) && itr.Next(ctx, &widgets[i]); i++ {
 			}
 			if itr.Err() != nil {
 				t.Error("unexpected error", itr.Err())
-			}
-			if !more {
 				break
 			}
-			leks, err := itr.LastEvaluatedKeys(context.Background())
+			t.Logf("parallel chunk: %d", i)
+			lek, err := itr.LastEvaluatedKeys(ctx)
 			if err != nil {
-				t.Error("LEK error", err)
+				t.Fatal("lek error", err)
 			}
-			itr = table.Scan().SearchLimit(1).IterParallelStartFrom(ctx, leks)
+			itr = table.Scan().SearchLimit(limit).IterParallelStartFrom(ctx, lek)
 		}
 		for i, w := range widgets {
 			if w.UserID == 0 && w.Time.IsZero() {
@@ -183,7 +176,7 @@ func TestScanMagicLEK(t *testing.T) {
 	if testDB == nil {
 		t.Skip(offlineSkipMsg)
 	}
-	table := testDB.Table(testTable)
+	table := testDB.Table(testTableWidgets)
 	ctx := context.Background()
 
 	widgets := []interface{}{

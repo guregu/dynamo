@@ -22,6 +22,7 @@ type Scan struct {
 	consistent  bool
 	limit       int64
 	searchLimit int64
+	reqLimit    int
 
 	segment       int64
 	totalSegments int64
@@ -120,11 +121,18 @@ func (s *Scan) Limit(limit int64) *Scan {
 	return s
 }
 
-// SearchLimit specifies a maximum amount of results to evaluate.
+// SearchLimit specifies the maximum amount of results to evaluate.
 // Use this along with StartFrom and Iter's LastEvaluatedKey to split up results.
 // Note that DynamoDB limits result sets to 1MB.
+// SearchLimit > 0 implies RequestLimit(1).
 func (s *Scan) SearchLimit(limit int64) *Scan {
 	s.searchLimit = limit
+	return s
+}
+
+// RequestLimit specifies the maximum amount of requests to make against DynamoDB's API.
+func (s *Scan) RequestLimit(limit int) *Scan {
+	s.reqLimit = limit
 	return s
 }
 
@@ -335,6 +343,7 @@ type scanIter struct {
 	err    error
 	idx    int
 	n      int64
+	reqs   int
 
 	// last item evaluated
 	last map[string]*dynamodb.AttributeValue
@@ -395,6 +404,10 @@ redo:
 		if itr.output.LastEvaluatedKey == nil || itr.scan.searchLimit > 0 {
 			return false
 		}
+		// have we hit the request limit?
+		if itr.scan.reqLimit > 0 && itr.reqs == itr.scan.reqLimit {
+			return false
+		}
 
 		// no, prepare next request and reset index
 		itr.input.ExclusiveStartKey = itr.output.LastEvaluatedKey
@@ -416,8 +429,12 @@ redo:
 	if len(itr.output.LastEvaluatedKey) > len(itr.exLEK) {
 		itr.exLEK = itr.output.LastEvaluatedKey
 	}
+	itr.reqs++
 
 	if len(itr.output.Items) == 0 {
+		if itr.scan.reqLimit > 0 && itr.reqs == itr.scan.reqLimit {
+			return false
+		}
 		if itr.output.LastEvaluatedKey != nil {
 			goto redo
 		}

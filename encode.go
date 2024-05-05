@@ -52,7 +52,7 @@ func marshal(v interface{}, flags encodeFlags) (*dynamodb.AttributeValue, error)
 	if err != nil {
 		return nil, err
 	}
-	enc, err := def.encodeType(rt, flags, nil)
+	enc, err := def.encodeType(rt, flags, def.info)
 	if err != nil {
 		return nil, err
 	}

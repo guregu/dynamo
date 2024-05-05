@@ -257,9 +257,6 @@ func (info *structInfo) findEncoder(key encodeKey) encodeFunc {
 	if enc, ok := info.types[key]; ok {
 		return enc
 	}
-	if enc := info.parent.findEncoder(key); enc != nil {
-		return enc
-	}
 	return info.parent.findEncoder(key)
 }
 
@@ -327,16 +324,6 @@ func collectTypes(rt reflect.Type, info *structInfo, trail []int) *structInfo {
 	}
 	if rt.Kind() != reflect.Struct {
 		panic("not a struct")
-	}
-
-	if info == nil {
-		info = &structInfo{
-			root:   rt,
-			fields: make(map[string]*structField),
-			refs:   make(map[encodeKey][]*structField),
-			types:  make(map[encodeKey]encodeFunc),
-			seen:   make(map[encodeKey]struct{}),
-		}
 	}
 
 	// fields := make(map[string]reflect.Value)

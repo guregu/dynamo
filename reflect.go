@@ -183,6 +183,206 @@ func visitFields(item map[string]*dynamodb.AttributeValue, rv reflect.Value, see
 	return nil
 }
 
+type encodeKey struct {
+	rt    reflect.Type
+	flags encodeFlags
+}
+
+type structInfo struct {
+	root   reflect.Type
+	fields map[string]*structField // by name
+	refs   map[encodeKey][]*structField
+	types  map[encodeKey]encodeFunc
+	zeros  map[reflect.Type]func(reflect.Value) bool
+	parent *structInfo
+
+	seen  map[encodeKey]struct{}
+	queue []encodeKey
+}
+
+func (info *structInfo) encode(rv reflect.Value, flags encodeFlags) (*dynamodb.AttributeValue, error) {
+	item := make(Item, len(info.fields))
+	for _, field := range info.fields {
+		fv := dig(rv, field.index)
+		if !fv.IsValid() {
+			// TODO: encode NULL?
+			continue
+		}
+
+		if field.flags&flagOmitEmpty != 0 && field.isZero != nil {
+			if field.isZero(fv) {
+				continue
+			}
+		}
+
+		av, err := field.enc(fv, field.flags)
+		if err != nil {
+			return nil, err
+		}
+		if av == nil {
+			if field.flags&flagNull != 0 {
+				item[field.name] = nullAV
+			}
+			continue
+		}
+		item[field.name] = av
+	}
+	return &dynamodb.AttributeValue{M: item}, nil
+}
+
+func (info *structInfo) isZero(rv reflect.Value) bool {
+	if info == nil {
+		return false
+	}
+	for _, field := range info.fields {
+		fv := dig(rv, field.index)
+		if !fv.IsValid() {
+			// TODO: encode NULL?
+			continue
+		}
+		if !field.isZero(fv) {
+			return false
+		}
+	}
+	return true
+}
+
+func (info *structInfo) findEncoder(key encodeKey) encodeFunc {
+	if info == nil {
+		return nil
+	}
+	if key.rt == info.root {
+		return info.encode
+	}
+	if enc, ok := info.types[key]; ok {
+		return enc
+	}
+	if enc := info.parent.findEncoder(key); enc != nil {
+		return enc
+	}
+	return info.parent.findEncoder(key)
+}
+
+func (info *structInfo) findZero(rt reflect.Type) func(reflect.Value) bool {
+	if info == nil {
+		return nil
+	}
+	if rt == info.root {
+		return info.isZero
+	}
+	if isZero, ok := info.zeros[rt]; ok {
+		return isZero
+	}
+	return info.parent.findZero(rt)
+}
+
+func (def *typedef) structInfo(rt reflect.Type, parent *structInfo) (*structInfo, error) {
+	info := &structInfo{
+		root:   rt,
+		parent: parent,
+		fields: make(map[string]*structField),
+		refs:   make(map[encodeKey][]*structField),
+		types:  make(map[encodeKey]encodeFunc),
+		zeros:  make(map[reflect.Type]func(reflect.Value) bool),
+		seen:   make(map[encodeKey]struct{}),
+	}
+
+	collectTypes(rt, info, nil)
+
+	for _, key := range info.queue {
+		fn, err := def.encodeType(key.rt, key.flags, info)
+		if err != nil {
+			return info, err
+		}
+		isZero := info.findZero(key.rt)
+		if isZero == nil {
+			isZero = def.isZeroFunc(key.rt)
+		}
+		for _, sf := range info.refs[key] {
+			sf.enc = fn
+			sf.isZero = isZero
+		}
+		info.types[key] = fn
+		info.zeros[key.rt] = isZero
+	}
+
+	// don't need these anymore
+	info.queue = nil
+	info.seen = nil
+
+	return info, nil
+}
+
+func collectTypes(rt reflect.Type, info *structInfo, trail []int) *structInfo {
+	for rt.Kind() == reflect.Pointer {
+		rt = rt.Elem()
+	}
+	if rt.Kind() != reflect.Struct {
+		panic("not a struct")
+	}
+
+	if info == nil {
+		info = &structInfo{
+			root:   rt,
+			fields: make(map[string]*structField),
+			refs:   make(map[encodeKey][]*structField),
+			types:  make(map[encodeKey]encodeFunc),
+			seen:   make(map[encodeKey]struct{}),
+		}
+	}
+
+	// fields := make(map[string]reflect.Value)
+	for i := 0; i < rt.NumField(); i++ {
+		field := rt.Field(i)
+		ft := field.Type
+		isPtr := ft.Kind() == reflect.Ptr
+
+		name, flags := fieldInfo(field)
+		if name == "-" {
+			// skip
+			continue
+		}
+
+		key := encodeKey{
+			rt:    ft,
+			flags: flags,
+		}
+
+		idx := field.Index
+		if len(trail) > 0 {
+			idx = append(trail, idx...)
+		}
+
+		sf := &structField{
+			index: idx,
+			name:  name,
+			flags: flags,
+		}
+		public := field.IsExported()
+		if _, ok := info.fields[name]; !ok {
+			if public {
+				info.fields[name] = sf
+			}
+			info.refs[key] = append(info.refs[key], sf)
+		}
+
+		// embed anonymous structs, they could be pointers so test that too
+		if (ft.Kind() == reflect.Struct || isPtr && ft.Elem().Kind() == reflect.Struct) && field.Anonymous {
+			collectTypes(ft, info, idx)
+			continue
+		}
+
+		if !public {
+			continue
+		}
+		if _, ok := info.seen[key]; ok {
+			continue
+		}
+		info.queue = append(info.queue, key)
+	}
+	return info
+}
+
 func visitTypeFields(rt reflect.Type, seen map[string]struct{}, trail []int, fn func(name string, index []int, flags encodeFlags, vt reflect.Type) error) error {
 	for rt.Kind() == reflect.Pointer {
 		rt = rt.Elem()
@@ -252,7 +452,7 @@ func reallocMap(v reflect.Value, size int) {
 type decodeKeyFunc func(reflect.Value, string) error
 
 func decodeMapKeyFunc(rt reflect.Type) decodeKeyFunc {
-	if reflect.PtrTo(rt.Key()).Implements(rtypeTextUnmarshaler) {
+	if reflect.PointerTo(rt.Key()).Implements(rtypeTextUnmarshaler) {
 		return func(kv reflect.Value, s string) error {
 			tm := kv.Interface().(encoding.TextUnmarshaler)
 			if err := tm.UnmarshalText([]byte(s)); err != nil {

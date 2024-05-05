@@ -778,6 +778,78 @@ var itemEncodingTests = []struct {
 			},
 		},
 	},
+	{
+		name: "mega recursion A -> B -> *A -> B",
+		in: MegaRecursiveA{
+			ID:   123,
+			Text: "hello",
+			Child: MegaRecursiveB{
+				ID:   "test",
+				Blah: 555,
+				Child: &MegaRecursiveA{
+					ID:   222,
+					Text: "help",
+					Child: MegaRecursiveB{
+						ID:   "why",
+						Blah: 1337,
+					},
+					Friends: []MegaRecursiveA{},
+					Enemies: []MegaRecursiveB{},
+				},
+			},
+			Friends: []MegaRecursiveA{
+				{ID: 1, Text: "suffering", Child: MegaRecursiveB{ID: "pain"}, Friends: []MegaRecursiveA{}, Enemies: []MegaRecursiveB{}},
+				{ID: 2, Text: "love", Child: MegaRecursiveB{ID: "understanding"}, Friends: []MegaRecursiveA{}, Enemies: []MegaRecursiveB{}},
+			},
+			Enemies: []MegaRecursiveB{
+				{ID: "recursion", Blah: 30},
+			},
+		},
+		out: map[string]*dynamodb.AttributeValue{
+			"ID":   {N: aws.String("123")},
+			"Text": {S: aws.String("hello")},
+			"Friends": {L: []*dynamodb.AttributeValue{
+				{M: map[string]*dynamodb.AttributeValue{
+					"ID":   {N: aws.String("1")},
+					"Text": {S: aws.String("suffering")},
+					"Child": {M: map[string]*dynamodb.AttributeValue{
+						"ID": {S: aws.String("pain")},
+					}},
+					"Friends": {L: []*dynamodb.AttributeValue{}},
+					"Enemies": {L: []*dynamodb.AttributeValue{}},
+				}},
+				{M: map[string]*dynamodb.AttributeValue{
+					"ID":   {N: aws.String("2")},
+					"Text": {S: aws.String("love")},
+					"Child": {M: map[string]*dynamodb.AttributeValue{
+						"ID": {S: aws.String("understanding")},
+					}},
+					"Friends": {L: []*dynamodb.AttributeValue{}},
+					"Enemies": {L: []*dynamodb.AttributeValue{}},
+				}},
+			}},
+			"Enemies": {L: []*dynamodb.AttributeValue{
+				{M: map[string]*dynamodb.AttributeValue{
+					"ID":   {S: aws.String("recursion")},
+					"Blah": {N: aws.String("30")},
+				}},
+			}},
+			"Child": {M: map[string]*dynamodb.AttributeValue{
+				"ID":   {S: aws.String("test")},
+				"Blah": {N: aws.String("555")},
+				"Child": {M: map[string]*dynamodb.AttributeValue{
+					"ID":      {N: aws.String("222")},
+					"Text":    {S: aws.String("help")},
+					"Friends": {L: []*dynamodb.AttributeValue{}},
+					"Enemies": {L: []*dynamodb.AttributeValue{}},
+					"Child": {M: map[string]*dynamodb.AttributeValue{
+						"ID":   {S: aws.String("why")},
+						"Blah": {N: aws.String("1337")},
+					}},
+				}},
+			}},
+		},
+	},
 }
 
 type embedded struct {
@@ -878,6 +950,20 @@ type Friend struct {
 	ID       int
 	Person   Person
 	Nickname string
+}
+
+type MegaRecursiveA struct {
+	ID      int
+	Child   MegaRecursiveB
+	Text    string
+	Friends []MegaRecursiveA
+	Enemies []MegaRecursiveB
+}
+
+type MegaRecursiveB struct {
+	ID    string
+	Child *MegaRecursiveA
+	Blah  int `dynamo:",omitempty"`
 }
 
 func byteSlicePtr(a []byte) *[]byte {

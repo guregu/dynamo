@@ -17,6 +17,7 @@ type typedef struct {
 	decoders map[unmarshalKey]decodeFunc
 	fields   []structField
 	root     reflect.Type
+	info     *structInfo
 }
 
 func newTypedef(rt reflect.Type) (*typedef, error) {
@@ -46,11 +47,15 @@ func (def *typedef) init(rt reflect.Type) error {
 		return nil
 	}
 
-	fieldptr, err := def.structFields(rt, true)
-	if fieldptr != nil {
-		def.fields = *fieldptr
+	info, err := def.structInfo(rt, nil)
+	if err != nil {
+		return err
 	}
-	return err
+	for _, field := range info.fields {
+		def.fields = append(def.fields, *field)
+	}
+	def.info = info
+	return nil
 }
 
 func registerTypedef(gotype reflect.Type, def *typedef) *typedef {
@@ -99,7 +104,7 @@ func (def *typedef) encodeItem(rv reflect.Value) (Item, error) {
 	case reflect.Struct:
 		return encodeItem(def.fields, rv)
 	case reflect.Map:
-		enc, err := def.encodeMapM(rv.Type(), flagNone)
+		enc, err := def.encodeMapM(rv.Type(), flagNone, def.info)
 		if err != nil {
 			return nil, err
 		}
@@ -397,47 +402,6 @@ type structField struct {
 	flags  encodeFlags
 	enc    encodeFunc
 	isZero func(reflect.Value) bool
-}
-
-// type encodeKey struct {
-// 	rt    reflect.Type
-// 	flags encodeFlags
-// }
-
-func (def *typedef) sameAsRoot(rt reflect.Type) bool {
-	switch {
-	case rt == def.root:
-		return true
-	case def.root.Kind() == reflect.Pointer && rt.Kind() != reflect.Pointer:
-		return def.root.Elem() == rt
-	case def.root.Kind() != reflect.Pointer && rt.Kind() == reflect.Pointer:
-		return rt.Elem() == def.root
-	}
-	return false
-}
-
-func (def *typedef) structFields(rt reflect.Type, isRoot bool) (*[]structField, error) {
-	if !isRoot && def.sameAsRoot(rt) {
-		return &def.fields, nil
-	}
-
-	var fields []structField
-	err := visitTypeFields(rt, nil, nil, func(name string, index []int, flags encodeFlags, vt reflect.Type) error {
-		enc, err := def.encodeType(vt, flags)
-		if err != nil {
-			return err
-		}
-		field := structField{
-			index:  index,
-			name:   name,
-			flags:  flags,
-			enc:    enc,
-			isZero: def.isZeroFunc(vt),
-		}
-		fields = append(fields, field)
-		return nil
-	})
-	return &fields, err
 }
 
 var (

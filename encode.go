@@ -52,7 +52,7 @@ func marshal(v interface{}, flags encodeFlags) (types.AttributeValue, error) {
 	if err != nil {
 		return nil, err
 	}
-	enc, err := def.encodeType(rt, flags)
+	enc, err := def.encodeType(rt, flags, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +90,9 @@ func encodeItem(fields []structField, rv reflect.Value) (Item, error) {
 				continue
 			}
 		}
-
+		if field.enc == nil {
+			continue
+		}
 		av, err := field.enc(fv, field.flags)
 		if err != nil {
 			return nil, err
@@ -165,27 +167,11 @@ func isZeroIface[T any](rt reflect.Type, isZero func(v T) bool) func(rv reflect.
 }
 
 func (def *typedef) isZeroStruct(rt reflect.Type) func(rv reflect.Value) bool {
-	fields, err := def.structFields(rt, false)
-	if err != nil {
-		return nil
+	if fn := def.info.findZero(rt); fn != nil {
+		return fn
 	}
-	return func(rv reflect.Value) bool {
-		for _, info := range *fields {
-			if info.isZero == nil {
-				continue
-			}
-
-			field := dig(rv, info.index)
-			if !field.IsValid() {
-				return true
-			}
-
-			if !info.isZero(field) {
-				return false
-			}
-		}
-		return true
-	}
+	child, _ := def.structInfo(rt, def.info)
+	return child.isZero
 }
 
 func (def *typedef) isZeroArray(rt reflect.Type) func(reflect.Value) bool {

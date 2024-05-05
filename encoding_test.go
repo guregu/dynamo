@@ -779,6 +779,78 @@ var itemEncodingTests = []struct {
 			}},
 		},
 	},
+	{
+		name: "mega recursion A -> B -> *A -> B",
+		in: MegaRecursiveA{
+			ID:   123,
+			Text: "hello",
+			Child: MegaRecursiveB{
+				ID:   "test",
+				Blah: 555,
+				Child: &MegaRecursiveA{
+					ID:   222,
+					Text: "help",
+					Child: MegaRecursiveB{
+						ID:   "why",
+						Blah: 1337,
+					},
+					Friends: []MegaRecursiveA{},
+					Enemies: []MegaRecursiveB{},
+				},
+			},
+			Friends: []MegaRecursiveA{
+				{ID: 1, Text: "suffering", Child: MegaRecursiveB{ID: "pain"}, Friends: []MegaRecursiveA{}, Enemies: []MegaRecursiveB{}},
+				{ID: 2, Text: "love", Child: MegaRecursiveB{ID: "understanding"}, Friends: []MegaRecursiveA{}, Enemies: []MegaRecursiveB{}},
+			},
+			Enemies: []MegaRecursiveB{
+				{ID: "recursion", Blah: 30},
+			},
+		},
+		out: Item{
+			"ID":   &types.AttributeValueMemberN{Value: "123"},
+			"Text": &types.AttributeValueMemberS{Value: "hello"},
+			"Friends": &types.AttributeValueMemberL{Value: []types.AttributeValue{
+				&types.AttributeValueMemberM{Value: Item{
+					"ID":   &types.AttributeValueMemberN{Value: "1"},
+					"Text": &types.AttributeValueMemberS{Value: "suffering"},
+					"Child": &types.AttributeValueMemberM{Value: Item{
+						"ID": &types.AttributeValueMemberS{Value: "pain"},
+					}},
+					"Friends": &types.AttributeValueMemberL{Value: []types.AttributeValue{}},
+					"Enemies": &types.AttributeValueMemberL{Value: []types.AttributeValue{}},
+				}},
+				&types.AttributeValueMemberM{Value: Item{
+					"ID":   &types.AttributeValueMemberN{Value: "2"},
+					"Text": &types.AttributeValueMemberS{Value: "love"},
+					"Child": &types.AttributeValueMemberM{Value: Item{
+						"ID": &types.AttributeValueMemberS{Value: "understanding"},
+					}},
+					"Friends": &types.AttributeValueMemberL{Value: []types.AttributeValue{}},
+					"Enemies": &types.AttributeValueMemberL{Value: []types.AttributeValue{}},
+				}},
+			}},
+			"Enemies": &types.AttributeValueMemberL{Value: []types.AttributeValue{
+				&types.AttributeValueMemberM{Value: Item{
+					"ID":   &types.AttributeValueMemberS{Value: "recursion"},
+					"Blah": &types.AttributeValueMemberN{Value: "30"},
+				}},
+			}},
+			"Child": &types.AttributeValueMemberM{Value: Item{
+				"ID":   &types.AttributeValueMemberS{Value: "test"},
+				"Blah": &types.AttributeValueMemberN{Value: "555"},
+				"Child": &types.AttributeValueMemberM{Value: Item{
+					"ID":      &types.AttributeValueMemberN{Value: "222"},
+					"Text":    &types.AttributeValueMemberS{Value: "help"},
+					"Friends": &types.AttributeValueMemberL{Value: []types.AttributeValue{}},
+					"Enemies": &types.AttributeValueMemberL{Value: []types.AttributeValue{}},
+					"Child": &types.AttributeValueMemberM{Value: Item{
+						"ID":   &types.AttributeValueMemberS{Value: "why"},
+						"Blah": &types.AttributeValueMemberN{Value: "1337"},
+					}},
+				}},
+			}},
+		},
+	},
 }
 
 type embedded struct {
@@ -877,6 +949,20 @@ type Friend struct {
 	ID       int
 	Person   Person
 	Nickname string
+}
+
+type MegaRecursiveA struct {
+	ID      int
+	Child   MegaRecursiveB
+	Text    string
+	Friends []MegaRecursiveA
+	Enemies []MegaRecursiveB
+}
+
+type MegaRecursiveB struct {
+	ID    string
+	Child *MegaRecursiveA
+	Blah  int `dynamo:",omitempty"`
 }
 
 func byteSlicePtr(a []byte) *[]byte {

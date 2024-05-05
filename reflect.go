@@ -277,6 +277,14 @@ func (info *structInfo) findZero(rt reflect.Type) func(reflect.Value) bool {
 }
 
 func (def *typedef) structInfo(rt reflect.Type, parent *structInfo) (*structInfo, error) {
+	rti := rt
+	for rti.Kind() == reflect.Pointer {
+		rti = rti.Elem()
+	}
+	if rti.Kind() != reflect.Struct {
+		return nil, nil
+	}
+
 	info := &structInfo{
 		root:   rt,
 		parent: parent,

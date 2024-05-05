@@ -131,10 +131,10 @@ func (s *Scan) SearchLimit(limit int64) *Scan {
 }
 
 // RequestLimit specifies the maximum amount of requests to make against DynamoDB's API.
-func (s *Scan) RequestLimit(limit int) *Scan {
-	s.reqLimit = limit
-	return s
-}
+// func (s *Scan) RequestLimit(limit int) *Scan {
+// 	s.reqLimit = limit
+// 	return s
+// }
 
 // ConsumedCapacity will measure the throughput capacity consumed by this operation and add it to cc.
 func (s *Scan) ConsumedCapacity(cc *ConsumedCapacity) *Scan {

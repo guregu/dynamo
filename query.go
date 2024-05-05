@@ -185,10 +185,10 @@ func (q *Query) SearchLimit(limit int64) *Query {
 }
 
 // RequestLimit specifies the maximum amount of requests to make against DynamoDB's API.
-func (q *Query) RequestLimit(limit int) *Query {
-	q.reqLimit = limit
-	return q
-}
+// func (q *Query) RequestLimit(limit int) *Query {
+// 	q.reqLimit = limit
+// 	return q
+// }
 
 // Order specifies the desired result order.
 // Requires a range key (a.k.a. partition key) to be specified.

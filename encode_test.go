@@ -87,6 +87,18 @@ var itemEncodeOnlyTests = []struct {
 			"Public": {N: aws.String("555")},
 		},
 	},
+	{
+		name: "nil exported pointer embedded struct",
+		in: struct {
+			ID string
+			*ExportedEmbedded
+		}{
+			ID: "abc",
+		},
+		out: map[string]*dynamodb.AttributeValue{
+			"ID": {S: aws.String("abc")},
+		},
+	},
 }
 
 func TestMarshal(t *testing.T) {

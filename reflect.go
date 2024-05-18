@@ -106,6 +106,9 @@ func indirectPtrNoAlloc(rv reflect.Value) reflect.Value {
 func dig(rv reflect.Value, index []int) reflect.Value {
 	rv = indirectNoAlloc(rv)
 	for i, idx := range index {
+		if !rv.IsValid() {
+			break
+		}
 		if i == len(index)-1 {
 			rv = indirectPtrNoAlloc(rv.Field(idx))
 		} else {

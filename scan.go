@@ -132,6 +132,7 @@ func (s *Scan) SearchLimit(limit int64) *Scan {
 }
 
 // RequestLimit specifies the maximum amount of requests to make against DynamoDB's API.
+// A limit of zero or less means unlimited requests.
 func (s *Scan) RequestLimit(limit int) *Scan {
 	s.reqLimit = limit
 	return s

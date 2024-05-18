@@ -185,6 +185,7 @@ func (q *Query) SearchLimit(limit int64) *Query {
 }
 
 // RequestLimit specifies the maximum amount of requests to make against DynamoDB's API.
+// A limit of zero or less means unlimited requests.
 func (q *Query) RequestLimit(limit int) *Query {
 	q.reqLimit = limit
 	return q

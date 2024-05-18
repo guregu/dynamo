@@ -185,10 +185,11 @@ func (q *Query) SearchLimit(limit int64) *Query {
 }
 
 // RequestLimit specifies the maximum amount of requests to make against DynamoDB's API.
-// func (q *Query) RequestLimit(limit int) *Query {
-// 	q.reqLimit = limit
-// 	return q
-// }
+// A limit of zero or less means unlimited requests.
+func (q *Query) RequestLimit(limit int) *Query {
+	q.reqLimit = limit
+	return q
+}
 
 // Order specifies the desired result order.
 // Requires a range key (a.k.a. partition key) to be specified.
@@ -286,22 +287,29 @@ func (q *Query) CountWithContext(ctx context.Context) (int64, error) {
 		return 0, q.err
 	}
 
-	var count int64
+	var count, scanned int64
+	var reqs int
 	var res *dynamodb.QueryOutput
 	for {
-		req := q.queryInput()
-		req.Select = selectCount
+		input := q.queryInput()
+		input.Select = selectCount
 
 		err := q.table.db.retry(ctx, func() error {
 			var err error
-			res, err = q.table.db.client.QueryWithContext(ctx, req)
+			res, err = q.table.db.client.QueryWithContext(ctx, input)
 			if err != nil {
 				return err
 			}
+			reqs++
+
 			if res.Count == nil {
-				return errors.New("nil count")
+				return errors.New("malformed DynamoDB response: count is nil")
 			}
 			count += *res.Count
+			if res.ScannedCount != nil {
+				scanned += *res.ScannedCount
+			}
+
 			return nil
 		})
 		if err != nil {
@@ -312,7 +320,10 @@ func (q *Query) CountWithContext(ctx context.Context) (int64, error) {
 		}
 
 		q.startKey = res.LastEvaluatedKey
-		if res.LastEvaluatedKey == nil || q.searchLimit > 0 {
+		if res.LastEvaluatedKey == nil ||
+			(q.limit > 0 && count >= q.limit) ||
+			(q.searchLimit > 0 && scanned >= q.searchLimit) ||
+			(q.reqLimit > 0 && reqs >= q.reqLimit) {
 			break
 		}
 	}

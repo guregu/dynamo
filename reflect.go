@@ -193,11 +193,11 @@ type encodeKey struct {
 
 type structInfo struct {
 	root   reflect.Type
+	parent *structInfo
 	fields map[string]*structField // by name
 	refs   map[encodeKey][]*structField
 	types  map[encodeKey]encodeFunc
 	zeros  map[reflect.Type]func(reflect.Value) bool
-	parent *structInfo
 
 	seen  map[encodeKey]struct{}
 	queue []encodeKey

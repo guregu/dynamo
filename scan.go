@@ -2,6 +2,7 @@ package dynamo
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"sync"
 
@@ -131,10 +132,11 @@ func (s *Scan) SearchLimit(limit int64) *Scan {
 }
 
 // RequestLimit specifies the maximum amount of requests to make against DynamoDB's API.
-// func (s *Scan) RequestLimit(limit int) *Scan {
-// 	s.reqLimit = limit
-// 	return s
-// }
+// A limit of zero or less means unlimited requests.
+func (s *Scan) RequestLimit(limit int) *Scan {
+	s.reqLimit = limit
+	return s
+}
 
 // ConsumedCapacity will measure the throughput capacity consumed by this operation and add it to cc.
 func (s *Scan) ConsumedCapacity(cc *ConsumedCapacity) *Scan {
@@ -260,6 +262,7 @@ func (s *Scan) CountWithContext(ctx context.Context) (int64, error) {
 	var count, scanned int64
 	input := s.scanInput()
 	input.Select = aws.String(dynamodb.SelectCount)
+	var reqs int
 	for {
 		var out *dynamodb.ScanOutput
 		err := s.table.db.retry(ctx, func() error {
@@ -268,23 +271,26 @@ func (s *Scan) CountWithContext(ctx context.Context) (int64, error) {
 			return err
 		})
 		if err != nil {
-			return count, err
+			return 0, err
 		}
+		reqs++
 
+		if out.Count == nil {
+			return count, errors.New("malformed DynamoDB outponse: count is nil")
+		}
 		count += *out.Count
-		scanned += *out.ScannedCount
+		if out.ScannedCount != nil {
+			scanned += *out.ScannedCount
+		}
 
 		if s.cc != nil {
 			addConsumedCapacity(s.cc, out.ConsumedCapacity)
 		}
 
-		if s.limit > 0 && count >= s.limit {
-			break
-		}
-		if s.searchLimit > 0 && scanned >= s.searchLimit {
-			break
-		}
-		if out.LastEvaluatedKey == nil {
+		if out.LastEvaluatedKey == nil ||
+			(s.limit > 0 && count >= s.limit) ||
+			(s.searchLimit > 0 && scanned >= s.searchLimit) ||
+			(s.reqLimit > 0 && reqs >= s.reqLimit) {
 			break
 		}
 

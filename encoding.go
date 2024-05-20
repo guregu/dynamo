@@ -15,7 +15,6 @@ var typeCache sync.Map // unmarshalKey → *typedef
 type typedef struct {
 	decoders map[unmarshalKey]decodeFunc
 	fields   []structField
-	root     reflect.Type
 	info     *structInfo
 }
 
@@ -23,7 +22,6 @@ func newTypedef(rt reflect.Type) (*typedef, error) {
 	def := &typedef{
 		decoders: make(map[unmarshalKey]decodeFunc),
 		// encoders: make(map[encodeKey]encodeFunc),
-		root: rt,
 	}
 	err := def.init(rt)
 	return def, err

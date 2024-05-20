@@ -138,10 +138,11 @@ func (s *Scan) SearchLimit(limit int) *Scan {
 }
 
 // RequestLimit specifies the maximum amount of requests to make against DynamoDB's API.
-// func (s *Scan) RequestLimit(limit int) *Scan {
-// 	s.reqLimit = limit
-// 	return s
-// }
+// A limit of zero or less means unlimited requests.
+func (s *Scan) RequestLimit(limit int) *Scan {
+	s.reqLimit = limit
+	return s
+}
 
 // ConsumedCapacity will measure the throughput capacity consumed by this operation and add it to cc.
 func (s *Scan) ConsumedCapacity(cc *ConsumedCapacity) *Scan {
@@ -247,6 +248,7 @@ func (s *Scan) Count(ctx context.Context) (int, error) {
 	var scanned int32
 	input := s.scanInput()
 	input.Select = types.SelectCount
+	var reqs int
 	for {
 		var out *dynamodb.ScanOutput
 		err := s.table.db.retry(ctx, func() error {
@@ -255,8 +257,9 @@ func (s *Scan) Count(ctx context.Context) (int, error) {
 			return err
 		})
 		if err != nil {
-			return count, err
+			return 0, err
 		}
+		reqs++
 
 		count += int(out.Count)
 		scanned += out.ScannedCount
@@ -265,13 +268,10 @@ func (s *Scan) Count(ctx context.Context) (int, error) {
 			addConsumedCapacity(s.cc, out.ConsumedCapacity)
 		}
 
-		if s.limit > 0 && count >= s.limit {
-			break
-		}
-		if s.searchLimit > 0 && scanned >= s.searchLimit {
-			break
-		}
-		if out.LastEvaluatedKey == nil {
+		if out.LastEvaluatedKey == nil ||
+			(s.limit > 0 && count >= s.limit) ||
+			(s.searchLimit > 0 && scanned >= s.searchLimit) ||
+			(s.reqLimit > 0 && reqs >= s.reqLimit) {
 			break
 		}
 

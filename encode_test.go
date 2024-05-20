@@ -93,6 +93,18 @@ var itemEncodeOnlyTests = []struct {
 			"Public": &types.AttributeValueMemberN{Value: ("555")},
 		},
 	},
+	{
+		name: "nil exported pointer embedded struct",
+		in: struct {
+			ID string
+			*ExportedEmbedded
+		}{
+			ID: "abc",
+		},
+		out: Item{
+			"ID": &types.AttributeValueMemberS{Value: "abc"},
+		},
+	},
 }
 
 func TestMarshal(t *testing.T) {

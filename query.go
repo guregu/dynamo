@@ -187,10 +187,11 @@ func (q *Query) SearchLimit(limit int) *Query {
 }
 
 // RequestLimit specifies the maximum amount of requests to make against DynamoDB's API.
-// func (q *Query) RequestLimit(limit int) *Query {
-// 	q.reqLimit = limit
-// 	return q
-// }
+// A limit of zero or less means unlimited requests.
+func (q *Query) RequestLimit(limit int) *Query {
+	q.reqLimit = limit
+	return q
+}
 
 // Order specifies the desired result order.
 // Requires a range key (a.k.a. partition key) to be specified.
@@ -277,21 +278,24 @@ func (q *Query) Count(ctx context.Context) (int, error) {
 	}
 
 	var count int
+	var scanned int32
+	var reqs int
 	var res *dynamodb.QueryOutput
 	for {
-		req := q.queryInput()
-		req.Select = selectCount
+		input := q.queryInput()
+		input.Select = selectCount
 
 		err := q.table.db.retry(ctx, func() error {
 			var err error
-			res, err = q.table.db.client.Query(ctx, req)
+			res, err = q.table.db.client.Query(ctx, input)
 			if err != nil {
 				return err
 			}
-			if res.Count == 0 {
-				return errors.New("nil count")
-			}
+			reqs++
+
 			count += int(res.Count)
+			scanned += res.ScannedCount
+
 			return nil
 		})
 		if err != nil {
@@ -302,7 +306,10 @@ func (q *Query) Count(ctx context.Context) (int, error) {
 		}
 
 		q.startKey = res.LastEvaluatedKey
-		if res.LastEvaluatedKey == nil || q.searchLimit > 0 {
+		if res.LastEvaluatedKey == nil ||
+			(q.limit > 0 && count >= q.limit) ||
+			(q.searchLimit > 0 && scanned >= q.searchLimit) ||
+			(q.reqLimit > 0 && reqs >= q.reqLimit) {
 			break
 		}
 	}

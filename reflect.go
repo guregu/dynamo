@@ -117,6 +117,9 @@ func indirectPtrNoAlloc(rv reflect.Value) reflect.Value {
 func dig(rv reflect.Value, index []int) reflect.Value {
 	rv = indirectNoAlloc(rv)
 	for i, idx := range index {
+		if !rv.IsValid() {
+			break
+		}
 		if i == len(index)-1 {
 			rv = indirectPtrNoAlloc(rv.Field(idx))
 		} else {
@@ -201,11 +204,11 @@ type encodeKey struct {
 
 type structInfo struct {
 	root   reflect.Type
+	parent *structInfo
 	fields map[string]*structField // by name
 	refs   map[encodeKey][]*structField
 	types  map[encodeKey]encodeFunc
 	zeros  map[reflect.Type]func(reflect.Value) bool
-	parent *structInfo
 
 	seen  map[encodeKey]struct{}
 	queue []encodeKey

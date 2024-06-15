@@ -66,7 +66,7 @@ func TestMain(m *testing.M) {
 			config.WithRegion(*region),
 			config.WithEndpointResolverWithOptions(resolv),
 			config.WithRetryer(func() aws.Retryer {
-				return retry.NewStandard(RetryTx)
+				return retry.NewStandard(RetryTxConflicts)
 			}),
 		)
 		if err != nil {

@@ -189,7 +189,7 @@ This creates a table with the primary hash key ID and range key Time. It creates
 
 As of v2, dynamo relies on the AWS SDK for retrying. See: [**Retries and Timeouts documentation**](https://aws.github.io/aws-sdk-go-v2/docs/configuring-sdk/retries-timeouts/) for information about how to configure its behavior.
 
-By default, canceled transactions (i.e. errors from conflicting transactions) will not be retried. To get automatic retrying behavior like in v1, use [`dynamo.RetryTx`](https://godoc.org/github.com/guregu/dynamo/v2#RetryTx).
+By default, canceled transactions (i.e. errors from conflicting transactions) will not be retried. To get automatic retrying behavior like in v1, use [`dynamo.RetryTxConflicts`](https://godoc.org/github.com/guregu/dynamo/v2#RetryTxConflicts).
 
 ```go
 import (
@@ -204,7 +204,7 @@ import (
 
 func main() {
 	cfg, err := config.LoadDefaultConfig(context.Background(), config.WithRetryer(func() aws.Retryer {
-		return retry.NewStandard(dynamo.RetryTx)
+		return retry.NewStandard(dynamo.RetryTxConflicts)
 	}))
 	if err != nil {
 		log.Fatal(err)

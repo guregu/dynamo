@@ -52,11 +52,11 @@ func ExampleNew_local_endpoint() {
 	_ = db
 }
 
-func ExampleRetryTx() {
-	// `dynamo.RetryTx` is an option you can pass to retry.NewStandard.
+func ExampleRetryTxConflicts() {
+	// `dynamo.RetryTxConflicts` is an option you can pass to retry.NewStandard.
 	// It will automatically retry canceled transactions.
 	cfg, err := config.LoadDefaultConfig(context.Background(), config.WithRetryer(func() aws.Retryer {
-		return retry.NewStandard(dynamo.RetryTx)
+		return retry.NewStandard(dynamo.RetryTxConflicts)
 	}))
 	if err != nil {
 		log.Fatal(err)

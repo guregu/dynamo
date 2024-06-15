@@ -15,10 +15,10 @@ func (db *DB) retry(_ context.Context, f func() error) error {
 	return f()
 }
 
-// RetryTx is an option for [github.com/aws/aws-sdk-go-v2/aws/retry.NewStandard]
-// that adds retrying behavior for TransactionCanceledException errors.
+// RetryTxConflicts is an option for [github.com/aws/aws-sdk-go-v2/aws/retry.NewStandard]
+// that adds retrying behavior for TransactionConflict within TransactionCanceledException errors.
 // See also: [github.com/aws/aws-sdk-go-v2/config.WithRetryer].
-func RetryTx(opts *retry.StandardOptions) {
+func RetryTxConflicts(opts *retry.StandardOptions) {
 	opts.Retryables = append(opts.Retryables, retry.IsErrorRetryableFunc(shouldRetryTx))
 }
 

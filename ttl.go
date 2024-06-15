@@ -3,8 +3,9 @@ package dynamo
 import (
 	"context"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 // UpdateTTL is a request to enable or disable a table's time to live functionality.
@@ -31,18 +32,11 @@ func (table Table) UpdateTTL(attribute string, enabled bool) *UpdateTTL {
 }
 
 // Run executes this request.
-func (ttl *UpdateTTL) Run() error {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return ttl.RunWithContext(ctx)
-}
-
-// RunWithContext executes this request.
-func (ttl *UpdateTTL) RunWithContext(ctx context.Context) error {
+func (ttl *UpdateTTL) Run(ctx context.Context) error {
 	input := ttl.input()
 
 	err := ttl.table.db.retry(ctx, func() error {
-		_, err := ttl.table.db.client.UpdateTimeToLiveWithContext(ctx, input)
+		_, err := ttl.table.db.client.UpdateTimeToLive(ctx, input)
 		return err
 	})
 	return err
@@ -51,7 +45,7 @@ func (ttl *UpdateTTL) RunWithContext(ctx context.Context) error {
 func (ttl *UpdateTTL) input() *dynamodb.UpdateTimeToLiveInput {
 	return &dynamodb.UpdateTimeToLiveInput{
 		TableName: aws.String(ttl.table.Name()),
-		TimeToLiveSpecification: &dynamodb.TimeToLiveSpecification{
+		TimeToLiveSpecification: &types.TimeToLiveSpecification{
 			Enabled:       aws.Bool(ttl.enabled),
 			AttributeName: aws.String(ttl.attrib),
 		},
@@ -69,20 +63,13 @@ func (table Table) DescribeTTL() *DescribeTTL {
 }
 
 // Run executes this request and returns details about time to live, or an error.
-func (d *DescribeTTL) Run() (TTLDescription, error) {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return d.RunWithContext(ctx)
-}
-
-// RunWithContext executes this request and returns details about time to live, or an error.
-func (d *DescribeTTL) RunWithContext(ctx context.Context) (TTLDescription, error) {
+func (d *DescribeTTL) Run(ctx context.Context) (TTLDescription, error) {
 	input := d.input()
 
 	var result *dynamodb.DescribeTimeToLiveOutput
 	err := d.table.db.retry(ctx, func() error {
 		var err error
-		result, err = d.table.db.client.DescribeTimeToLiveWithContext(ctx, input)
+		result, err = d.table.db.client.DescribeTimeToLive(ctx, input)
 		return err
 	})
 	if err != nil {
@@ -92,8 +79,8 @@ func (d *DescribeTTL) RunWithContext(ctx context.Context) (TTLDescription, error
 	desc := TTLDescription{
 		Status: TTLDisabled,
 	}
-	if result.TimeToLiveDescription.TimeToLiveStatus != nil {
-		desc.Status = TTLStatus(*result.TimeToLiveDescription.TimeToLiveStatus)
+	if result.TimeToLiveDescription.TimeToLiveStatus != "" {
+		desc.Status = TTLStatus(result.TimeToLiveDescription.TimeToLiveStatus)
 	}
 	if result.TimeToLiveDescription.AttributeName != nil {
 		desc.Attribute = *result.TimeToLiveDescription.AttributeName

@@ -8,9 +8,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 // StreamView determines what information is written to a table's stream.
@@ -18,13 +19,13 @@ type StreamView string
 
 var (
 	// Only the key attributes of the modified item are written to the stream.
-	KeysOnlyView StreamView = dynamodb.StreamViewTypeKeysOnly
+	KeysOnlyView = StreamView(types.StreamViewTypeKeysOnly)
 	// The entire item, as it appears after it was modified, is written to the stream.
-	NewImageView StreamView = dynamodb.StreamViewTypeNewImage
+	NewImageView = StreamView(types.StreamViewTypeNewImage)
 	// The entire item, as it appeared before it was modified, is written to the stream.
-	OldImageView StreamView = dynamodb.StreamViewTypeOldImage
+	OldImageView = StreamView(types.StreamViewTypeOldImage)
 	// Both the new and the old item images of the item are written to the stream.
-	NewAndOldImagesView StreamView = dynamodb.StreamViewTypeNewAndOldImages
+	NewAndOldImagesView = StreamView(types.StreamViewTypeNewAndOldImages)
 )
 
 // IndexProjection determines which attributes are mirrored into indices.
@@ -32,11 +33,11 @@ type IndexProjection string
 
 var (
 	// Only the key attributes of the modified item are written to the stream.
-	KeysOnlyProjection IndexProjection = dynamodb.ProjectionTypeKeysOnly
+	KeysOnlyProjection = IndexProjection(types.ProjectionTypeKeysOnly)
 	// All of the table attributes are projected into the index.
-	AllProjection IndexProjection = dynamodb.ProjectionTypeAll
+	AllProjection = IndexProjection(types.ProjectionTypeAll)
 	// Only the specified table attributes are projected into the index.
-	IncludeProjection IndexProjection = dynamodb.ProjectionTypeInclude
+	IncludeProjection = IndexProjection(types.ProjectionTypeInclude)
 )
 
 // CreateTable is a request to create a new table.
@@ -44,16 +45,16 @@ var (
 type CreateTable struct {
 	db                      *DB
 	tableName               string
-	attribs                 []*dynamodb.AttributeDefinition
-	schema                  []*dynamodb.KeySchemaElement
-	globalIndices           map[string]dynamodb.GlobalSecondaryIndex
-	localIndices            map[string]dynamodb.LocalSecondaryIndex
+	attribs                 []types.AttributeDefinition
+	schema                  []types.KeySchemaElement
+	globalIndices           map[string]types.GlobalSecondaryIndex
+	localIndices            map[string]types.LocalSecondaryIndex
 	readUnits               int64
 	writeUnits              int64
 	streamView              StreamView
 	ondemand                bool
-	tags                    []*dynamodb.Tag
-	encryptionSpecification *dynamodb.SSESpecification
+	tags                    []types.Tag
+	encryptionSpecification *types.SSESpecification
 	err                     error
 }
 
@@ -77,12 +78,12 @@ func (db *DB) CreateTable(name string, from interface{}) *CreateTable {
 	ct := &CreateTable{
 		db:            db,
 		tableName:     name,
-		schema:        []*dynamodb.KeySchemaElement{},
-		globalIndices: make(map[string]dynamodb.GlobalSecondaryIndex),
-		localIndices:  make(map[string]dynamodb.LocalSecondaryIndex),
+		schema:        []types.KeySchemaElement{},
+		globalIndices: make(map[string]types.GlobalSecondaryIndex),
+		localIndices:  make(map[string]types.LocalSecondaryIndex),
 		readUnits:     1,
 		writeUnits:    1,
-		tags:          []*dynamodb.Tag{},
+		tags:          []types.Tag{},
 	}
 	rv := reflect.ValueOf(from)
 	ct.setError(ct.from(rv))
@@ -107,7 +108,7 @@ func (ct *CreateTable) Provision(readUnits, writeUnits int64) *CreateTable {
 // global secondary index. Local secondary indices share their capacity with the table.
 func (ct *CreateTable) ProvisionIndex(index string, readUnits, writeUnits int64) *CreateTable {
 	idx := ct.globalIndices[index]
-	idx.ProvisionedThroughput = &dynamodb.ProvisionedThroughput{
+	idx.ProvisionedThroughput = &types.ProvisionedThroughput{
 		ReadCapacityUnits:  &readUnits,
 		WriteCapacityUnits: &writeUnits,
 	}
@@ -125,20 +126,20 @@ func (ct *CreateTable) Stream(view StreamView) *CreateTable {
 // Project specifies the projection type for the given table.
 // When using IncludeProjection, you must specify the additional attributes to include via includeAttribs.
 func (ct *CreateTable) Project(index string, projection IndexProjection, includeAttribs ...string) *CreateTable {
-	projectionStr := string(projection)
-	proj := &dynamodb.Projection{
-		ProjectionType: &projectionStr,
+	projectionStr := types.ProjectionType(projection)
+	proj := &types.Projection{
+		ProjectionType: projectionStr,
 	}
 	if projection == IncludeProjection {
 	attribs:
 		for _, attr := range includeAttribs {
 			attr := attr
 			for _, a := range proj.NonKeyAttributes {
-				if attr == *a {
+				if attr == a {
 					continue attribs
 				}
 			}
-			proj.NonKeyAttributes = append(proj.NonKeyAttributes, &attr)
+			proj.NonKeyAttributes = append(proj.NonKeyAttributes, attr)
 		}
 	}
 	if idx, global := ct.globalIndices[index]; global {
@@ -156,27 +157,27 @@ func (ct *CreateTable) Project(index string, projection IndexProjection, include
 // Index specifies an index to add to this table.
 func (ct *CreateTable) Index(index Index) *CreateTable {
 	ct.add(index.HashKey, string(index.HashKeyType))
-	ks := []*dynamodb.KeySchemaElement{
+	ks := []types.KeySchemaElement{
 		{
 			AttributeName: &index.HashKey,
-			KeyType:       aws.String(dynamodb.KeyTypeHash),
+			KeyType:       types.KeyTypeHash,
 		},
 	}
 	if index.RangeKey != "" {
 		ct.add(index.RangeKey, string(index.RangeKeyType))
-		ks = append(ks, &dynamodb.KeySchemaElement{
+		ks = append(ks, types.KeySchemaElement{
 			AttributeName: &index.RangeKey,
-			KeyType:       aws.String(dynamodb.KeyTypeRange),
+			KeyType:       types.KeyTypeRange,
 		})
 	}
 
-	var proj *dynamodb.Projection
+	var proj *types.Projection
 	if index.ProjectionType != "" {
-		proj = &dynamodb.Projection{
-			ProjectionType: aws.String((string)(index.ProjectionType)),
+		proj = &types.Projection{
+			ProjectionType: types.ProjectionType(index.ProjectionType),
 		}
 		if index.ProjectionType == IncludeProjection {
-			proj.NonKeyAttributes = aws.StringSlice(index.ProjectionAttribs)
+			proj.NonKeyAttributes = index.ProjectionAttribs
 		}
 	}
 
@@ -193,7 +194,7 @@ func (ct *CreateTable) Index(index Index) *CreateTable {
 	idx := ct.globalIndices[index.Name]
 	idx.KeySchema = ks
 	if index.Throughput.Read != 0 || index.Throughput.Write != 0 {
-		idx.ProvisionedThroughput = &dynamodb.ProvisionedThroughput{
+		idx.ProvisionedThroughput = &types.ProvisionedThroughput{
 			ReadCapacityUnits:  &index.Throughput.Read,
 			WriteCapacityUnits: &index.Throughput.Write,
 		}
@@ -213,7 +214,7 @@ func (ct *CreateTable) Tag(key, value string) *CreateTable {
 			return ct
 		}
 	}
-	tag := &dynamodb.Tag{
+	tag := types.Tag{
 		Key:   aws.String(key),
 		Value: aws.String(value),
 	}
@@ -224,48 +225,34 @@ func (ct *CreateTable) Tag(key, value string) *CreateTable {
 // SSEEncryption specifies the server side encryption for this table.
 // Encryption is disabled by default.
 func (ct *CreateTable) SSEEncryption(enabled bool, keyID string, sseType SSEType) *CreateTable {
-	encryption := &dynamodb.SSESpecification{
+	encryption := types.SSESpecification{
 		Enabled:        aws.Bool(enabled),
 		KMSMasterKeyId: aws.String(keyID),
-		SSEType:        aws.String(string(sseType)),
+		SSEType:        types.SSEType(string(sseType)),
 	}
-	ct.encryptionSpecification = encryption
+	ct.encryptionSpecification = &encryption
 	return ct
 }
 
 // Run creates this table or returns an error.
-func (ct *CreateTable) Run() error {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return ct.RunWithContext(ctx)
-}
-
-// RunWithContext creates this table or returns an error.
-func (ct *CreateTable) RunWithContext(ctx context.Context) error {
+func (ct *CreateTable) Run(ctx context.Context) error {
 	if ct.err != nil {
 		return ct.err
 	}
 
 	input := ct.input()
 	return ct.db.retry(ctx, func() error {
-		_, err := ct.db.client.CreateTableWithContext(ctx, input)
+		_, err := ct.db.client.CreateTable(ctx, input)
 		return err
 	})
 }
 
 // Wait creates this table and blocks until it exists and is ready to use.
-func (ct *CreateTable) Wait() error {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return ct.WaitWithContext(ctx)
-}
-
-// WaitWithContext creates this table and blocks until it exists and is ready to use.
-func (ct *CreateTable) WaitWithContext(ctx context.Context) error {
-	if err := ct.RunWithContext(ctx); err != nil {
+func (ct *CreateTable) Wait(ctx context.Context) error {
+	if err := ct.Run(ctx); err != nil {
 		return err
 	}
-	return ct.db.Table(ct.tableName).WaitWithContext(ctx)
+	return ct.db.Table(ct.tableName).Wait(ctx)
 }
 
 func (ct *CreateTable) from(rv reflect.Value) error {
@@ -297,9 +284,9 @@ func (ct *CreateTable) from(rv reflect.Value) error {
 		// primary keys
 		if keyType := keyTypeFromTag(field.Tag.Get("dynamo")); keyType != "" {
 			ct.add(name, typeOf(fv, field.Tag.Get("dynamo")))
-			ct.schema = append(ct.schema, &dynamodb.KeySchemaElement{
+			ct.schema = append(ct.schema, types.KeySchemaElement{
 				AttributeName: &name,
-				KeyType:       &keyType,
+				KeyType:       types.KeyType(keyType),
 			})
 		}
 
@@ -310,9 +297,9 @@ func (ct *CreateTable) from(rv reflect.Value) error {
 				keyType := keyTypeFromTag(index)
 				indexName := index[:len(index)-len(keyType)-1]
 				idx := ct.globalIndices[indexName]
-				idx.KeySchema = append(idx.KeySchema, &dynamodb.KeySchemaElement{
+				idx.KeySchema = append(idx.KeySchema, types.KeySchemaElement{
 					AttributeName: &name,
-					KeyType:       &keyType,
+					KeyType:       types.KeyType(keyType),
 				})
 				ct.globalIndices[indexName] = idx
 			}
@@ -325,9 +312,9 @@ func (ct *CreateTable) from(rv reflect.Value) error {
 				keyType := keyTypeFromTag(localIndex)
 				indexName := localIndex[:len(localIndex)-len(keyType)-1]
 				idx := ct.localIndices[indexName]
-				idx.KeySchema = append(idx.KeySchema, &dynamodb.KeySchemaElement{
+				idx.KeySchema = append(idx.KeySchema, types.KeySchemaElement{
 					AttributeName: &name,
-					KeyType:       &keyType,
+					KeyType:       types.KeyType(keyType),
 				})
 				ct.localIndices[indexName] = idx
 			}
@@ -346,9 +333,9 @@ func (ct *CreateTable) input() *dynamodb.CreateTableInput {
 		SSESpecification:     ct.encryptionSpecification,
 	}
 	if ct.ondemand {
-		input.BillingMode = aws.String(dynamodb.BillingModePayPerRequest)
+		input.BillingMode = types.BillingModePayPerRequest
 	} else {
-		input.ProvisionedThroughput = &dynamodb.ProvisionedThroughput{
+		input.ProvisionedThroughput = &types.ProvisionedThroughput{
 			ReadCapacityUnits:  &ct.readUnits,
 			WriteCapacityUnits: &ct.writeUnits,
 		}
@@ -356,9 +343,9 @@ func (ct *CreateTable) input() *dynamodb.CreateTableInput {
 	if ct.streamView != "" {
 		enabled := true
 		view := string(ct.streamView)
-		input.StreamSpecification = &dynamodb.StreamSpecification{
+		input.StreamSpecification = &types.StreamSpecification{
 			StreamEnabled:  &enabled,
-			StreamViewType: &view,
+			StreamViewType: types.StreamViewType(view),
 		}
 	}
 	for name, idx := range ct.localIndices {
@@ -366,40 +353,40 @@ func (ct *CreateTable) input() *dynamodb.CreateTableInput {
 		idx.IndexName = &name
 		if idx.Projection == nil {
 			all := string(AllProjection)
-			idx.Projection = &dynamodb.Projection{
-				ProjectionType: &all,
+			idx.Projection = &types.Projection{
+				ProjectionType: types.ProjectionType(all),
 			}
 		}
 		// add the primary hash key
 		if len(idx.KeySchema) == 1 {
-			idx.KeySchema = []*dynamodb.KeySchemaElement{
+			idx.KeySchema = []types.KeySchemaElement{
 				ct.schema[0],
 				idx.KeySchema[0],
 			}
 		}
 		sortKeySchemas(idx.KeySchema)
-		input.LocalSecondaryIndexes = append(input.LocalSecondaryIndexes, &idx)
+		input.LocalSecondaryIndexes = append(input.LocalSecondaryIndexes, idx)
 	}
 	for name, idx := range ct.globalIndices {
 		name, idx := name, idx
 		idx.IndexName = &name
 		if idx.Projection == nil {
 			all := string(AllProjection)
-			idx.Projection = &dynamodb.Projection{
-				ProjectionType: &all,
+			idx.Projection = &types.Projection{
+				ProjectionType: types.ProjectionType(all),
 			}
 		}
 		if ct.ondemand {
 			idx.ProvisionedThroughput = nil
 		} else if idx.ProvisionedThroughput == nil {
 			units := int64(1)
-			idx.ProvisionedThroughput = &dynamodb.ProvisionedThroughput{
+			idx.ProvisionedThroughput = &types.ProvisionedThroughput{
 				ReadCapacityUnits:  &units,
 				WriteCapacityUnits: &units,
 			}
 		}
 		sortKeySchemas(idx.KeySchema)
-		input.GlobalSecondaryIndexes = append(input.GlobalSecondaryIndexes, &idx)
+		input.GlobalSecondaryIndexes = append(input.GlobalSecondaryIndexes, idx)
 	}
 	if len(ct.tags) > 0 {
 		input.Tags = ct.tags
@@ -419,9 +406,9 @@ func (ct *CreateTable) add(name string, typ string) {
 		}
 	}
 
-	ct.attribs = append(ct.attribs, &dynamodb.AttributeDefinition{
+	ct.attribs = append(ct.attribs, types.AttributeDefinition{
 		AttributeName: &name,
-		AttributeType: &typ,
+		AttributeType: types.ScalarAttributeType(typ),
 	})
 }
 
@@ -448,9 +435,9 @@ func typeOf(rv reflect.Value, tag string) string {
 					return typeOf(reflect.ValueOf(iface), tag)
 				}
 			}
-		case dynamodbattribute.Marshaler:
-			av := &dynamodb.AttributeValue{}
-			if err := x.MarshalDynamoDBAttributeValue(av); err == nil {
+		case attributevalue.Marshaler:
+
+			if av, err := x.MarshalDynamoDBAttributeValue(); err == nil {
 				if iface, err := av2iface(av); err == nil {
 					return typeOf(reflect.ValueOf(iface), tag)
 				}
@@ -481,7 +468,7 @@ check:
 	return ""
 }
 
-func keyTypeFromTag(tag string) string {
+func keyTypeFromTag(tag string) types.KeyType {
 	split := strings.Split(tag, ",")
 	if len(split) <= 1 {
 		return ""
@@ -489,16 +476,16 @@ func keyTypeFromTag(tag string) string {
 	for _, v := range split[1:] {
 		switch v {
 		case "hash", "partition":
-			return dynamodb.KeyTypeHash
+			return types.KeyTypeHash
 		case "range", "sort":
-			return dynamodb.KeyTypeRange
+			return types.KeyTypeRange
 		}
 	}
 	return ""
 }
 
-func sortKeySchemas(schemas []*dynamodb.KeySchemaElement) {
-	if *schemas[0].KeyType == dynamodb.KeyTypeRange {
+func sortKeySchemas(schemas []types.KeySchemaElement) {
+	if schemas[0].KeyType == types.KeyTypeRange {
 		schemas[0], schemas[1] = schemas[1], schemas[0]
 	}
 }

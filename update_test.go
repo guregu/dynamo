@@ -1,12 +1,13 @@
 package dynamo
 
 import (
+	"context"
 	"reflect"
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 func TestUpdate(t *testing.T) {
@@ -14,6 +15,7 @@ func TestUpdate(t *testing.T) {
 		t.Skip(offlineSkipMsg)
 	}
 	table := testDB.Table(testTableWidgets)
+	ctx := context.TODO()
 
 	type widget2 struct {
 		widget
@@ -40,7 +42,7 @@ func TestUpdate(t *testing.T) {
 		MySet2: map[string]struct{}{"a": {}, "b": {}, "bad1": {}, "c": {}, "bad2": {}},
 		MySet3: map[int64]struct{}{1: {}, 999: {}, 2: {}, 3: {}, 555: {}},
 	}
-	err := table.Put(item).Run()
+	err := table.Put(item).Run(ctx)
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
@@ -51,8 +53,8 @@ func TestUpdate(t *testing.T) {
 			"#meta": "Meta",
 			"#pet":  "pet",
 		}),
-		AttributeValues: map[string]*dynamodb.AttributeValue{
-			":cat": {S: aws.String("猫")},
+		AttributeValues: Item{
+			":cat": &types.AttributeValueMemberS{Value: "猫"},
 		},
 	}
 	rmLit := ExpressionLiteral{
@@ -67,8 +69,8 @@ func TestUpdate(t *testing.T) {
 		AttributeNames: aws.StringMap(map[string]string{
 			"#msg": "Msg",
 		}),
-		AttributeValues: map[string]*dynamodb.AttributeValue{
-			":hi": {S: aws.String("hello")},
+		AttributeValues: Item{
+			":hi": &types.AttributeValueMemberS{Value: "hello"},
 		},
 	}
 
@@ -90,7 +92,7 @@ func TestUpdate(t *testing.T) {
 		DeleteFromSet("MySet2", []string{"bad1", "bad2"}).
 		DeleteFromSet("MySet3", map[int64]struct{}{999: {}, 555: {}}).
 		ConsumedCapacity(&cc).
-		Value(&result)
+		Value(ctx, &result)
 
 	expected := widget2{
 		widget: widget{
@@ -130,7 +132,7 @@ func TestUpdate(t *testing.T) {
 		Range("Time", item.Time).
 		Set("Msg", expected2.Msg).
 		Add("Count", 1).
-		OnlyUpdatedValue(&updated)
+		OnlyUpdatedValue(ctx, &updated)
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
@@ -143,7 +145,7 @@ func TestUpdate(t *testing.T) {
 		Range("Time", item.Time).
 		Set("Msg", "this shouldn't be seen").
 		Add("Count", 100).
-		OnlyUpdatedOldValue(&updatedOld)
+		OnlyUpdatedOldValue(ctx, &updatedOld)
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
@@ -158,7 +160,7 @@ func TestUpdate(t *testing.T) {
 		Add("Count", 1).
 		If("'Count' > ?", 100).
 		If("(MeaningOfLife = ?)", 42).
-		Value(&result)
+		Value(ctx, &result)
 	if !IsCondCheckFailed(err) {
 		t.Error("expected ConditionalCheckFailedException, not", err)
 	}
@@ -169,6 +171,7 @@ func TestUpdateNil(t *testing.T) {
 		t.Skip(offlineSkipMsg)
 	}
 	table := testDB.Table(testTableWidgets)
+	ctx := context.TODO()
 
 	// first, add an item to make sure there is at least one
 	item := widget{
@@ -180,7 +183,7 @@ func TestUpdateNil(t *testing.T) {
 		},
 		Count: 100,
 	}
-	err := table.Put(item).Run()
+	err := table.Put(item).Run(ctx)
 	if err != nil {
 		t.Error("unexpected error:", err)
 		t.FailNow()
@@ -199,7 +202,7 @@ func TestUpdateNil(t *testing.T) {
 		Set("Meta.'ok'", (*ptrTextMarshaler)(nil)).
 		SetExpr("'Count' = ?", (*textMarshaler)(nil)).
 		SetExpr("MsgPtr = ?", "").
-		Value(&result)
+		Value(ctx, &result)
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
@@ -224,6 +227,7 @@ func TestUpdateSetAutoOmit(t *testing.T) {
 		t.Skip(offlineSkipMsg)
 	}
 	table := testDB.Table(testTableWidgets)
+	ctx := context.TODO()
 
 	type widget2 struct {
 		widget
@@ -241,7 +245,7 @@ func TestUpdateSetAutoOmit(t *testing.T) {
 		CStr: customString("delete me"),
 		SPtr: &str,
 	}
-	err := table.Put(item).Run()
+	err := table.Put(item).Run(ctx)
 	if err != nil {
 		t.Error("unexpected error:", err)
 		t.FailNow()
@@ -252,7 +256,7 @@ func TestUpdateSetAutoOmit(t *testing.T) {
 	err = table.Update("UserID", item.UserID).Range("Time", item.Time).
 		Set("CStr", customString("")).
 		Set("SPtr", nil).
-		Value(&result)
+		Value(ctx, &result)
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}

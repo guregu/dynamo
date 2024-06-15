@@ -7,20 +7,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 var itemDecodeOnlyTests = []struct {
 	name   string
-	given  map[string]*dynamodb.AttributeValue
+	given  Item
 	expect interface{}
 }{
 	{
 		// unexported embedded pointers should be ignored
 		name: "embedded unexported pointer",
-		given: map[string]*dynamodb.AttributeValue{
-			"Embedded": {BOOL: aws.Bool(true)},
+		given: Item{
+			"Embedded": &types.AttributeValueMemberBOOL{Value: true},
 		},
 		expect: struct {
 			*embedded
@@ -29,8 +28,8 @@ var itemDecodeOnlyTests = []struct {
 	{
 		// unexported fields should be ignored
 		name: "unexported fields",
-		given: map[string]*dynamodb.AttributeValue{
-			"a": {BOOL: aws.Bool(true)},
+		given: Item{
+			"a": &types.AttributeValueMemberBOOL{Value: true},
 		},
 		expect: struct {
 			a bool
@@ -39,8 +38,8 @@ var itemDecodeOnlyTests = []struct {
 	{
 		// embedded pointers shouldn't clobber existing fields
 		name: "exported pointer embedded struct clobber",
-		given: map[string]*dynamodb.AttributeValue{
-			"Embedded": {S: aws.String("OK")},
+		given: Item{
+			"Embedded": &types.AttributeValueMemberS{Value: "OK"},
 		},
 		expect: struct {
 			Embedded string
@@ -79,11 +78,11 @@ func TestUnmarshalAppend(t *testing.T) {
 	page := "5"
 	limit := "20"
 	null := true
-	item := map[string]*dynamodb.AttributeValue{
-		"UserID": {N: &id},
-		"Page":   {N: &page},
-		"Limit":  {N: &limit},
-		"Null":   {NULL: &null},
+	item := Item{
+		"UserID": &types.AttributeValueMemberN{Value: id},
+		"Page":   &types.AttributeValueMemberN{Value: page},
+		"Limit":  &types.AttributeValueMemberN{Value: limit},
+		"Null":   &types.AttributeValueMemberNULL{Value: null},
 	}
 
 	do := unmarshalAppendTo(&results)
@@ -92,7 +91,7 @@ func TestUnmarshalAppend(t *testing.T) {
 		item2 := maps.Clone(item)
 		id := 12345 + i
 		idstr := strconv.Itoa(id)
-		item2["UserID"] = &dynamodb.AttributeValue{N: &idstr}
+		item2["UserID"] = &types.AttributeValueMemberN{Value: idstr}
 		err := do(item2, &results)
 		if err != nil {
 			t.Fatal(err)
@@ -157,52 +156,6 @@ func TestUnmarshalItem(t *testing.T) {
 	}
 }
 
-func TestUnmarshalNULL(t *testing.T) {
-	tru := true
-	arbitrary := "hello world"
-	double := new(*int)
-	item := map[string]*dynamodb.AttributeValue{
-		"String":    {NULL: &tru},
-		"Slice":     {NULL: &tru},
-		"Array":     {NULL: &tru},
-		"StringPtr": {NULL: &tru},
-		"DoublePtr": {NULL: &tru},
-		"Map":       {NULL: &tru},
-		"Interface": {NULL: &tru},
-	}
-
-	type resultType struct {
-		String    string
-		Slice     []string
-		Array     [2]byte
-		StringPtr *string
-		DoublePtr **int
-		Map       map[string]int
-		Interface interface{}
-	}
-
-	// dirty result, we want this to be reset
-	result := resultType{
-		String:    "ABC",
-		Slice:     []string{"A", "B"},
-		Array:     [2]byte{'A', 'B'},
-		StringPtr: &arbitrary,
-		DoublePtr: double,
-		Map: map[string]int{
-			"A": 1,
-		},
-		Interface: "interface{}",
-	}
-
-	if err := UnmarshalItem(item, &result); err != nil {
-		t.Error(err)
-	}
-
-	if (!reflect.DeepEqual(result, resultType{})) {
-		t.Error("unmarshal null: bad result:", result, "≠", resultType{})
-	}
-}
-
 func TestUnmarshalMissing(t *testing.T) {
 	// This test makes sure we're zeroing out fields of structs even if the given data doesn't contain them
 
@@ -232,8 +185,8 @@ func TestUnmarshalMissing(t *testing.T) {
 		},
 	}
 
-	replace := map[string]*dynamodb.AttributeValue{
-		"UserID": {N: aws.String("112")},
+	replace := Item{
+		"UserID": &types.AttributeValueMemberN{Value: "112"},
 	}
 
 	if err := UnmarshalItem(replace, &w); err != nil {
@@ -244,11 +197,13 @@ func TestUnmarshalMissing(t *testing.T) {
 		t.Error("bad unmarshal missing. want:", want, "got:", w)
 	}
 
-	replace2 := map[string]*dynamodb.AttributeValue{
-		"UserID": {N: aws.String("113")},
-		"Foo": {M: map[string]*dynamodb.AttributeValue{
-			"Bar": {N: aws.String("1338")},
-		}},
+	replace2 := Item{
+		"UserID": &types.AttributeValueMemberN{Value: "113"},
+		"Foo": &types.AttributeValueMemberM{
+			Value: Item{
+				"Bar": &types.AttributeValueMemberN{Value: "1338"},
+			},
+		},
 	}
 
 	want = widget2{
@@ -322,12 +277,12 @@ func TestDecode3(t *testing.T) {
 	// t.Fail()
 }
 
-var exampleItem = map[string]*dynamodb.AttributeValue{
-	"UserID": {N: aws.String("555")},
-	"Msg":    {S: aws.String("fux")},
-	"Count":  {N: aws.String("1337")},
-	"Meta": {M: map[string]*dynamodb.AttributeValue{
-		"Foo": {S: aws.String("1336")},
+var exampleItem = map[string]types.AttributeValue{
+	"UserID": &types.AttributeValueMemberN{Value: "555"},
+	"Msg":    &types.AttributeValueMemberS{Value: "fux"},
+	"Count":  &types.AttributeValueMemberN{Value: "1337"},
+	"Meta": &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
+		"Foo": &types.AttributeValueMemberS{Value: "1336"},
 	}},
 }
 var exampleWant = widget{

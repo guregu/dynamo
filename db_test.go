@@ -1,6 +1,7 @@
 package dynamo
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -10,10 +11,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/smithy-go"
 )
 
 var (
@@ -22,7 +24,7 @@ var (
 	testTableSprockets = "TestDB-Sprockets"
 )
 
-var dummyCreds = credentials.NewStaticCredentials("dummy", "dummy", "")
+var dummyCreds = credentials.NewStaticCredentialsProvider("dummy", "dummy", "")
 
 const offlineSkipMsg = "DYNAMO_TEST_REGION not set"
 
@@ -49,11 +51,28 @@ func TestMain(m *testing.M) {
 		region = &dtr
 	}
 	if region != nil {
-		testDB = New(session.Must(session.NewSession()), &aws.Config{
-			Region:   region,
-			Endpoint: endpoint,
-			// LogLevel: aws.LogLevel(aws.LogDebugWithHTTPBody),
-		})
+		var resolv aws.EndpointResolverWithOptions
+		if endpoint != nil {
+			resolv = aws.EndpointResolverWithOptionsFunc(
+				func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+					return aws.Endpoint{URL: *endpoint}, nil
+				},
+			)
+		}
+		// TransactionCanceledException
+
+		cfg, err := config.LoadDefaultConfig(
+			context.Background(),
+			config.WithRegion(*region),
+			config.WithEndpointResolverWithOptions(resolv),
+			config.WithRetryer(func() aws.Retryer {
+				return retry.NewStandard(RetryTxConflicts)
+			}),
+		)
+		if err != nil {
+			log.Fatal(err)
+		}
+		testDB = New(cfg)
 	}
 
 	timestamp := strconv.FormatInt(time.Now().UnixMilli(), 10)
@@ -85,17 +104,17 @@ func TestMain(m *testing.M) {
 	default:
 		shouldCreate = endpoint != nil
 	}
-
+	ctx := context.Background()
 	var created []Table
 	if testDB != nil {
 		for _, name := range []string{testTableWidgets, testTableSprockets} {
 			table := testDB.Table(name)
 			log.Println("Checking test table:", name)
-			_, err := table.Describe().Run()
+			_, err := table.Describe().Run(ctx)
 			switch {
 			case isTableNotExistsErr(err) && shouldCreate:
 				log.Println("Creating test table:", name)
-				if err := testDB.CreateTable(name, widget{}).Run(); err != nil {
+				if err := testDB.CreateTable(name, widget{}).Run(ctx); err != nil {
 					panic(err)
 				}
 				created = append(created, testDB.Table(name))
@@ -110,15 +129,18 @@ func TestMain(m *testing.M) {
 
 	for _, table := range created {
 		log.Println("Deleting test table:", table.Name())
-		if err := table.DeleteTable().Run(); err != nil {
+		if err := table.DeleteTable().Run(ctx); err != nil {
 			log.Println("Error deleting test table:", table.Name(), err)
 		}
 	}
 }
 
 func isTableNotExistsErr(err error) bool {
-	var ae awserr.Error
-	return errors.As(err, &ae) && ae.Code() == "ResourceNotFoundException"
+	var aerr smithy.APIError
+	if errors.As(err, &aerr) {
+		return aerr.ErrorCode() == "ResourceNotFoundException"
+	}
+	return false
 }
 
 func TestListTables(t *testing.T) {
@@ -126,7 +148,7 @@ func TestListTables(t *testing.T) {
 		t.Skip(offlineSkipMsg)
 	}
 
-	tables, err := testDB.ListTables().All()
+	tables, err := testDB.ListTables().All(context.TODO())
 	if err != nil {
 		t.Error(err)
 		return

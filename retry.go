@@ -3,92 +3,41 @@ package dynamo
 import (
 	"context"
 	"errors"
-	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/cenkalti/backoff/v4"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
-// RetryTimeout defines the maximum amount of time that requests will
-// attempt to automatically retry for. In other words, this is the maximum
-// amount of time that dynamo operations will block.
-// RetryTimeout is only considered by methods that do not take a context.
-// Higher values are better when using tables with lower throughput.
-var RetryTimeout = 1 * time.Minute
+// TODO: delete this
 
-func defaultContext() (context.Context, context.CancelFunc) {
-	if RetryTimeout == 0 {
-		return aws.BackgroundContext(), (func() {})
-	}
-	return context.WithDeadline(aws.BackgroundContext(), time.Now().Add(RetryTimeout))
+func (db *DB) retry(_ context.Context, f func() error) error {
+	return f()
 }
 
-func (db *DB) retry(ctx context.Context, f func() error) error {
-	// if a custom retryer has been set, the SDK will retry for us
-	if db.retryer != nil {
-		return f()
-	}
-
-	var err error
-	var next time.Duration
-	b := backoff.WithContext(backoff.NewExponentialBackOff(), ctx)
-	for i := 0; db.retryMax < 0 || i <= db.retryMax; i++ {
-		if err = f(); err == nil {
-			return nil
-		}
-
-		if !canRetry(err) {
-			return err
-		}
-
-		if next = b.NextBackOff(); next == backoff.Stop {
-			return err
-		}
-
-		if err := aws.SleepWithContext(ctx, next); err != nil {
-			return err
-		}
-	}
-	return err
+// RetryTxConflicts is an option for [github.com/aws/aws-sdk-go-v2/aws/retry.NewStandard]
+// that adds retrying behavior for TransactionConflict within TransactionCanceledException errors.
+// See also: [github.com/aws/aws-sdk-go-v2/config.WithRetryer].
+func RetryTxConflicts(opts *retry.StandardOptions) {
+	opts.Retryables = append(opts.Retryables, retry.IsErrorRetryableFunc(shouldRetryTx))
 }
 
-// errRetry is a sentinel error to retry, should never be returned to user
-var errRetry = errors.New("dynamo: retry")
-
-func canRetry(err error) bool {
-	if errors.Is(err, errRetry) {
-		return true
-	}
-
-	if txe, ok := err.(*dynamodb.TransactionCanceledException); ok && txe.StatusCode() == 400 {
-		retry := false
+func shouldRetryTx(err error) aws.Ternary {
+	var txe *types.TransactionCanceledException
+	if errors.As(err, &txe) {
+		retry := aws.FalseTernary
 		for _, reason := range txe.CancellationReasons {
 			if reason.Code == nil {
 				continue
 			}
 			switch *reason.Code {
 			case "ValidationError", "ConditionalCheckFailed", "ItemCollectionSizeLimitExceeded":
-				return false
+				return aws.FalseTernary
 			case "ThrottlingError", "ProvisionedThroughputExceeded", "TransactionConflict":
-				retry = true
+				retry = aws.TrueTernary
 			}
 		}
 		return retry
 	}
-
-	if ae, ok := err.(awserr.RequestFailure); ok {
-		switch ae.StatusCode() {
-		case 500, 503:
-			return true
-		case 400:
-			switch ae.Code() {
-			case "ProvisionedThroughputExceededException",
-				"ThrottlingException":
-				return true
-			}
-		}
-	}
-	return false
+	return aws.UnknownTernary
 }

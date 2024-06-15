@@ -1,14 +1,15 @@
 package dynamo
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sort"
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 func TestTableLifecycle(t *testing.T) {
@@ -18,6 +19,8 @@ func TestTableLifecycle(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+
+	ctx := context.TODO()
 
 	now := time.Now().UTC()
 	name := fmt.Sprintf("TestDB-%d", now.UnixNano())
@@ -37,11 +40,11 @@ func TestTableLifecycle(t *testing.T) {
 		HashKeyType:  StringType,
 		RangeKey:     "Bar",
 		RangeKeyType: NumberType,
-	}).Wait(); err != nil {
+	}).Wait(ctx); err != nil {
 		t.Fatal(err)
 	}
 
-	desc, err := testDB.Table(name).Describe().Run()
+	desc, err := testDB.Table(name).Describe().Run(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +68,7 @@ func TestTableLifecycle(t *testing.T) {
 				RangeKeyType:      NumberType,
 				Throughput:        Throughput{Read: 1, Write: 1},
 				ProjectionType:    AllProjection,
-				ProjectionAttribs: []string{},
+				ProjectionAttribs: []string(nil),
 			},
 			{
 				Name: "Seq-ID-index",
@@ -77,7 +80,7 @@ func TestTableLifecycle(t *testing.T) {
 				RangeKeyType:      StringType,
 				Throughput:        Throughput{Read: 1, Write: 1},
 				ProjectionType:    AllProjection,
-				ProjectionAttribs: []string{},
+				ProjectionAttribs: []string(nil),
 			},
 			{
 				Name: "UUID-index",
@@ -87,7 +90,7 @@ func TestTableLifecycle(t *testing.T) {
 				HashKeyType:       StringType,
 				Throughput:        Throughput{Read: 1, Write: 1},
 				ProjectionType:    AllProjection,
-				ProjectionAttribs: []string{},
+				ProjectionAttribs: []string(nil),
 			},
 		},
 		LSI: []Index{
@@ -103,7 +106,7 @@ func TestTableLifecycle(t *testing.T) {
 				RangeKeyType:      NumberType,
 				Throughput:        Throughput{Read: 1, Write: 1},
 				ProjectionType:    AllProjection,
-				ProjectionAttribs: []string{},
+				ProjectionAttribs: []string(nil),
 			},
 		},
 	}
@@ -114,32 +117,32 @@ func TestTableLifecycle(t *testing.T) {
 
 	// make sure it really works
 	table := testDB.Table(name)
-	if err := table.Put(UserAction{UserID: "test", Time: now, Seq: 1, UUID: "42"}).Run(); err != nil {
+	if err := table.Put(UserAction{UserID: "test", Time: now, Seq: 1, UUID: "42"}).Run(ctx); err != nil {
 		t.Fatal(err)
 	}
 
 	// delete & wait
-	if err := testDB.Table(name).DeleteTable().Wait(); err != nil {
+	if err := testDB.Table(name).DeleteTable().Wait(ctx); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestAddConsumedCapacity(t *testing.T) {
-	raw := &dynamodb.ConsumedCapacity{
+	raw := &types.ConsumedCapacity{
 		TableName: aws.String("TestTable"),
-		Table: &dynamodb.Capacity{
+		Table: &types.Capacity{
 			CapacityUnits:      aws.Float64(9),
 			ReadCapacityUnits:  aws.Float64(4),
 			WriteCapacityUnits: aws.Float64(5),
 		},
-		GlobalSecondaryIndexes: map[string]*dynamodb.Capacity{
+		GlobalSecondaryIndexes: map[string]types.Capacity{
 			"TestGSI": {
 				CapacityUnits:      aws.Float64(3),
 				ReadCapacityUnits:  aws.Float64(1),
 				WriteCapacityUnits: aws.Float64(2),
 			},
 		},
-		LocalSecondaryIndexes: map[string]*dynamodb.Capacity{
+		LocalSecondaryIndexes: map[string]types.Capacity{
 			"TestLSI": {
 				CapacityUnits:      aws.Float64(30),
 				ReadCapacityUnits:  aws.Float64(10),
@@ -150,7 +153,7 @@ func TestAddConsumedCapacity(t *testing.T) {
 		ReadCapacityUnits:  aws.Float64(15),
 		WriteCapacityUnits: aws.Float64(27),
 	}
-	expected := ConsumedCapacity{
+	expected := &ConsumedCapacity{
 		TableName:  *raw.TableName,
 		Table:      *raw.Table.CapacityUnits,
 		TableRead:  *raw.Table.ReadCapacityUnits,
@@ -166,8 +169,8 @@ func TestAddConsumedCapacity(t *testing.T) {
 		Write:      *raw.WriteCapacityUnits,
 	}
 
-	var cc ConsumedCapacity
-	addConsumedCapacity(&cc, raw)
+	var cc = new(ConsumedCapacity)
+	addConsumedCapacity(cc, raw)
 
 	if !reflect.DeepEqual(cc, expected) {
 		t.Error("bad ConsumedCapacity:", cc, "≠", expected)

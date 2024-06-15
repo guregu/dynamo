@@ -6,8 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 var (
@@ -146,8 +145,8 @@ func BenchmarkUnmarshalText(b *testing.B) {
 		// x := newRecipe(rv)
 		for i := 0; i < b.N; i++ {
 			r, _ := typedefOf(rv.Type())
-			if err := r.decodeItem(map[string]*dynamodb.AttributeValue{
-				"Foo": {S: aws.String("true")},
+			if err := r.decodeItem(map[string]types.AttributeValue{
+				"Foo": &types.AttributeValueMemberS{Value: "true"},
 			}, rv); err != nil {
 				b.Fatal(err)
 			}
@@ -162,7 +161,7 @@ func BenchmarkUnmarshalAppend(b *testing.B) {
 	items := make([]Item, 10_000)
 	for i := range items {
 		items[i] = Item{
-			"Hello": &dynamodb.AttributeValue{S: aws.String("world")},
+			"Hello": &types.AttributeValueMemberS{Value: "world"},
 		}
 	}
 	b.ResetTimer()
@@ -187,7 +186,7 @@ func BenchmarkUnmarshalAppend2(b *testing.B) {
 	items := make([]Item, 10_000)
 	for i := range items {
 		items[i] = Item{
-			"Hello": &dynamodb.AttributeValue{S: aws.String("world")},
+			"Hello": &types.AttributeValueMemberS{Value: "world"},
 		}
 	}
 	b.ResetTimer()

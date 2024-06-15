@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/aws/smithy-go/time"
 	"github.com/cenkalti/backoff/v4"
 )
 
@@ -178,17 +179,9 @@ func (bg *BatchGet) ConsumedCapacity(cc *ConsumedCapacity) *BatchGet {
 }
 
 // All executes this request and unmarshals all results to out, which must be a pointer to a slice.
-func (bg *BatchGet) All(out interface{}) error {
+func (bg *BatchGet) All(ctx context.Context, out interface{}) error {
 	iter := newBGIter(bg, unmarshalAppendTo(out), nil, bg.err)
-	for iter.Next(out) {
-	}
-	return iter.Err()
-}
-
-// AllWithContext executes this request and unmarshals all results to out, which must be a pointer to a slice.
-func (bg *BatchGet) AllWithContext(ctx context.Context, out interface{}) error {
-	iter := newBGIter(bg, unmarshalAppendTo(out), nil, bg.err)
-	for iter.NextWithContext(ctx, out) {
+	for iter.Next(ctx, out) {
 	}
 	return iter.Err()
 }
@@ -214,7 +207,7 @@ func (bg *BatchGet) input(start int) *dynamodb.BatchGetItemInput {
 	}
 
 	in := &dynamodb.BatchGetItemInput{
-		RequestItems: make(map[string]*dynamodb.KeysAndAttributes),
+		RequestItems: make(map[string]types.KeysAndAttributes),
 	}
 
 	for _, get := range bg.reqs[start:end] {
@@ -224,13 +217,13 @@ func (bg *BatchGet) input(start int) *dynamodb.BatchGetItemInput {
 		}
 	}
 	if bg.cc != nil {
-		in.ReturnConsumedCapacity = aws.String(dynamodb.ReturnConsumedCapacityIndexes)
+		in.ReturnConsumedCapacity = types.ReturnConsumedCapacityIndexes
 	}
 
 	for _, get := range bg.reqs[start:end] {
 		table := get.table.Name()
-		kas := in.RequestItems[table]
-		if kas == nil {
+		kas, ok := in.RequestItems[table]
+		if !ok {
 			kas = get.keysAndAttribs()
 			if bg.consistent {
 				kas.ConsistentRead = &bg.consistent
@@ -287,13 +280,7 @@ func newBGIter(bg *BatchGet, fn unmarshalFunc, track *string, err error) *bgIter
 
 // Next tries to unmarshal the next result into out.
 // Returns false when it is complete or if it runs into an error.
-func (itr *bgIter) Next(out interface{}) bool {
-	ctx, cancel := defaultContext()
-	defer cancel()
-	return itr.NextWithContext(ctx, out)
-}
-
-func (itr *bgIter) NextWithContext(ctx context.Context, out interface{}) bool {
+func (itr *bgIter) Next(ctx context.Context, out interface{}) bool {
 	// stop if we have an error
 	if ctx.Err() != nil {
 		itr.err = ctx.Err()
@@ -341,7 +328,7 @@ redo:
 			// no, prepare a new request with the remaining keys
 			itr.input.RequestItems = itr.output.UnprocessedKeys
 			// we need to sleep here a bit as per the official docs
-			if err := aws.SleepWithContext(ctx, itr.backoff.NextBackOff()); err != nil {
+			if err := time.SleepWithContext(ctx, itr.backoff.NextBackOff()); err != nil {
 				// timed out
 				itr.err = err
 				return false
@@ -352,7 +339,7 @@ redo:
 
 	itr.err = itr.bg.batch.table.db.retry(ctx, func() error {
 		var err error
-		itr.output, err = itr.bg.batch.table.db.client.BatchGetItemWithContext(ctx, itr.input)
+		itr.output, err = itr.bg.batch.table.db.client.BatchGetItem(ctx, itr.input)
 		return err
 	})
 	if itr.err != nil {
@@ -360,7 +347,7 @@ redo:
 	}
 	if itr.bg.cc != nil {
 		for _, cc := range itr.output.ConsumedCapacity {
-			addConsumedCapacity(itr.bg.cc, cc)
+			addConsumedCapacity(itr.bg.cc, &cc)
 		}
 	}
 

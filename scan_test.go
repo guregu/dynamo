@@ -3,10 +3,9 @@ package dynamo
 import (
 	"context"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
-
-	"github.com/aws/aws-sdk-go/aws"
 )
 
 func TestScan(t *testing.T) {
@@ -14,6 +13,7 @@ func TestScan(t *testing.T) {
 		t.Skip(offlineSkipMsg)
 	}
 	table := testDB.Table(testTableWidgets)
+	ctx := context.TODO()
 
 	// first, add an item to make sure there is at least one
 	item := widget{
@@ -21,13 +21,13 @@ func TestScan(t *testing.T) {
 		Time:   time.Now().UTC(),
 		Msg:    "hello",
 	}
-	err := table.Put(item).Run()
+	err := table.Put(item).Run(ctx)
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
 
 	// count items via Query
-	ct, err := table.Get("UserID", 42).Consistent(true).Count()
+	ct, err := table.Get("UserID", 42).Consistent(true).Count(ctx)
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
@@ -36,7 +36,7 @@ func TestScan(t *testing.T) {
 	t.Run("All", func(t *testing.T) {
 		var result []widget
 		var cc ConsumedCapacity
-		err = table.Scan().Filter("UserID = ?", 42).Consistent(true).ConsumedCapacity(&cc).All(&result)
+		err = table.Scan().Filter("UserID = ?", 42).Consistent(true).ConsumedCapacity(&cc).All(ctx, &result)
 		if err != nil {
 			t.Error("unexpected error:", err)
 		}
@@ -63,7 +63,7 @@ func TestScan(t *testing.T) {
 	// check this against Scan's count, too
 	t.Run("Count", func(t *testing.T) {
 		var cc2 ConsumedCapacity
-		scanCt, err := table.Scan().Filter("UserID = ?", 42).Consistent(true).ConsumedCapacity(&cc2).Count()
+		scanCt, err := table.Scan().Filter("UserID = ?", 42).Consistent(true).ConsumedCapacity(&cc2).Count(ctx)
 		if err != nil {
 			t.Error("unexpected error:", err)
 		}
@@ -108,6 +108,7 @@ func TestScanPaging(t *testing.T) {
 		t.Skip(offlineSkipMsg)
 	}
 	table := testDB.Table(testTableWidgets)
+	ctx := context.TODO()
 
 	// prepare data
 	insert := make([]interface{}, 10)
@@ -118,7 +119,7 @@ func TestScanPaging(t *testing.T) {
 			Msg:    "garbage",
 		}
 	}
-	if _, err := table.Batch().Write().Put(insert...).Run(); err != nil {
+	if _, err := table.Batch().Write().Put(insert...).Run(ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -126,12 +127,16 @@ func TestScanPaging(t *testing.T) {
 		widgets := [10]widget{}
 		itr := table.Scan().Consistent(true).SearchLimit(1).Iter()
 		for i := 0; i < len(widgets); i++ {
-			itr.Next(&widgets[i])
+			itr.Next(ctx, &widgets[i])
 			if itr.Err() != nil {
 				t.Error("unexpected error", itr.Err())
 				break
 			}
-			itr = table.Scan().StartFrom(itr.LastEvaluatedKey()).SearchLimit(1).Iter()
+			lek, err := itr.LastEvaluatedKey(context.Background())
+			if err != nil {
+				t.Error("LEK error", err)
+			}
+			itr = table.Scan().StartFrom(lek).SearchLimit(1).Iter()
 		}
 		for i, w := range widgets {
 			if w.UserID == 0 && w.Time.IsZero() {
@@ -144,17 +149,21 @@ func TestScanPaging(t *testing.T) {
 		const segments = 2
 		ctx := context.Background()
 		widgets := [10]widget{}
-		limit := int64(len(widgets) / segments)
+		limit := int(len(widgets) / segments)
 		itr := table.Scan().Consistent(true).SearchLimit(limit).IterParallel(ctx, segments)
 		for i := 0; i < len(widgets); {
-			for ; i < len(widgets) && itr.Next(&widgets[i]); i++ {
+			for ; i < len(widgets) && itr.Next(ctx, &widgets[i]); i++ {
 			}
 			if itr.Err() != nil {
 				t.Error("unexpected error", itr.Err())
 				break
 			}
 			t.Logf("parallel chunk: %d", i)
-			itr = table.Scan().SearchLimit(limit).IterParallelStartFrom(ctx, itr.LastEvaluatedKeys())
+			lek, err := itr.LastEvaluatedKeys(ctx)
+			if err != nil {
+				t.Fatal("lek error", err)
+			}
+			itr = table.Scan().SearchLimit(limit).IterParallelStartFrom(ctx, lek)
 		}
 		for i, w := range widgets {
 			if w.UserID == 0 && w.Time.IsZero() {
@@ -168,7 +177,13 @@ func TestScanMagicLEK(t *testing.T) {
 	if testDB == nil {
 		t.Skip(offlineSkipMsg)
 	}
-	table := testDB.Table(testTableWidgets)
+
+	testDB0 := *testDB
+	testDB0.descs = new(sync.Map)
+	freshTestDB := &testDB0
+
+	table := freshTestDB.Table(testTableWidgets)
+	ctx := context.Background()
 
 	widgets := []interface{}{
 		widget{
@@ -188,7 +203,7 @@ func TestScanMagicLEK(t *testing.T) {
 		},
 	}
 	// prepare data
-	if _, err := table.Batch().Write().Put(widgets...).Run(); err != nil {
+	if _, err := table.Batch().Write().Put(widgets...).Run(ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -196,11 +211,15 @@ func TestScanMagicLEK(t *testing.T) {
 		itr := table.Scan().Filter("'Msg' = ?", "TestScanMagicLEK").Limit(2).Iter()
 		for i := 0; i < len(widgets); i++ {
 			var w widget
-			itr.Next(&w)
+			itr.Next(ctx, &w)
 			if itr.Err() != nil {
 				t.Error("unexpected error", itr.Err())
 			}
-			itr = table.Scan().Filter("'Msg' = ?", "TestScanMagicLEK").StartFrom(itr.LastEvaluatedKey()).Limit(2).Iter()
+			lek, err := itr.LastEvaluatedKey(context.Background())
+			if err != nil {
+				t.Error("LEK error", err)
+			}
+			itr = table.Scan().Filter("'Msg' = ?", "TestScanMagicLEK").StartFrom(lek).Limit(2).Iter()
 		}
 	})
 
@@ -208,16 +227,20 @@ func TestScanMagicLEK(t *testing.T) {
 		itr := table.Scan().Index("Msg-Time-index").Filter("UserID = ?", 2069).Limit(2).Iter()
 		for i := 0; i < len(widgets); i++ {
 			var w widget
-			itr.Next(&w)
+			itr.Next(ctx, &w)
 			if itr.Err() != nil {
 				t.Error("unexpected error", itr.Err())
 			}
-			itr = table.Scan().Index("Msg-Time-index").Filter("UserID = ?", 2069).StartFrom(itr.LastEvaluatedKey()).Limit(2).Iter()
+			lek, err := itr.LastEvaluatedKey(context.Background())
+			if err != nil {
+				t.Error("LEK error", err)
+			}
+			itr = table.Scan().Index("Msg-Time-index").Filter("UserID = ?", 2069).StartFrom(lek).Limit(2).Iter()
 		}
 	})
 
 	t.Run("table cache", func(t *testing.T) {
-		pk, err := table.primaryKeys(aws.BackgroundContext(), nil, nil, "")
+		pk, err := table.primaryKeys(context.Background(), nil, nil, "")
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -1,6 +1,7 @@
 package dynamo
 
 import (
+	"context"
 	"testing"
 	"time"
 )
@@ -15,6 +16,7 @@ func TestBatchGetWrite(t *testing.T) {
 	table2 := testDB.Table(testTableSprockets)
 	tables := []Table{table1, table2}
 	totalBatchSize := batchSize * len(tables)
+	ctx := context.TODO()
 
 	items := make([]interface{}, batchSize)
 	widgets := make(map[int]widget)
@@ -39,7 +41,7 @@ func TestBatchGetWrite(t *testing.T) {
 	batch1 := batches[0]
 	batch1.Merge(batches[1:]...)
 	var wcc ConsumedCapacity
-	wrote, err := batch1.ConsumedCapacity(&wcc).Run()
+	wrote, err := batch1.ConsumedCapacity(&wcc).Run(ctx)
 	if wrote != totalBatchSize {
 		t.Error("unexpected wrote:", wrote, "≠", totalBatchSize)
 	}
@@ -65,7 +67,7 @@ func TestBatchGetWrite(t *testing.T) {
 	get1.Merge(gets[1:]...)
 
 	var results []widget
-	err = get1.All(&results)
+	err = get1.All(ctx, &results)
 	if err != nil {
 		t.Error("unexpected error:", err)
 	}
@@ -92,7 +94,7 @@ func TestBatchGetWrite(t *testing.T) {
 	wrote, err = table1.Batch("UserID", "Time").Write().
 		Delete(keys...).
 		DeleteInRange(table2, "UserID", "Time", keys...).
-		Run()
+		Run(ctx)
 	if wrote != totalBatchSize {
 		t.Error("unexpected wrote:", wrote, "≠", totalBatchSize)
 	}
@@ -107,7 +109,7 @@ func TestBatchGetWrite(t *testing.T) {
 			Get(keys...).
 			FromRange(table2, "UserID", "Time", keys...).
 			Consistent(true).
-			All(&results)
+			All(ctx, &results)
 		if err != ErrNotFound {
 			t.Error("expected ErrNotFound, got", err)
 		}
@@ -122,15 +124,16 @@ func TestBatchGetEmptySets(t *testing.T) {
 		t.Skip(offlineSkipMsg)
 	}
 	table := testDB.Table(testTableWidgets)
+	ctx := context.TODO()
 
 	now := time.Now().UnixNano() / 1000000000
 	id := int(now)
 	entry := widget{UserID: id, Time: time.Now()}
-	if err := table.Put(entry).Run(); err != nil {
+	if err := table.Put(entry).Run(ctx); err != nil {
 		panic(err)
 	}
 	entry2 := widget{UserID: id + batchSize*2, Time: entry.Time}
-	if err := table.Put(entry2).Run(); err != nil {
+	if err := table.Put(entry2).Run(ctx); err != nil {
 		panic(err)
 	}
 
@@ -140,7 +143,7 @@ func TestBatchGetEmptySets(t *testing.T) {
 	}
 
 	results := []widget{}
-	err := table.Batch("UserID", "Time").Get(keysToCheck...).Consistent(true).All(&results)
+	err := table.Batch("UserID", "Time").Get(keysToCheck...).Consistent(true).All(ctx, &results)
 	if err != nil {
 		t.Error(err)
 	}
@@ -148,12 +151,12 @@ func TestBatchGetEmptySets(t *testing.T) {
 		t.Error("batch get empty set, unexpected length:", len(results), "want:", 2)
 	}
 
-	if err := table.Delete("UserID", entry.UserID).Range("Time", entry.Time).Run(); err != nil {
+	if err := table.Delete("UserID", entry.UserID).Range("Time", entry.Time).Run(ctx); err != nil {
 		panic(err)
 	}
 
 	results = []widget{}
-	err = table.Batch("UserID", "Time").Get(keysToCheck...).Consistent(true).All(&results)
+	err = table.Batch("UserID", "Time").Get(keysToCheck...).Consistent(true).All(ctx, &results)
 	if err != nil {
 		t.Error(err)
 	}
@@ -162,7 +165,7 @@ func TestBatchGetEmptySets(t *testing.T) {
 	}
 
 	results = []widget{}
-	err = table.Batch("UserID", "Time").Get(keysToCheck[:len(keysToCheck)-1]...).Consistent(true).All(&results)
+	err = table.Batch("UserID", "Time").Get(keysToCheck[:len(keysToCheck)-1]...).Consistent(true).All(ctx, &results)
 	if err != ErrNotFound {
 		t.Error(err)
 	}
@@ -173,13 +176,14 @@ func TestBatchGetEmptySets(t *testing.T) {
 
 func TestBatchEmptyInput(t *testing.T) {
 	table := testDB.Table(testTableWidgets)
+	ctx := context.TODO()
 	var out []any
-	err := table.Batch("UserID", "Time").Get().All(&out)
+	err := table.Batch("UserID", "Time").Get().All(ctx, &out)
 	if err != ErrNoInput {
 		t.Error("unexpected error", err)
 	}
 
-	_, err = table.Batch("UserID", "Time").Write().Run()
+	_, err = table.Batch("UserID", "Time").Write().Run(ctx)
 	if err != ErrNoInput {
 		t.Error("unexpected error", err)
 	}

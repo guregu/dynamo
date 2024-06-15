@@ -5,8 +5,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 func TestSubExpr(t *testing.T) {
@@ -64,9 +64,9 @@ func TestSubMerge(t *testing.T) {
 			"#abc":    aws.String("custom"),
 			"#abcdef": aws.String("model"),
 		},
-		AttributeValues: map[string]*dynamodb.AttributeValue{
-			":v":  {S: aws.String("abc")},
-			":v0": {N: aws.String("555")},
+		AttributeValues: Item{
+			":v":  &types.AttributeValueMemberS{Value: "abc"},
+			":v0": &types.AttributeValueMemberN{Value: "555"},
 		},
 	}
 	rewrite, err := s.subExpr("?", lit)
@@ -84,8 +84,8 @@ func TestSubMerge(t *testing.T) {
 		if !ok {
 			t.Error("missing merged name:", k, foreign)
 		}
-		if !reflect.DeepEqual(v, got) {
-			t.Error("merged name mismatch. want:", v, "got:", got)
+		if !reflect.DeepEqual(*v, got) {
+			t.Error("merged name mismatch. want:", *v, "got:", got)
 		}
 	}
 

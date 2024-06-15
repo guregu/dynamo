@@ -5,27 +5,27 @@ import (
 	"reflect"
 	"strconv"
 
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 // Marshaler is the interface implemented by objects that can marshal themselves into
 // an AttributeValue.
 type Marshaler interface {
-	MarshalDynamo() (*dynamodb.AttributeValue, error)
+	MarshalDynamo() (types.AttributeValue, error)
 }
 
 // ItemMarshaler is the interface implemented by objects that can marshal themselves
 // into an Item (a map of strings to AttributeValues).
 type ItemMarshaler interface {
-	MarshalDynamoItem() (map[string]*dynamodb.AttributeValue, error)
+	MarshalDynamoItem() (Item, error)
 }
 
 // MarshalItem converts the given struct into a DynamoDB item.
-func MarshalItem(v interface{}) (map[string]*dynamodb.AttributeValue, error) {
+func MarshalItem(v interface{}) (Item, error) {
 	return marshalItem(v)
 }
 
-func marshalItem(v interface{}) (map[string]*dynamodb.AttributeValue, error) {
+func marshalItem(v interface{}) (Item, error) {
 	rv := reflect.ValueOf(v)
 	rt := rv.Type()
 	plan, err := typedefOf(rt)
@@ -37,11 +37,11 @@ func marshalItem(v interface{}) (map[string]*dynamodb.AttributeValue, error) {
 }
 
 // Marshal converts the given value into a DynamoDB attribute value.
-func Marshal(v interface{}) (*dynamodb.AttributeValue, error) {
+func Marshal(v interface{}) (types.AttributeValue, error) {
 	return marshal(v, flagNone)
 }
 
-func marshal(v interface{}, flags encodeFlags) (*dynamodb.AttributeValue, error) {
+func marshal(v interface{}, flags encodeFlags) (types.AttributeValue, error) {
 	rv := reflect.ValueOf(v)
 	if !rv.IsValid() {
 		return nil, nil
@@ -64,8 +64,8 @@ func marshal(v interface{}, flags encodeFlags) (*dynamodb.AttributeValue, error)
 	return enc(rv, flags)
 }
 
-func marshalSliceNoOmit(values []interface{}) ([]*dynamodb.AttributeValue, error) {
-	avs := make([]*dynamodb.AttributeValue, 0, len(values))
+func marshalSliceNoOmit(values []interface{}) ([]types.AttributeValue, error) {
+	avs := make([]types.AttributeValue, 0, len(values))
 	for _, v := range values {
 		av, err := marshal(v, flagAllowEmpty)
 		if err != nil {

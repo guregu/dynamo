@@ -8,7 +8,7 @@ This library is stable and versioned with Go modules.
 > [!TIP]
 > dynamo v2 is finally released! See [**v2 Migration**](#migrating-from-v1) for tips on migrating from dynamo v1.
 > 
-> If you're using an older version, see: [**dynamo v1 Documentation**](https://pkg.go.dev/github.com/guregu/dynamo).
+> For dynamo v1, which uses [aws-sdk-go v1](https://github.com/aws/aws-sdk-go/), see: [**dynamo v1 documentation**](https://pkg.go.dev/github.com/guregu/dynamo).
 
 ### Example
 

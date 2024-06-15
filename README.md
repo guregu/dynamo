@@ -189,6 +189,31 @@ This creates a table with the primary hash key ID and range key Time. It creates
 
 As of v2, dynamo relies on the AWS SDK for retrying. See: [**Retries and Timeouts documentation**](https://aws.github.io/aws-sdk-go-v2/docs/configuring-sdk/retries-timeouts/) for information about how to configure its behavior.
 
+By default, canceled transactions (i.e. errors from conflicting transactions) will not be retried. To get automatic retrying behavior like in v1, use [`dynamo.RetryTx`](https://godoc.org/github.com/guregu/dynamo/v2#RetryTx).
+
+```go
+import (
+	"context"
+	"log"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/guregu/dynamo/v2"
+)
+
+func main() {
+	cfg, err := config.LoadDefaultConfig(context.Background(), config.WithRetryer(func() aws.Retryer {
+		return retry.NewStandard(dynamo.RetryTx)
+	}))
+	if err != nil {
+		log.Fatal(err)
+	}
+	db := dynamo.New(cfg)
+	// use db
+}
+```
+
 ### Compatibility with the official AWS library
 
 dynamo has been in development before the official AWS libraries were stable. We use a different encoder and decoder than the [dynamodbattribute](https://pkg.go.dev/github.com/jviney/aws-sdk-go-v2/service/dynamodb/dynamodbattribute) package. dynamo uses the `dynamo` struct tag instead of the `dynamodbav` struct tag, and we also prefer to automatically omit invalid values such as empty strings, whereas the dynamodbattribute package substitutes null values for them. Items that satisfy the [`dynamodbattribute.(Un)marshaler`](https://pkg.go.dev/github.com/jviney/aws-sdk-go-v2/service/dynamodb/dynamodbattribute#Marshaler) interfaces are compatibile with both libraries.

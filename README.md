@@ -243,7 +243,9 @@ The API hasn't changed much from v1 to v2. Here are some migration tips:
 - All request methods now take a [context](https://go.dev/blog/context) as their first argument.
 - Retrying relies on the AWS SDK configuration, see: [Retrying](#retrying).
   - Transactions won't retry TransactionCanceled responses by default anymore, make sure you configure that if you need it.
+- Arguments that took `int64` (such as in `Query.Limit`) now take `int` instead.
 - [Compatibility with the official AWS library](#compatibility-with-the-official-aws-library) uses v2 interfaces instead of v1.
+- `KMSMasterKeyArn` renamed to `KMSMasterKeyARN`.
 
 ### Integration tests
 

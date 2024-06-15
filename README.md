@@ -1,9 +1,14 @@
-## dynamo [![GoDoc](https://godoc.org/github.com/guregu/dynamo?status.svg)](https://godoc.org/github.com/guregu/dynamo)
-`import "github.com/guregu/dynamo"`
+## dynamo [![GoDoc](https://godoc.org/github.com/guregu/dynamo/v2?status.svg)](https://godoc.org/github.com/guregu/dynamo/v2)
+`import "github.com/guregu/dynamo/v2"`
 
 dynamo is an expressive [DynamoDB](https://aws.amazon.com/dynamodb/) client for Go, with an easy but powerful API. dynamo integrates with the official [AWS SDK v2](https://github.com/aws/aws-sdk-go-v2/).
 
 This library is stable and versioned with Go modules.
+
+> [!TIP]
+> dynamo v2 is finally released! See [**v2 Migration**](#migrating-from-v1) for tips on migrating from dynamo v1.
+> 
+> If you're using an older version, see: [**dynamo v1 Documentation**](https://pkg.go.dev/github.com/guregu/dynamo).
 
 ### Example
 
@@ -17,7 +22,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/guregu/dynamo"
+	"github.com/guregu/dynamo/v2"
 )
 
 // Use struct tags much like the standard JSON library,
@@ -45,21 +50,21 @@ func main() {
 
 	// put item
 	w := widget{UserID: 613, Time: time.Now(), Msg: "hello"}
-	err = table.Put(w).Run()
+	err = table.Put(w).Run(ctx)
 
 	// get the same item
 	var result widget
 	err = table.Get("UserID", w.UserID).
 		Range("Time", dynamo.Equal, w.Time).
-		One(&result)
+		One(ctx, &result)
 
 	// get all items
 	var results []widget
-	err = table.Scan().All(&results)
+	err = table.Scan().All(ctx, &results)
 
 	// use placeholders in filter expressions (see Expressions section below)
 	var filtered []widget
-	err = table.Scan().Filter("'Count' > ?", 10).All(&filtered)
+	err = table.Scan().Filter("'Count' > ?", 10).All(ctx, &filtered)
 }
 ```
 
@@ -76,14 +81,14 @@ Please see the [DynamoDB reference on expressions](http://docs.aws.amazon.com/am
 ```go
 // Using single quotes to escape a reserved word, and a question mark as a value placeholder.
 // Finds all items whose date is greater than or equal to lastUpdate.
-table.Scan().Filter("'Date' >= ?", lastUpdate).All(&results)
+table.Scan().Filter("'Date' >= ?", lastUpdate).All(ctx, &results)
 
 // Using dollar signs as a placeholder for attribute names.
 // Deletes the item with an ID of 42 if its score is at or below the cutoff, and its name starts with G.
-table.Delete("ID", 42).If("Score <= ? AND begins_with($, ?)", cutoff, "Name", "G").Run()
+table.Delete("ID", 42).If("Score <= ? AND begins_with($, ?)", cutoff, "Name", "G").Run(ctx)
 
 // Put a new item, only if it doesn't already exist.
-table.Put(item{ID: 42}).If("attribute_not_exists(ID)").Run()
+table.Put(item{ID: 42}).If("attribute_not_exists(ID)").Run(ctx)
 ```
 
 ### Encoding support
@@ -182,42 +187,13 @@ This creates a table with the primary hash key ID and range key Time. It creates
 
 ### Retrying
 
-Requests that fail with certain errors (e.g. `ThrottlingException`) are [automatically retried](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Programming.Errors.html#Programming.Errors.RetryAndBackoff).
-Methods that take a `context.Context` will retry until the context is canceled.
-Methods without a context will use the `RetryTimeout` global variable, which can be changed; using context is recommended instead.
-
-#### Limiting or disabling retrying
-
-The maximum number of retries can be configured via the `MaxRetries` field in the `*aws.Config` passed to `dynamo.New()`. A value of `0` will disable retrying. A value of `-1` means unlimited and is the default (however, context or `RetryTimeout` will still apply).
-
-```go
-db := dynamo.New(session, &aws.Config{
-	MaxRetries: aws.Int(0), // disables automatic retrying
-})
-```
-
-#### Custom retrying logic
-
-If a custom [`request.Retryer`](https://pkg.go.dev/github.com/aws/aws-sdk-go/aws/request#Retryer) is set via the `Retryer` field in `*aws.Config`, dynamo will delegate retrying entirely to it, taking precedence over other retrying settings. This allows you to have full control over all aspects of retrying.
-
-Example using [`client.DefaultRetryer`](https://pkg.go.dev/github.com/aws/aws-sdk-go/aws/client#DefaultRetryer):
-
-```go
-retryer := client.DefaultRetryer{
-	NumMaxRetries:    10,
-	MinThrottleDelay: 500 * time.Millisecond,
-	MaxThrottleDelay: 30 * time.Second,
-}
-db := dynamo.New(session, &aws.Config{
-	Retryer: retryer,
-})
-```
+As of v2, dynamo relies on the AWS SDK for retrying. See: [**Retries and Timeouts documentation**](https://aws.github.io/aws-sdk-go-v2/docs/configuring-sdk/retries-timeouts/) for information about how to configure its behavior.
 
 ### Compatibility with the official AWS library
 
-dynamo has been in development before the official AWS libraries were stable. We use a different encoder and decoder than the [dynamodbattribute](https://godoc.org/github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute) package. dynamo uses the `dynamo` struct tag instead of the `dynamodbav` struct tag, and we also prefer to automatically omit invalid values such as empty strings, whereas the dynamodbattribute package substitutes null values for them. Items that satisfy the [`dynamodbattribute.(Un)marshaler`](https://godoc.org/github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute#Marshaler) interfaces are compatibile with both libraries.
+dynamo has been in development before the official AWS libraries were stable. We use a different encoder and decoder than the [dynamodbattribute](https://pkg.go.dev/github.com/jviney/aws-sdk-go-v2/service/dynamodb/dynamodbattribute) package. dynamo uses the `dynamo` struct tag instead of the `dynamodbav` struct tag, and we also prefer to automatically omit invalid values such as empty strings, whereas the dynamodbattribute package substitutes null values for them. Items that satisfy the [`dynamodbattribute.(Un)marshaler`](https://pkg.go.dev/github.com/jviney/aws-sdk-go-v2/service/dynamodb/dynamodbattribute#Marshaler) interfaces are compatibile with both libraries.
 
-In order to use dynamodbattribute's encoding facilities, you must wrap objects passed to dynamo with [`dynamo.AWSEncoding`](https://godoc.org/github.com/guregu/dynamo#AWSEncoding). Here is a quick example:
+In order to use dynamodbattribute's encoding facilities, you must wrap objects passed to dynamo with [`dynamo.AWSEncoding`](https://godoc.org/github.com/guregu/dynamo/v2#AWSEncoding). Here is a quick example:
 
 ```go
 // Notice the use of the dynamodbav struct tag
@@ -229,11 +205,20 @@ type book struct {
 err := db.Table("Books").Put(dynamo.AWSEncoding(book{
 	ID:    42,
 	Title: "Principia Discordia",
-})).Run()
+})).Run(ctx)
 // When getting an item you MUST pass a pointer to AWSEncoding!
 var someBook book
-err := db.Table("Books").Get("ID", 555).One(dynamo.AWSEncoding(&someBook))
+err := db.Table("Books").Get("ID", 555).One(ctx, dynamo.AWSEncoding(&someBook))
 ```
+
+### Migrating from v1
+
+The API hasn't changed much from v1 to v2. Here are some migration tips:
+
+- All request methods now take a [context](https://go.dev/blog/context) as their first argument.
+- Retrying relies on the AWS SDK configuration, see: [Retrying](#retrying).
+  - Transactions won't retry TransactionCanceled responses by default anymore, make sure you configure that if you need it.
+- [Compatibility with the official AWS library](#compatibility-with-the-official-aws-library) uses v2 interfaces instead of v1.
 
 ### Integration tests
 

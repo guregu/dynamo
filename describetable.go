@@ -268,7 +268,7 @@ func (dt *DescribeTable) Run(ctx context.Context) (Description, error) {
 	}
 
 	desc := newDescription(result.Table)
-	dt.table.desc.Store(desc)
+	dt.table.db.storeDesc(desc)
 	return desc, nil
 }
 

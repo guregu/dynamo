@@ -3,7 +3,6 @@ package dynamo
 import (
 	"context"
 	"fmt"
-	"sync/atomic"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -33,8 +32,6 @@ const (
 type Table struct {
 	name string
 	db   *DB
-	// desc is this table's cached description, used for inferring keys
-	desc *atomic.Value // Description
 }
 
 // Table returns a Table handle specified by name.
@@ -42,7 +39,6 @@ func (db *DB) Table(name string) Table {
 	return Table{
 		name: name,
 		db:   db,
-		desc: new(atomic.Value),
 	}
 }
 
@@ -119,7 +115,8 @@ func (table Table) primaryKeys(ctx context.Context, lek, esk Item, index string)
 	// now we're forced to call DescribeTable
 
 	// do we have a description cached?
-	if desc, ok := table.desc.Load().(Description); ok {
+
+	if desc, ok := table.db.loadDesc(table.name); ok {
 		keys := desc.keys(index)
 		if keys != nil {
 			return keys, nil

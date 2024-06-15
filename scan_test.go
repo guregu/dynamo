@@ -3,6 +3,7 @@ package dynamo
 import (
 	"context"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 )
@@ -176,7 +177,12 @@ func TestScanMagicLEK(t *testing.T) {
 	if testDB == nil {
 		t.Skip(offlineSkipMsg)
 	}
-	table := testDB.Table(testTableWidgets)
+
+	testDB0 := *testDB
+	testDB0.descs = new(sync.Map)
+	freshTestDB := &testDB0
+
+	table := freshTestDB.Table(testTableWidgets)
 	ctx := context.Background()
 
 	widgets := []interface{}{

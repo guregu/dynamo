@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -17,6 +18,8 @@ import (
 // DB is a DynamoDB client.
 type DB struct {
 	client dynamodbiface.DynamoDBAPI
+	// table description cache for LEK inference
+	descs *sync.Map // table name → Description
 }
 
 // New creates a new client with the given configuration.
@@ -32,6 +35,7 @@ func New(cfg aws.Config, options ...func(*dynamodb.Options)) *DB {
 func NewFromIface(client dynamodbiface.DynamoDBAPI) *DB {
 	db := &DB{
 		client: client,
+		descs:  new(sync.Map),
 	}
 	return db
 }
@@ -39,6 +43,17 @@ func NewFromIface(client dynamodbiface.DynamoDBAPI) *DB {
 // Client returns this DB's internal client used to make API requests.
 func (db *DB) Client() dynamodbiface.DynamoDBAPI {
 	return db.client
+}
+
+func (db *DB) loadDesc(name string) (desc Description, ok bool) {
+	if descv, exists := db.descs.Load(name); exists {
+		desc, ok = descv.(Description)
+	}
+	return
+}
+
+func (db *DB) storeDesc(desc Description) {
+	db.descs.Store(desc.Name, desc)
 }
 
 // ListTables is a request to list tables.

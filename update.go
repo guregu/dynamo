@@ -349,7 +349,7 @@ func (u *Update) run(ctx context.Context) (*dynamodb.UpdateItemOutput, error) {
 		output, err = u.table.db.client.UpdateItem(ctx, input)
 		return err
 	})
-	if u.cc != nil {
+	if u.cc != nil && output != nil {
 		addConsumedCapacity(u.cc, output.ConsumedCapacity)
 	}
 	return output, err

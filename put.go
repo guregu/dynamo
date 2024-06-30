@@ -83,7 +83,7 @@ func (p *Put) run(ctx context.Context) (output *dynamodb.PutItemOutput, err erro
 		output, err = p.table.db.client.PutItem(ctx, req)
 		return err
 	})
-	if p.cc != nil {
+	if p.cc != nil && output != nil {
 		addConsumedCapacity(p.cc, output.ConsumedCapacity)
 	}
 	return

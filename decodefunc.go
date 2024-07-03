@@ -203,7 +203,7 @@ func decodeMap(decodeKey func(reflect.Value, string) error) func(plan *typedef, 
 			}
 			innerRV := reflect.New(rv.Type().Elem())
 			if err := plan.decodeAttr(flags, v, innerRV.Elem()); err != nil {
-				return fmt.Errorf("error decoding key %q into %v", name, kp.Type().Elem())
+				return fmt.Errorf("error decoding map entry %q (%s) into type %v", name, avTypeName(v), innerRV.Type().Elem())
 			}
 			rv.SetMapIndex(kp.Elem(), innerRV.Elem())
 		}

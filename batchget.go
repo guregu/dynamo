@@ -232,6 +232,7 @@ func (bg *BatchGet) input(start int) *dynamodb.BatchGetItemInput {
 			continue
 		}
 		kas.Keys = append(kas.Keys, get.keys())
+		in.RequestItems[table] = kas
 	}
 	return in
 }

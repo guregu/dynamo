@@ -188,3 +188,14 @@ func TestBatchEmptyInput(t *testing.T) {
 		t.Error("unexpected error", err)
 	}
 }
+
+func TestBatchGetInputSize(t *testing.T) {
+	// see: https://github.com/guregu/dynamo/issues/240
+	table := testDB.Table(testTableWidgets)
+	keys := []Keyed{Keys{1, "abc"}, Keys{2, "def"}}
+	batch := table.Batch("UserID", "Time").Get(keys...)
+	input := batch.input(0)
+	if size := len(input.RequestItems[testTableWidgets].Keys); size != len(keys) {
+		t.Error("input amalgamation size mismatch. want:", len(keys), "got:", size)
+	}
+}

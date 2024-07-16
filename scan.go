@@ -254,6 +254,7 @@ func (s *Scan) Count(ctx context.Context) (int, error) {
 		err := s.table.db.retry(ctx, func() error {
 			var err error
 			out, err = s.table.db.client.Scan(ctx, input)
+			s.cc.incRequests()
 			return err
 		})
 		if err != nil {
@@ -399,6 +400,7 @@ redo:
 	itr.err = itr.scan.table.db.retry(ctx, func() error {
 		var err error
 		itr.output, err = itr.scan.table.db.client.Scan(ctx, itr.input)
+		itr.scan.cc.incRequests()
 		return err
 	})
 

@@ -221,6 +221,7 @@ func (q *Query) One(ctx context.Context, out interface{}) error {
 		err := q.table.db.retry(ctx, func() error {
 			var err error
 			res, err = q.table.db.client.GetItem(ctx, req)
+			q.cc.incRequests()
 			if err != nil {
 				return err
 			}
@@ -246,6 +247,7 @@ func (q *Query) One(ctx context.Context, out interface{}) error {
 	err := q.table.db.retry(ctx, func() error {
 		var err error
 		res, err = q.table.db.client.Query(ctx, req)
+		q.cc.incRequests()
 		if err != nil {
 			return err
 		}
@@ -288,6 +290,7 @@ func (q *Query) Count(ctx context.Context) (int, error) {
 		err := q.table.db.retry(ctx, func() error {
 			var err error
 			res, err = q.table.db.client.Query(ctx, input)
+			q.cc.incRequests()
 			if err != nil {
 				return err
 			}
@@ -392,6 +395,7 @@ func (itr *queryIter) Next(ctx context.Context, out interface{}) bool {
 	itr.err = itr.query.table.db.retry(ctx, func() error {
 		var err error
 		itr.output, err = itr.query.table.db.client.Query(ctx, itr.input)
+		itr.query.cc.incRequests()
 		return err
 	})
 

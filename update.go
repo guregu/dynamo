@@ -347,6 +347,7 @@ func (u *Update) run(ctx context.Context) (*dynamodb.UpdateItemOutput, error) {
 	err := u.table.db.retry(ctx, func() error {
 		var err error
 		output, err = u.table.db.client.UpdateItem(ctx, input)
+		u.cc.incRequests()
 		return err
 	})
 	if u.cc != nil && output != nil {

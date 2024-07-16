@@ -139,6 +139,7 @@ func (bw *BatchWrite) Run(ctx context.Context) (wrote int, err error) {
 			err := bw.batch.table.db.retry(ctx, func() error {
 				var err error
 				res, err = bw.batch.table.db.client.BatchWriteItem(ctx, req)
+				bw.cc.incRequests()
 				return err
 			})
 			if err != nil {

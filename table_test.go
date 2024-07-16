@@ -170,7 +170,7 @@ func TestAddConsumedCapacity(t *testing.T) {
 	}
 
 	var cc = new(ConsumedCapacity)
-	addConsumedCapacity(cc, raw)
+	cc.add(raw)
 
 	if !reflect.DeepEqual(cc, expected) {
 		t.Error("bad ConsumedCapacity:", cc, "≠", expected)

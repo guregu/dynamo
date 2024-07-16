@@ -348,8 +348,8 @@ redo:
 		return false
 	}
 	if itr.bg.cc != nil {
-		for _, cc := range itr.output.ConsumedCapacity {
-			addConsumedCapacity(itr.bg.cc, &cc)
+		for i := range itr.output.ConsumedCapacity {
+			itr.bg.cc.add(&itr.output.ConsumedCapacity[i])
 		}
 	}
 

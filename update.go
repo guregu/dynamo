@@ -350,8 +350,8 @@ func (u *Update) run(ctx context.Context) (*dynamodb.UpdateItemOutput, error) {
 		u.cc.incRequests()
 		return err
 	})
-	if u.cc != nil && output != nil {
-		addConsumedCapacity(u.cc, output.ConsumedCapacity)
+	if output != nil {
+		u.cc.add(output.ConsumedCapacity)
 	}
 	return output, err
 }

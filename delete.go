@@ -111,8 +111,8 @@ func (d *Delete) run(ctx context.Context) (*dynamodb.DeleteItemOutput, error) {
 		d.cc.incRequests()
 		return err
 	})
-	if d.cc != nil && output != nil {
-		addConsumedCapacity(d.cc, output.ConsumedCapacity)
+	if output != nil {
+		d.cc.add(output.ConsumedCapacity)
 	}
 	return output, err
 }

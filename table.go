@@ -241,7 +241,7 @@ type ConsumedCapacity struct {
 	Requests int
 }
 
-func addConsumedCapacity(cc *ConsumedCapacity, raw *types.ConsumedCapacity) {
+func (cc *ConsumedCapacity) add(raw *types.ConsumedCapacity) {
 	if cc == nil || raw == nil {
 		return
 	}

@@ -233,9 +233,7 @@ func (q *Query) One(ctx context.Context, out interface{}) error {
 		if err != nil {
 			return err
 		}
-		if q.cc != nil {
-			addConsumedCapacity(q.cc, res.ConsumedCapacity)
-		}
+		q.cc.add(res.ConsumedCapacity)
 
 		return unmarshalItem(res.Item, out)
 	}
@@ -266,9 +264,7 @@ func (q *Query) One(ctx context.Context, out interface{}) error {
 	if err != nil {
 		return err
 	}
-	if q.cc != nil {
-		addConsumedCapacity(q.cc, res.ConsumedCapacity)
-	}
+	q.cc.add(res.ConsumedCapacity)
 
 	return unmarshalItem(res.Items[0], out)
 }
@@ -304,9 +300,7 @@ func (q *Query) Count(ctx context.Context) (int, error) {
 		if err != nil {
 			return 0, err
 		}
-		if q.cc != nil {
-			addConsumedCapacity(q.cc, res.ConsumedCapacity)
-		}
+		q.cc.add(res.ConsumedCapacity)
 
 		q.startKey = res.LastEvaluatedKey
 		if res.LastEvaluatedKey == nil ||
@@ -402,9 +396,7 @@ func (itr *queryIter) Next(ctx context.Context, out interface{}) bool {
 	if itr.err != nil {
 		return false
 	}
-	if itr.query.cc != nil {
-		addConsumedCapacity(itr.query.cc, itr.output.ConsumedCapacity)
-	}
+	itr.query.cc.add(itr.output.ConsumedCapacity)
 	if len(itr.output.LastEvaluatedKey) > len(itr.exLEK) {
 		itr.exLEK = itr.output.LastEvaluatedKey
 	}

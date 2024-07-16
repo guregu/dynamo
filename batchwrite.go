@@ -146,8 +146,8 @@ func (bw *BatchWrite) Run(ctx context.Context) (wrote int, err error) {
 				return wrote, err
 			}
 			if bw.cc != nil {
-				for _, cc := range res.ConsumedCapacity {
-					addConsumedCapacity(bw.cc, &cc)
+				for i := range res.ConsumedCapacity {
+					bw.cc.add(&res.ConsumedCapacity[i])
 				}
 			}
 

@@ -70,9 +70,10 @@ func (tx *GetTx) Run(ctx context.Context) error {
 	err = tx.db.retry(ctx, func() error {
 		var err error
 		resp, err = tx.db.client.TransactGetItems(ctx, input)
+		tx.cc.incRequests()
 		if tx.cc != nil && resp != nil {
-			for _, cc := range resp.ConsumedCapacity {
-				addConsumedCapacity(tx.cc, &cc)
+			for i := range resp.ConsumedCapacity {
+				tx.cc.add(&resp.ConsumedCapacity[i])
 			}
 		}
 		return err
@@ -110,9 +111,10 @@ func (tx *GetTx) All(ctx context.Context, out interface{}) error {
 	err = tx.db.retry(ctx, func() error {
 		var err error
 		resp, err = tx.db.client.TransactGetItems(ctx, input)
+		tx.cc.incRequests()
 		if tx.cc != nil && resp != nil {
-			for _, cc := range resp.ConsumedCapacity {
-				addConsumedCapacity(tx.cc, &cc)
+			for i := range resp.ConsumedCapacity {
+				tx.cc.add(&resp.ConsumedCapacity[i])
 			}
 		}
 		return err
@@ -256,9 +258,10 @@ func (tx *WriteTx) Run(ctx context.Context) error {
 	}
 	err = tx.db.retry(ctx, func() error {
 		out, err := tx.db.client.TransactWriteItems(ctx, input)
-		if tx.cc != nil && out != nil {
-			for _, cc := range out.ConsumedCapacity {
-				addConsumedCapacity(tx.cc, &cc)
+		tx.cc.incRequests()
+		if out != nil {
+			for i := range out.ConsumedCapacity {
+				tx.cc.add(&out.ConsumedCapacity[i])
 			}
 		}
 		return err

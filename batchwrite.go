@@ -139,14 +139,15 @@ func (bw *BatchWrite) Run(ctx context.Context) (wrote int, err error) {
 			err := bw.batch.table.db.retry(ctx, func() error {
 				var err error
 				res, err = bw.batch.table.db.client.BatchWriteItem(ctx, req)
+				bw.cc.incRequests()
 				return err
 			})
 			if err != nil {
 				return wrote, err
 			}
 			if bw.cc != nil {
-				for _, cc := range res.ConsumedCapacity {
-					addConsumedCapacity(bw.cc, &cc)
+				for i := range res.ConsumedCapacity {
+					bw.cc.add(&res.ConsumedCapacity[i])
 				}
 			}
 

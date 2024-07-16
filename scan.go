@@ -254,6 +254,7 @@ func (s *Scan) Count(ctx context.Context) (int, error) {
 		err := s.table.db.retry(ctx, func() error {
 			var err error
 			out, err = s.table.db.client.Scan(ctx, input)
+			s.cc.incRequests()
 			return err
 		})
 		if err != nil {
@@ -263,10 +264,7 @@ func (s *Scan) Count(ctx context.Context) (int, error) {
 
 		count += int(out.Count)
 		scanned += out.ScannedCount
-
-		if s.cc != nil {
-			addConsumedCapacity(s.cc, out.ConsumedCapacity)
-		}
+		s.cc.add(out.ConsumedCapacity)
 
 		if out.LastEvaluatedKey == nil ||
 			(s.limit > 0 && count >= s.limit) ||
@@ -399,15 +397,14 @@ redo:
 	itr.err = itr.scan.table.db.retry(ctx, func() error {
 		var err error
 		itr.output, err = itr.scan.table.db.client.Scan(ctx, itr.input)
+		itr.scan.cc.incRequests()
 		return err
 	})
 
 	if itr.err != nil {
 		return false
 	}
-	if itr.scan.cc != nil {
-		addConsumedCapacity(itr.scan.cc, itr.output.ConsumedCapacity)
-	}
+	itr.scan.cc.add(itr.output.ConsumedCapacity)
 	if len(itr.output.LastEvaluatedKey) > len(itr.exLEK) {
 		itr.exLEK = itr.output.LastEvaluatedKey
 	}

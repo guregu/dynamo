@@ -207,6 +207,7 @@ type ConsumedCapacity struct {
 	// Write is the total number of write capacity units consumed during this operation.
 	// This seems to be only set for transactions.
 	Write float64
+
 	// GSI is a map of Global Secondary Index names to total consumed capacity units.
 	GSI map[string]float64
 	// GSIRead is a map of Global Secondary Index names to consumed read capacity units.
@@ -215,6 +216,7 @@ type ConsumedCapacity struct {
 	// GSIWrite is a map of Global Secondary Index names to consumed write capacity units.
 	// This seems to be only set for transactions.
 	GSIWrite map[string]float64
+
 	// LSI is a map of Local Secondary Index names to total consumed capacity units.
 	LSI map[string]float64
 	// LSIRead is a map of Local Secondary Index names to consumed read capacity units.
@@ -223,6 +225,7 @@ type ConsumedCapacity struct {
 	// LSIWrite is a map of Local Secondary Index names to consumed write capacity units.
 	// This seems to be only set for transactions.
 	LSIWrite map[string]float64
+
 	// Table is the amount of total throughput consumed by the table.
 	Table float64
 	// TableRead is the amount of read throughput consumed by the table.
@@ -233,9 +236,12 @@ type ConsumedCapacity struct {
 	TableWrite float64
 	// TableName is the name of the table affected by this operation.
 	TableName string
+
+	// Requests is the number of SDK requests made against DynamoDB's API.
+	Requests int
 }
 
-func addConsumedCapacity(cc *ConsumedCapacity, raw *types.ConsumedCapacity) {
+func (cc *ConsumedCapacity) add(raw *types.ConsumedCapacity) {
 	if cc == nil || raw == nil {
 		return
 	}
@@ -302,6 +308,13 @@ func addConsumedCapacity(cc *ConsumedCapacity, raw *types.ConsumedCapacity) {
 	}
 }
 
+func (cc *ConsumedCapacity) incRequests() {
+	if cc == nil {
+		return
+	}
+	cc.Requests++
+}
+
 func mergeConsumedCapacity(dst, src *ConsumedCapacity) {
 	if dst == nil || src == nil {
 		return
@@ -363,4 +376,5 @@ func mergeConsumedCapacity(dst, src *ConsumedCapacity) {
 	if dst.TableName == "" && src.TableName != "" {
 		dst.TableName = src.TableName
 	}
+	dst.Requests += src.Requests
 }

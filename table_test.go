@@ -170,11 +170,20 @@ func TestAddConsumedCapacity(t *testing.T) {
 	}
 
 	var cc = new(ConsumedCapacity)
-	addConsumedCapacity(cc, raw)
+	cc.add(raw)
 
 	if !reflect.DeepEqual(cc, expected) {
 		t.Error("bad ConsumedCapacity:", cc, "≠", expected)
 	}
+
+	t.Run("request count", func(t *testing.T) {
+		const expectedReqs = 2
+		cc.incRequests()
+		cc.incRequests()
+		if cc.Requests != expectedReqs {
+			t.Error("bad Requests count:", cc.Requests, "≠", expectedReqs)
+		}
+	})
 }
 
 func normalizeDesc(desc *Description) {

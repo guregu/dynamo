@@ -341,14 +341,15 @@ redo:
 	itr.err = itr.bg.batch.table.db.retry(ctx, func() error {
 		var err error
 		itr.output, err = itr.bg.batch.table.db.client.BatchGetItem(ctx, itr.input)
+		itr.bg.cc.incRequests()
 		return err
 	})
 	if itr.err != nil {
 		return false
 	}
 	if itr.bg.cc != nil {
-		for _, cc := range itr.output.ConsumedCapacity {
-			addConsumedCapacity(itr.bg.cc, &cc)
+		for i := range itr.output.ConsumedCapacity {
+			itr.bg.cc.add(&itr.output.ConsumedCapacity[i])
 		}
 	}
 

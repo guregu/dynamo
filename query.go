@@ -221,6 +221,7 @@ func (q *Query) One(ctx context.Context, out interface{}) error {
 		err := q.table.db.retry(ctx, func() error {
 			var err error
 			res, err = q.table.db.client.GetItem(ctx, req)
+			q.cc.incRequests()
 			if err != nil {
 				return err
 			}
@@ -232,9 +233,7 @@ func (q *Query) One(ctx context.Context, out interface{}) error {
 		if err != nil {
 			return err
 		}
-		if q.cc != nil {
-			addConsumedCapacity(q.cc, res.ConsumedCapacity)
-		}
+		q.cc.add(res.ConsumedCapacity)
 
 		return unmarshalItem(res.Item, out)
 	}
@@ -246,6 +245,7 @@ func (q *Query) One(ctx context.Context, out interface{}) error {
 	err := q.table.db.retry(ctx, func() error {
 		var err error
 		res, err = q.table.db.client.Query(ctx, req)
+		q.cc.incRequests()
 		if err != nil {
 			return err
 		}
@@ -264,9 +264,7 @@ func (q *Query) One(ctx context.Context, out interface{}) error {
 	if err != nil {
 		return err
 	}
-	if q.cc != nil {
-		addConsumedCapacity(q.cc, res.ConsumedCapacity)
-	}
+	q.cc.add(res.ConsumedCapacity)
 
 	return unmarshalItem(res.Items[0], out)
 }
@@ -288,6 +286,7 @@ func (q *Query) Count(ctx context.Context) (int, error) {
 		err := q.table.db.retry(ctx, func() error {
 			var err error
 			res, err = q.table.db.client.Query(ctx, input)
+			q.cc.incRequests()
 			if err != nil {
 				return err
 			}
@@ -301,9 +300,7 @@ func (q *Query) Count(ctx context.Context) (int, error) {
 		if err != nil {
 			return 0, err
 		}
-		if q.cc != nil {
-			addConsumedCapacity(q.cc, res.ConsumedCapacity)
-		}
+		q.cc.add(res.ConsumedCapacity)
 
 		q.startKey = res.LastEvaluatedKey
 		if res.LastEvaluatedKey == nil ||
@@ -392,15 +389,14 @@ func (itr *queryIter) Next(ctx context.Context, out interface{}) bool {
 	itr.err = itr.query.table.db.retry(ctx, func() error {
 		var err error
 		itr.output, err = itr.query.table.db.client.Query(ctx, itr.input)
+		itr.query.cc.incRequests()
 		return err
 	})
 
 	if itr.err != nil {
 		return false
 	}
-	if itr.query.cc != nil {
-		addConsumedCapacity(itr.query.cc, itr.output.ConsumedCapacity)
-	}
+	itr.query.cc.add(itr.output.ConsumedCapacity)
 	if len(itr.output.LastEvaluatedKey) > len(itr.exLEK) {
 		itr.exLEK = itr.output.LastEvaluatedKey
 	}

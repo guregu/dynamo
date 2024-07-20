@@ -193,6 +193,38 @@ func (bg *BatchGet) Iter() Iter {
 
 // IterWithTable is like [BatchGet.Iter], but will update the value pointed by tablePtr after each iteration.
 // This can be useful when getting from multiple tables to determine which table the latest item came from.
+//
+// For example, you can utilize this iterator to read the results into different structs.
+//
+//	widgetBatch := widgetsTable.Batch("UserID").Get(dynamo.Keys{userID})
+//	sprocketBatch := sprocketsTable.Batch("UserID").Get(dynamo.Keys{userID})
+//
+//	var table string
+//	iter := widgetBatch.Merge(sprocketBatch).IterWithTable(&table)
+//
+//	// now we will use the table iterator to unmarshal the values into their respective types
+//	var s sprocket
+//	var w widget
+//	var tmp map[string]types.AttributeValue
+//	for iter.Next(ctx, &tmp) {
+//		if table == "Widgets" {
+//			err := dynamo.UnmarshalItem(tmp, &w)
+//			if err != nil {
+//				fmt.Println(err)
+//			}
+//		} else if table == "Sprockets" {
+//			err := dynamo.UnmarshalItem(tmp, &s)
+//			if err != nil {
+//				fmt.Println(err)
+//			}
+//		} else {
+//			fmt.Printf("Unexpected Table: %s\n", table)
+//		}
+//	}
+//
+//	if iter.Err() != nil {
+//		fmt.Println(iter.Err())
+//	}
 func (bg *BatchGet) IterWithTable(tablePtr *string) Iter {
 	return newBGIter(bg, unmarshalItem, tablePtr, bg.err)
 }

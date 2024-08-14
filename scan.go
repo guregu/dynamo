@@ -434,6 +434,12 @@ func (itr *scanIter) Err() error {
 	return itr.err
 }
 
+func (itr *scanIter) SetError(err error) {
+	if itr.err == nil {
+		itr.err = err
+	}
+}
+
 // LastEvaluatedKey returns a key that can be used to continue this scan.
 // Use with SearchLimit for best results.
 func (itr *scanIter) LastEvaluatedKey(ctx context.Context) (PagingKey, error) {

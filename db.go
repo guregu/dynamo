@@ -203,6 +203,45 @@ func IsCondCheckFailed(err error) bool {
 	return false
 }
 
-// type noopLogger struct{}
+// Unmarshals an item from a ConditionalCheckFailedException into `out`, with the same behavior as [UnmarshalItem].
+// The return value boolean `match` will be true if condCheckErr is a ConditionalCheckFailedException,
+// otherwise false if it is nil or a different error.
+func UnmarshalItemFromCondCheckFailed(condCheckErr error, out any) (match bool, err error) {
+	if condCheckErr == nil {
+		return false, nil
+	}
+	var cfe *types.ConditionalCheckFailedException
+	if errors.As(condCheckErr, &cfe) {
+		if cfe.Item == nil {
+			return true, fmt.Errorf("dynamo: ConditionalCheckFailedException does not contain item")
+		}
+		return true, UnmarshalItem(cfe.Item, out)
+	}
+	return false, condCheckErr
+}
 
-// func (noopLogger) Log(...interface{}) {}
+// Unmarshals items from a TransactionCanceledException by appending them to `out`, which must be a pointer to a slice.
+// The return value boolean `match` will be true if txCancelErr is a TransactionCanceledException with at least one ConditionalCheckFailed cancellation reason,
+// otherwise false if it is nil or a different error.
+func UnmarshalItemsFromTxCondCheckFailed(txCancelErr error, out any) (match bool, err error) {
+	if txCancelErr == nil {
+		return false, nil
+	}
+	unmarshal := unmarshalAppendTo(out)
+	var txe *types.TransactionCanceledException
+	if errors.As(txCancelErr, &txe) {
+		for _, cr := range txe.CancellationReasons {
+			if cr.Code != nil && *cr.Code == "ConditionalCheckFailed" {
+				if cr.Item == nil {
+					return true, fmt.Errorf("dynamo: TransactionCanceledException.CancellationReasons does not contain item")
+				}
+				if err = unmarshal(cr.Item, out); err != nil {
+					return true, err
+				}
+				match = true
+			}
+		}
+		return match, nil
+	}
+	return false, txCancelErr
+}

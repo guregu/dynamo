@@ -86,6 +86,7 @@ func (check *ConditionCheck) writeTxItem() (*types.TransactWriteItem, error) {
 	}
 	if check.condition != "" {
 		item.ConditionExpression = aws.String(check.condition)
+		item.ReturnValuesOnConditionCheckFailure = types.ReturnValuesOnConditionCheckFailureAllOld
 	}
 	return &types.TransactWriteItem{
 		ConditionCheck: item,

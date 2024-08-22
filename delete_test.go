@@ -29,13 +29,17 @@ func TestDelete(t *testing.T) {
 	}
 
 	// fail to delete it
-	err = table.Delete("UserID", item.UserID).
+	var curr widget
+	wrote, err := table.Delete("UserID", item.UserID).
 		Range("Time", item.Time).
 		If("Meta.'color' = ?", "octarine").
 		If("Msg = ?", "wrong msg").
-		Run(ctx)
-	if !IsCondCheckFailed(err) {
-		t.Error("expected ConditionalCheckFailedException, not", err)
+		CurrentValue(ctx, &curr)
+	if wrote {
+		t.Error("wrote should be false")
+	}
+	if !reflect.DeepEqual(curr, item) {
+		t.Errorf("bad value. %#v ≠ %#v", curr, item)
 	}
 
 	// delete it

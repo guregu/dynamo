@@ -13,8 +13,10 @@ import (
 // It uses the UpdateItem API.
 // See: http://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_UpdateItem.html
 type Update struct {
-	table      Table
+	table Table
+
 	returnType types.ReturnValue
+	onCondFail types.ReturnValuesOnConditionCheckFailure
 
 	hashKey   string
 	hashValue types.AttributeValue
@@ -347,6 +349,7 @@ func (u *Update) OnlyUpdatedOldValue(ctx context.Context, out interface{}) error
 // See also: [UnmarshalItemFromCondCheckFailed].
 func (u *Update) CurrentValue(ctx context.Context, out interface{}) (wrote bool, err error) {
 	u.returnType = types.ReturnValueAllNew
+	u.onCondFail = types.ReturnValuesOnConditionCheckFailureAllOld
 	output, err := u.run(ctx)
 	if err != nil {
 		if ok, err := UnmarshalItemFromCondCheckFailed(err, out); ok {
@@ -355,6 +358,17 @@ func (u *Update) CurrentValue(ctx context.Context, out interface{}) (wrote bool,
 		return false, err
 	}
 	return true, unmarshalItem(output.Attributes, out)
+}
+
+// IncludeAllItemsInCondCheckFail specifies whether an item update that fails its condition check should include the item itself in the error.
+// Such items can be extracted using [UnmarshalItemFromCondCheckFailed] for single updates, or [UnmarshalItemsFromTxCondCheckFailed] for write transactions.
+func (u *Update) IncludeItemInCondCheckFail(enabled bool) *Update {
+	if enabled {
+		u.onCondFail = types.ReturnValuesOnConditionCheckFailureAllOld
+	} else {
+		u.onCondFail = types.ReturnValuesOnConditionCheckFailureNone
+	}
+	return u
 }
 
 func (u *Update) run(ctx context.Context) (*dynamodb.UpdateItemOutput, error) {
@@ -387,7 +401,7 @@ func (u *Update) updateInput() *dynamodb.UpdateItemInput {
 	}
 	if u.condition != "" {
 		input.ConditionExpression = &u.condition
-		input.ReturnValuesOnConditionCheckFailure = types.ReturnValuesOnConditionCheckFailureAllOld
+		input.ReturnValuesOnConditionCheckFailure = u.onCondFail
 	}
 	if u.cc != nil {
 		input.ReturnConsumedCapacity = types.ReturnConsumedCapacityIndexes

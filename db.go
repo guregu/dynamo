@@ -213,7 +213,7 @@ func UnmarshalItemFromCondCheckFailed(condCheckErr error, out any) (match bool, 
 	var cfe *types.ConditionalCheckFailedException
 	if errors.As(condCheckErr, &cfe) {
 		if cfe.Item == nil {
-			return true, fmt.Errorf("dynamo: ConditionalCheckFailedException does not contain item")
+			return true, fmt.Errorf("dynamo: ConditionalCheckFailedException does not contain item (is IncludeItemInCondCheckFail disabled?): %w", condCheckErr)
 		}
 		return true, UnmarshalItem(cfe.Item, out)
 	}
@@ -233,7 +233,7 @@ func UnmarshalItemsFromTxCondCheckFailed(txCancelErr error, out any) (match bool
 		for _, cr := range txe.CancellationReasons {
 			if cr.Code != nil && *cr.Code == "ConditionalCheckFailed" {
 				if cr.Item == nil {
-					return true, fmt.Errorf("dynamo: TransactionCanceledException.CancellationReasons does not contain item")
+					return true, fmt.Errorf("dynamo: TransactionCanceledException.CancellationReasons does not contain item (is IncludeItemInCondCheckFail disabled?): %w", txCancelErr)
 				}
 				if err = unmarshal(cr.Item, out); err != nil {
 					return true, err

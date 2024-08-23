@@ -11,8 +11,10 @@ import (
 // Delete is a request to delete an item.
 // See: http://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_DeleteItem.html
 type Delete struct {
-	table      Table
+	table Table
+
 	returnType types.ReturnValue
+	onCondFail types.ReturnValuesOnConditionCheckFailure
 
 	hashKey   string
 	hashValue types.AttributeValue
@@ -108,6 +110,7 @@ func (d *Delete) OldValue(ctx context.Context, out interface{}) error {
 // See also: [UnmarshalItemFromCondCheckFailed].
 func (d *Delete) CurrentValue(ctx context.Context, out interface{}) (wrote bool, err error) {
 	d.returnType = types.ReturnValueNone
+	d.onCondFail = types.ReturnValuesOnConditionCheckFailureAllOld
 	_, err = d.run(ctx)
 	if err != nil {
 		if ok, err := UnmarshalItemFromCondCheckFailed(err, out); ok {
@@ -116,6 +119,17 @@ func (d *Delete) CurrentValue(ctx context.Context, out interface{}) (wrote bool,
 		return false, err
 	}
 	return true, nil
+}
+
+// IncludeAllItemsInCondCheckFail specifies whether an item delete that fails its condition check should include the item itself in the error.
+// Such items can be extracted using [UnmarshalItemFromCondCheckFailed] for single deletes, or [UnmarshalItemsFromTxCondCheckFailed] for write transactions.
+func (d *Delete) IncludeItemInCondCheckFail(enabled bool) *Delete {
+	if enabled {
+		d.onCondFail = types.ReturnValuesOnConditionCheckFailureAllOld
+	} else {
+		d.onCondFail = types.ReturnValuesOnConditionCheckFailureNone
+	}
+	return d
 }
 
 func (d *Delete) run(ctx context.Context) (*dynamodb.DeleteItemOutput, error) {
@@ -147,7 +161,7 @@ func (d *Delete) deleteInput() *dynamodb.DeleteItemInput {
 	}
 	if d.condition != "" {
 		input.ConditionExpression = &d.condition
-		input.ReturnValuesOnConditionCheckFailure = types.ReturnValuesOnConditionCheckFailureAllOld
+		input.ReturnValuesOnConditionCheckFailure = d.onCondFail
 	}
 	if d.cc != nil {
 		input.ReturnConsumedCapacity = types.ReturnConsumedCapacityIndexes

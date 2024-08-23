@@ -143,6 +143,7 @@ func TestTx(t *testing.T) {
 		tx := testDB.WriteTx()
 		tx.Put(table.Put(widget{UserID: 69, Time: date1}).If("'BadField' = ?", "should not exist"))
 		tx.Put(table.Put(widget{UserID: 69, Time: date2}).If("'BadField' = ?", "should not exist"))
+		tx.IncludeAllItemsInCondCheckFail(true)
 		err := tx.Run(ctx)
 		if err == nil {
 			t.Fatal("expected error")

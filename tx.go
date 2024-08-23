@@ -168,11 +168,12 @@ type writeTxOp interface {
 // WriteTx is analogous to TransactWriteItems in DynamoDB's API.
 // See: https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_TransactWriteItems.html
 type WriteTx struct {
-	db    *DB
-	items []writeTxOp
-	token string
-	cc    *ConsumedCapacity
-	err   error
+	db         *DB
+	items      []writeTxOp
+	token      string
+	onCondFail types.ReturnValuesOnConditionCheckFailure
+	cc         *ConsumedCapacity
+	err        error
 }
 
 // WriteTx begins a new write transaction.
@@ -203,6 +204,20 @@ func (tx *WriteTx) Update(u *Update) *WriteTx {
 // Check adds a conditional check to this transaction.
 func (tx *WriteTx) Check(check *ConditionCheck) *WriteTx {
 	tx.items = append(tx.items, check)
+	return tx
+}
+
+// IncludeAllItemsInCondCheckFail specifies whether an item write that fails its condition check should include the item itself in the error.
+// Such items can be extracted using [UnmarshalItemsFromTxCondCheckFailed].
+//
+// By default, the individual settings for each item are respected.
+// Calling this will override all individual settings.
+func (tx *WriteTx) IncludeAllItemsInCondCheckFail(enabled bool) *WriteTx {
+	if enabled {
+		tx.onCondFail = types.ReturnValuesOnConditionCheckFailureAllOld
+	} else {
+		tx.onCondFail = types.ReturnValuesOnConditionCheckFailureNone
+	}
 	return tx
 }
 
@@ -279,6 +294,7 @@ func (tx *WriteTx) input() (*dynamodb.TransactWriteItemsInput, error) {
 		if err != nil {
 			return nil, err
 		}
+		setTWIReturnType(wti, tx.onCondFail)
 		input.TransactItems = append(input.TransactItems, *wti)
 	}
 	if tx.token != "" {
@@ -288,6 +304,22 @@ func (tx *WriteTx) input() (*dynamodb.TransactWriteItemsInput, error) {
 		input.ReturnConsumedCapacity = types.ReturnConsumedCapacityIndexes
 	}
 	return input, nil
+}
+
+func setTWIReturnType(wti *types.TransactWriteItem, ret types.ReturnValuesOnConditionCheckFailure) {
+	if ret == "" {
+		return
+	}
+	switch {
+	case wti.ConditionCheck != nil:
+		wti.ConditionCheck.ReturnValuesOnConditionCheckFailure = ret
+	case wti.Delete != nil:
+		wti.Delete.ReturnValuesOnConditionCheckFailure = ret
+	case wti.Put != nil:
+		wti.Put.ReturnValuesOnConditionCheckFailure = ret
+	case wti.Update != nil:
+		wti.Update.ReturnValuesOnConditionCheckFailure = ret
+	}
 }
 
 func (tx *WriteTx) setError(err error) {

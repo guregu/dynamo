@@ -70,7 +70,10 @@ func TestPut(t *testing.T) {
 
 	// putting the same item: this should fail
 	t.Run("UnmarshalItemFromCondCheckFailed", func(t *testing.T) {
-		err := table.Put(newItem).If("attribute_not_exists(UserID)").If("attribute_not_exists('Time')").Run(ctx)
+		err := table.Put(newItem).
+			If("attribute_not_exists(UserID)").
+			If("attribute_not_exists('Time')").
+			IncludeItemInCondCheckFail(true).Run(ctx)
 		if !IsCondCheckFailed(err) {
 			t.Error("expected ConditionalCheckFailedException, not", err)
 		}

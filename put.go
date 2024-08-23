@@ -10,8 +10,10 @@ import (
 // Put is a request to create or replace an item.
 // See: http://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_PutItem.html
 type Put struct {
-	table      Table
+	table Table
+
 	returnType types.ReturnValue
+	onCondFail types.ReturnValuesOnConditionCheckFailure
 
 	item Item
 	subber
@@ -83,6 +85,7 @@ func (p *Put) OldValue(ctx context.Context, out interface{}) error {
 // See also: [UnmarshalItemFromCondCheckFailed].
 func (p *Put) CurrentValue(ctx context.Context, out interface{}) (wrote bool, err error) {
 	p.returnType = types.ReturnValueNone
+	p.onCondFail = types.ReturnValuesOnConditionCheckFailureAllOld
 	item, _, err := p.run(ctx)
 	wrote = err == nil
 	if err != nil {
@@ -91,6 +94,17 @@ func (p *Put) CurrentValue(ctx context.Context, out interface{}) (wrote bool, er
 	}
 	err = unmarshalItem(item, out)
 	return
+}
+
+// IncludeAllItemsInCondCheckFail specifies whether an item put that fails its condition check should include the item itself in the error.
+// Such items can be extracted using [UnmarshalItemFromCondCheckFailed] for single puts, or [UnmarshalItemsFromTxCondCheckFailed] for write transactions.
+func (p *Put) IncludeItemInCondCheckFail(enabled bool) *Put {
+	if enabled {
+		p.onCondFail = types.ReturnValuesOnConditionCheckFailureAllOld
+	} else {
+		p.onCondFail = types.ReturnValuesOnConditionCheckFailureNone
+	}
+	return p
 }
 
 func (p *Put) run(ctx context.Context) (item Item, output *dynamodb.PutItemOutput, err error) {
@@ -121,7 +135,7 @@ func (p *Put) input() *dynamodb.PutItemInput {
 	}
 	if p.condition != "" {
 		input.ConditionExpression = &p.condition
-		input.ReturnValuesOnConditionCheckFailure = types.ReturnValuesOnConditionCheckFailureAllOld
+		input.ReturnValuesOnConditionCheckFailure = p.onCondFail
 	}
 	if p.cc != nil {
 		input.ReturnConsumedCapacity = types.ReturnConsumedCapacityIndexes

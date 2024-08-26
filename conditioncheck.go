@@ -16,7 +16,8 @@ type ConditionCheck struct {
 	rangeKey   string
 	rangeValue types.AttributeValue
 
-	condition string
+	condition  string
+	onCondFail types.ReturnValuesOnConditionCheckFailure
 	subber
 
 	err error
@@ -74,6 +75,15 @@ func (check *ConditionCheck) IfNotExists() *ConditionCheck {
 	return check.If("attribute_not_exists($)", check.hashKey)
 }
 
+func (check *ConditionCheck) IncludeItemInCondCheckFail(enabled bool) *ConditionCheck {
+	if enabled {
+		check.onCondFail = types.ReturnValuesOnConditionCheckFailureAllOld
+	} else {
+		check.onCondFail = types.ReturnValuesOnConditionCheckFailureNone
+	}
+	return check
+}
+
 func (check *ConditionCheck) writeTxItem() (*types.TransactWriteItem, error) {
 	if check.err != nil {
 		return nil, check.err
@@ -86,6 +96,7 @@ func (check *ConditionCheck) writeTxItem() (*types.TransactWriteItem, error) {
 	}
 	if check.condition != "" {
 		item.ConditionExpression = aws.String(check.condition)
+		item.ReturnValuesOnConditionCheckFailure = check.onCondFail
 	}
 	return &types.TransactWriteItem{
 		ConditionCheck: item,

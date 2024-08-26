@@ -11,8 +11,10 @@ import (
 // Delete is a request to delete an item.
 // See: http://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_DeleteItem.html
 type Delete struct {
-	table      Table
-	returnType string
+	table Table
+
+	returnType types.ReturnValue
+	onCondFail types.ReturnValuesOnConditionCheckFailure
 
 	hashKey   string
 	hashValue types.AttributeValue
@@ -79,7 +81,7 @@ func (d *Delete) ConsumedCapacity(cc *ConsumedCapacity) *Delete {
 
 // Run executes this delete request.
 func (d *Delete) Run(ctx context.Context) error {
-	d.returnType = "NONE"
+	d.returnType = types.ReturnValueNone
 	_, err := d.run(ctx)
 	return err
 }
@@ -87,7 +89,7 @@ func (d *Delete) Run(ctx context.Context) error {
 // OldValue executes this delete request, unmarshaling the previous value to out.
 // Returns ErrNotFound is there was no previous value.
 func (d *Delete) OldValue(ctx context.Context, out interface{}) error {
-	d.returnType = "ALL_OLD"
+	d.returnType = types.ReturnValueAllOld
 	output, err := d.run(ctx)
 	switch {
 	case err != nil:
@@ -96,6 +98,38 @@ func (d *Delete) OldValue(ctx context.Context, out interface{}) error {
 		return ErrNotFound
 	}
 	return unmarshalItem(output.Attributes, out)
+}
+
+// CurrentValue executes this delete.
+// If successful, the return value `deleted` will be true, and nothing will be unmarshaled to `out`
+//
+// If the delete is unsuccessful because of a condition check failure, `deleted` will be false, the current value of the item will be unmarshaled to `out`, and `err` will be nil.
+//
+// If the delete is unsuccessful for any other reason, `deleted` will be false and `err` will be non-nil.
+//
+// See also: [UnmarshalItemFromCondCheckFailed].
+func (d *Delete) CurrentValue(ctx context.Context, out interface{}) (wrote bool, err error) {
+	d.returnType = types.ReturnValueNone
+	d.onCondFail = types.ReturnValuesOnConditionCheckFailureAllOld
+	_, err = d.run(ctx)
+	if err != nil {
+		if ok, err := UnmarshalItemFromCondCheckFailed(err, out); ok {
+			return false, err
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+// IncludeAllItemsInCondCheckFail specifies whether an item delete that fails its condition check should include the item itself in the error.
+// Such items can be extracted using [UnmarshalItemFromCondCheckFailed] for single deletes, or [UnmarshalItemsFromTxCondCheckFailed] for write transactions.
+func (d *Delete) IncludeItemInCondCheckFail(enabled bool) *Delete {
+	if enabled {
+		d.onCondFail = types.ReturnValuesOnConditionCheckFailureAllOld
+	} else {
+		d.onCondFail = types.ReturnValuesOnConditionCheckFailureNone
+	}
+	return d
 }
 
 func (d *Delete) run(ctx context.Context) (*dynamodb.DeleteItemOutput, error) {
@@ -121,12 +155,13 @@ func (d *Delete) deleteInput() *dynamodb.DeleteItemInput {
 	input := &dynamodb.DeleteItemInput{
 		TableName:                 &d.table.name,
 		Key:                       d.key(),
-		ReturnValues:              types.ReturnValue(d.returnType),
+		ReturnValues:              d.returnType,
 		ExpressionAttributeNames:  d.nameExpr,
 		ExpressionAttributeValues: d.valueExpr,
 	}
 	if d.condition != "" {
 		input.ConditionExpression = &d.condition
+		input.ReturnValuesOnConditionCheckFailure = d.onCondFail
 	}
 	if d.cc != nil {
 		input.ReturnConsumedCapacity = types.ReturnConsumedCapacityIndexes
@@ -141,11 +176,12 @@ func (d *Delete) writeTxItem() (*types.TransactWriteItem, error) {
 	input := d.deleteInput()
 	item := &types.TransactWriteItem{
 		Delete: &types.Delete{
-			TableName:                 input.TableName,
-			Key:                       input.Key,
-			ExpressionAttributeNames:  input.ExpressionAttributeNames,
-			ExpressionAttributeValues: input.ExpressionAttributeValues,
-			ConditionExpression:       input.ConditionExpression,
+			TableName:                           input.TableName,
+			Key:                                 input.Key,
+			ExpressionAttributeNames:            input.ExpressionAttributeNames,
+			ExpressionAttributeValues:           input.ExpressionAttributeValues,
+			ConditionExpression:                 input.ConditionExpression,
+			ReturnValuesOnConditionCheckFailure: input.ReturnValuesOnConditionCheckFailure,
 		},
 	}
 	return item, nil

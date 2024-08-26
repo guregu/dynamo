@@ -69,10 +69,35 @@ func TestPut(t *testing.T) {
 	}
 
 	// putting the same item: this should fail
-	err = table.Put(newItem).If("attribute_not_exists(UserID)").If("attribute_not_exists('Time')").Run(ctx)
-	if !IsCondCheckFailed(err) {
-		t.Error("expected ConditionalCheckFailedException, not", err)
-	}
+	t.Run("UnmarshalItemFromCondCheckFailed", func(t *testing.T) {
+		err := table.Put(newItem).
+			If("attribute_not_exists(UserID)").
+			If("attribute_not_exists('Time')").
+			IncludeItemInCondCheckFail(true).Run(ctx)
+		if !IsCondCheckFailed(err) {
+			t.Error("expected ConditionalCheckFailedException, not", err)
+		}
+		var curr widget2
+		if match, err := UnmarshalItemFromCondCheckFailed(err, &curr); !match || err != nil {
+			t.Error("bad match:", match, err)
+		}
+		if curr.Msg != newItem.Msg {
+			t.Errorf("bad cond check fail value. %#v ≠ %#v", curr, newItem)
+		}
+	})
+	t.Run("CurrentValue", func(t *testing.T) {
+		var curr widget2
+		wrote, err := table.Put(newItem).If("attribute_not_exists(UserID)").If("attribute_not_exists('Time')").CurrentValue(ctx, &curr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if wrote {
+			t.Error("wrote should be false")
+		}
+		if curr.Msg != newItem.Msg {
+			t.Errorf("bad cond check fail value. %#v ≠ %#v", curr, newItem)
+		}
+	})
 }
 
 func TestPutAndQueryAWSEncoding(t *testing.T) {

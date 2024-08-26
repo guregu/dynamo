@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"sort"
 	"sync"
 	"testing"
 	"time"
@@ -137,6 +138,34 @@ func TestTx(t *testing.T) {
 	if err = tx.Run(ctx); err != nil {
 		t.Error(err)
 	}
+
+	t.Run("UnmarshalItemsFromTxCondCheckFailed", func(t *testing.T) {
+		tx := testDB.WriteTx()
+		tx.Put(table.Put(widget{UserID: 69, Time: date1}).If("'BadField' = ?", "should not exist"))
+		tx.Put(table.Put(widget{UserID: 69, Time: date2}).If("'BadField' = ?", "should not exist"))
+		tx.IncludeAllItemsInCondCheckFail(true)
+		err := tx.Run(ctx)
+		if err == nil {
+			t.Fatal("expected error")
+		}
+		var badItems []widget
+		match, err := UnmarshalItemsFromTxCondCheckFailed(err, &badItems)
+		if !match {
+			t.Error("error doesn't match", err)
+		}
+		if err != nil {
+			t.Error(err)
+		}
+		if len(badItems) != 2 {
+			t.Error("wrong amount of bad items:", len(badItems), badItems)
+		}
+		sort.Slice(badItems, func(i, j int) bool {
+			return badItems[i].Time.Before(badItems[j].Time)
+		})
+		if !badItems[0].Time.Equal(date1) || !badItems[1].Time.Equal(date2) {
+			t.Error("wrong unmarshaled values:", badItems)
+		}
+	})
 
 	// Delete
 	tx = testDB.WriteTx()

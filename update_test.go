@@ -154,15 +154,19 @@ func TestUpdate(t *testing.T) {
 	}
 
 	// send an update with a failing condition
-	err = table.Update("UserID", item.UserID).
+	var curr widget2
+	wrote, err := table.Update("UserID", item.UserID).
 		Range("Time", item.Time).
 		Set("Msg", "shouldn't happen").
 		Add("Count", 1).
 		If("'Count' > ?", 100).
 		If("(MeaningOfLife = ?)", 42).
-		Value(ctx, &result)
-	if !IsCondCheckFailed(err) {
-		t.Error("expected ConditionalCheckFailedException, not", err)
+		CurrentValue(ctx, &curr)
+	if wrote {
+		t.Error("wrote should be false")
+	}
+	if curr.Msg != "this shouldn't be seen" {
+		t.Errorf("bad result. %v", curr.Msg)
 	}
 }
 

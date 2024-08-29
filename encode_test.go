@@ -152,6 +152,40 @@ func TestMarshalItemAsymmetric(t *testing.T) {
 	}
 }
 
+func TestIssue247(t *testing.T) {
+	// https: //github.com/guregu/dynamo/issues/247
+	type ServerResponse struct {
+		EmbeddedID int
+	}
+	type TestAddition struct {
+		ServerResponse
+	}
+	type TestItem struct {
+		ID       int          `dynamo:"id,hash" json:"id"`
+		Name     string       `dynamo:"name,range" json:"name"`
+		Addition TestAddition `dynamo:"addition,omitempty"`
+	}
+	x := TestItem{ID: 1, Name: "test"}
+	item, err := MarshalItem(x)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, ok := item["addition"]
+	if ok {
+		t.Error("should be omitted")
+	}
+
+	x.Addition.EmbeddedID = 123
+	item, err = MarshalItem(x)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, ok = item["addition"]
+	if !ok {
+		t.Error("should be present")
+	}
+}
+
 type isValue_Kind interface {
 	isValue_Kind()
 }

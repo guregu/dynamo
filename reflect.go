@@ -250,12 +250,14 @@ func (info *structInfo) isZero(rv reflect.Value) bool {
 	}
 	for _, field := range info.fields {
 		fv := dig(rv, field.index)
-		if !fv.IsValid() /* field doesn't exist */ {
+		if !fv.IsValid() {
+			// field doesn't exist
 			continue
 		}
 		if field.isZero == nil {
-			// TODO: https://github.com/guregu/dynamo/issues/247
-			// need to give child structs an isZero
+			// see: https://github.com/guregu/dynamo/issues/247
+			// this happens when there's no substance in the field
+			// (e.g. when it's embedded and isZero is handled by the parent type)
 			continue
 		}
 		if !field.isZero(fv) {

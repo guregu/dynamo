@@ -542,6 +542,50 @@ var itemEncodingTests = []struct {
 		},
 	},
 	{
+		name: "field with embedded struct + omitempty (empty)",
+		in:   Issue247{ID: 1, Name: "test"},
+		out: Item{
+			"id":   &types.AttributeValueMemberN{Value: "1"},
+			"name": &types.AttributeValueMemberS{Value: "test"},
+		},
+	},
+	{
+		name: "field with embedded struct + omitempty (not empty)",
+		in: Issue247{
+			ID:       1,
+			Name:     "test",
+			Addition: Issue247Field{Issue247Embedded: Issue247Embedded{EmbeddedID: 123}},
+		},
+		out: Item{
+			"id":       &types.AttributeValueMemberN{Value: "1"},
+			"name":     &types.AttributeValueMemberS{Value: "test"},
+			"addition": &types.AttributeValueMemberM{Value: Item{"EmbeddedID": &types.AttributeValueMemberN{Value: "123"}}},
+		},
+	},
+	{
+		name: "field with embedded struct subfield + omitempty (empty)",
+		in:   Issue247Alt{ID: 1, Name: "test", Addition: Issue247FieldAlt{}},
+		out: Item{
+			"id":   &types.AttributeValueMemberN{Value: "1"},
+			"name": &types.AttributeValueMemberS{Value: "test"},
+		},
+	},
+	{
+		name: "field with embedded struct subfield + omitempty (not empty)",
+		in: Issue247Alt{ID: 1, Name: "test", Addition: Issue247FieldAlt{
+			Field: Issue247Embedded{EmbeddedID: 123},
+		}},
+		out: Item{
+			"id":   &types.AttributeValueMemberN{Value: "1"},
+			"name": &types.AttributeValueMemberS{Value: "test"},
+			"addition": &types.AttributeValueMemberM{Value: Item{
+				"Field": &types.AttributeValueMemberM{Value: Item{
+					"EmbeddedID": &types.AttributeValueMemberN{Value: "123"},
+				}},
+			}},
+		},
+	},
+	{
 		name: "sets",
 		in: struct {
 			SS1  []string                   `dynamo:",set"`
@@ -967,6 +1011,27 @@ type MegaRecursiveB struct {
 
 func byteSlicePtr(a []byte) *[]byte {
 	return &a
+}
+
+type Issue247 struct {
+	ID       int           `dynamo:"id,hash" json:"id"`
+	Name     string        `dynamo:"name,range" json:"name"`
+	Addition Issue247Field `dynamo:"addition,omitempty"`
+}
+type Issue247Field struct {
+	Issue247Embedded
+}
+type Issue247Embedded struct {
+	EmbeddedID int
+}
+
+type Issue247Alt struct {
+	ID       int              `dynamo:"id,hash" json:"id"`
+	Name     string           `dynamo:"name,range" json:"name"`
+	Addition Issue247FieldAlt `dynamo:"addition,omitempty"`
+}
+type Issue247FieldAlt struct {
+	Field Issue247Embedded `dynamo:",omitempty"`
 }
 
 var (

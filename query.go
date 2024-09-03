@@ -428,6 +428,12 @@ func (itr *queryIter) Err() error {
 	return itr.err
 }
 
+func (itr *queryIter) SetError(err error) {
+	if itr.err == nil {
+		itr.err = err
+	}
+}
+
 func (itr *queryIter) LastEvaluatedKey(ctx context.Context) (PagingKey, error) {
 	if itr.output != nil {
 		// if we've hit the end of our results, we can use the real LEK

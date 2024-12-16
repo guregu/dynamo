@@ -239,34 +239,19 @@ func (q *Query) One(ctx context.Context, out interface{}) error {
 	}
 
 	// If not, try a Query.
-	req := q.queryInput()
-
-	var res *dynamodb.QueryOutput
-	err := q.table.db.retry(ctx, func() error {
-		var err error
-		res, err = q.table.db.client.Query(ctx, req)
-		q.cc.incRequests()
-		if err != nil {
-			return err
-		}
-
-		switch {
-		case len(res.Items) == 0:
-			return ErrNotFound
-		case len(res.Items) > 1 && q.limit != 1:
-			return ErrTooMany
-		case res.LastEvaluatedKey != nil && q.searchLimit != 0:
-			return ErrTooMany
-		}
-
-		return nil
-	})
-	if err != nil {
+	iter := q.Iter().(*queryIter)
+	ok := iter.Next(ctx, out)
+	if err := iter.Err(); err != nil {
 		return err
 	}
-	q.cc.add(res.ConsumedCapacity)
-
-	return unmarshalItem(res.Items[0], out)
+	if !ok {
+		return ErrNotFound
+	}
+	// Best effort: do we have any pending unused items?
+	if iter.hasMore() {
+		return ErrTooMany
+	}
+	return nil
 }
 
 // Count executes this request, returning the number of results.
@@ -420,6 +405,13 @@ func (itr *queryIter) Next(ctx context.Context, out interface{}) bool {
 	itr.idx++
 	itr.n++
 	return itr.err == nil
+}
+
+func (itr *queryIter) hasMore() bool {
+	if itr.query.limit > 0 && itr.n == itr.query.limit {
+		return false
+	}
+	return itr.output != nil && itr.idx < len(itr.output.Items)
 }
 
 // Err returns the error encountered, if any.

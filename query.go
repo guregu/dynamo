@@ -240,7 +240,8 @@ func (q *Query) One(ctx context.Context, out interface{}) error {
 
 	// If not, try a Query.
 	iter := q.Iter().(*queryIter)
-	ok := iter.Next(ctx, out)
+	var item Item
+	ok := iter.Next(ctx, &item)
 	if err := iter.Err(); err != nil {
 		return err
 	}
@@ -251,7 +252,7 @@ func (q *Query) One(ctx context.Context, out interface{}) error {
 	if iter.hasMore() {
 		return ErrTooMany
 	}
-	return nil
+	return unmarshalItem(item, out)
 }
 
 // Count executes this request, returning the number of results.

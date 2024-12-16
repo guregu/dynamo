@@ -239,7 +239,7 @@ func (q *Query) One(ctx context.Context, out interface{}) error {
 	}
 
 	// If not, try a Query.
-	iter := q.Iter().(*queryIter)
+	iter := q.newIter(unmarshalItem)
 	var item Item
 	ok := iter.Next(ctx, &item)
 	if err := iter.Err(); err != nil {
@@ -298,6 +298,14 @@ func (q *Query) Count(ctx context.Context) (int, error) {
 	}
 
 	return count, nil
+}
+
+func (q *Query) newIter(unmarshal unmarshalFunc) *queryIter {
+	return &queryIter{
+		query:     q,
+		unmarshal: unmarshal,
+		err:       q.err,
+	}
 }
 
 // queryIter is the iterator for Query operations
@@ -451,11 +459,7 @@ func (itr *queryIter) LastEvaluatedKey(ctx context.Context) (PagingKey, error) {
 
 // All executes this request and unmarshals all results to out, which must be a pointer to a slice.
 func (q *Query) All(ctx context.Context, out interface{}) error {
-	iter := &queryIter{
-		query:     q,
-		unmarshal: unmarshalAppendTo(out),
-		err:       q.err,
-	}
+	iter := q.newIter(unmarshalAppendTo(out))
 	for iter.Next(ctx, out) {
 	}
 	return iter.Err()
@@ -464,11 +468,7 @@ func (q *Query) All(ctx context.Context, out interface{}) error {
 // AllWithLastEvaluatedKey executes this request and unmarshals all results to out, which must be a pointer to a slice.
 // This returns a PagingKey you can use with StartFrom to split up results.
 func (q *Query) AllWithLastEvaluatedKey(ctx context.Context, out interface{}) (PagingKey, error) {
-	iter := &queryIter{
-		query:     q,
-		unmarshal: unmarshalAppendTo(out),
-		err:       q.err,
-	}
+	iter := q.newIter(unmarshalAppendTo(out))
 	for iter.Next(ctx, out) {
 	}
 	lek, err := iter.LastEvaluatedKey(ctx)
@@ -477,12 +477,7 @@ func (q *Query) AllWithLastEvaluatedKey(ctx context.Context, out interface{}) (P
 
 // Iter returns a results iterator for this request.
 func (q *Query) Iter() PagingIter {
-	iter := &queryIter{
-		query:     q,
-		unmarshal: unmarshalItem,
-		err:       q.err,
-	}
-	return iter
+	return q.newIter(unmarshalItem)
 }
 
 // can we use the get item API?

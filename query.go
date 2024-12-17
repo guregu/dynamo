@@ -208,6 +208,9 @@ func (q *Query) ConsumedCapacity(cc *ConsumedCapacity) *Query {
 
 // One executes this query and retrieves a single result,
 // unmarshaling the result to out.
+// This uses the DynamoDB GetItem API when possible, otherwise Query.
+// If the query returns more than one result, [ErrTooMany] may be returned. This is intended as a diagnostic for query mistakes.
+// To avoid [ErrTooMany], set the [Query.Limit] to 1.
 func (q *Query) One(ctx context.Context, out interface{}) error {
 	if q.err != nil {
 		return q.err

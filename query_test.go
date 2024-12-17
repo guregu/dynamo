@@ -2,6 +2,7 @@ package dynamo
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"testing"
 	"time"
@@ -109,6 +110,30 @@ func TestGetAllCount(t *testing.T) {
 	}
 	if !reflect.DeepEqual(one, item) {
 		t.Errorf("bad result for get one. %v ≠ %v", one, item)
+	}
+
+	// trigger ErrTooMany
+	one = widget{}
+	err = table.Get("UserID", 42).Range("Time", Greater, "0").Consistent(true).One(ctx, &one)
+	if !errors.Is(err, ErrTooMany) {
+		t.Errorf("bad error from get one. %v ≠ %v", err, ErrTooMany)
+	}
+
+	// suppress ErrTooMany with Limit(1)
+	one = widget{}
+	err = table.Get("UserID", 42).Range("Time", Greater, "0").Consistent(true).Limit(1).One(ctx, &one)
+	if err != nil {
+		t.Error("unexpected error:", err)
+	}
+	if one.UserID == 0 {
+		t.Errorf("bad result for get one: %v", one)
+	}
+
+	// trigger ErrNotFound via SearchLimit + Filter + One
+	one = widget{}
+	err = table.Get("UserID", 42).Range("Time", Greater, "0").Filter("Msg = ?", item.Msg).Consistent(true).SearchLimit(1).One(ctx, &one)
+	if !errors.Is(err, ErrNotFound) {
+		t.Errorf("bad error from get one. %v ≠ %v", err, ErrNotFound)
 	}
 
 	// GetItem + Project

@@ -132,8 +132,8 @@ func (u *Update) SetIfNotExists(path string, value interface{}) *Update {
 	return u
 }
 
-// SetIfNotNil changes path to the given value only if the value and marshalled value are not nil.
-func (u *Update) SetIfNotNil(path string, value interface{}) *Update {
+// SetIgnoringNil changes path to the given value only if the value and marshalled value are not nil.
+func (u *Update) SetIgnoringNil(path string, value interface{}) *Update {
 	if value == nil {
 		return u
 	}

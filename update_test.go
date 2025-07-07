@@ -80,7 +80,7 @@ func TestUpdate(t *testing.T) {
 	err = table.Update("UserID", item.UserID).
 		Range("Time", item.Time).
 		Set("Msg", "changed").
-		SetIfNotNil("Msg", nil).
+		SetIgnoringNil("Msg", nil).
 		SetExpr("Meta.$ = ?", "foo", "baz").
 		SetExpr("$", setLit).
 		Add("Count", 1).

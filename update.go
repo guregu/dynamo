@@ -132,6 +132,26 @@ func (u *Update) SetIfNotExists(path string, value interface{}) *Update {
 	return u
 }
 
+// SetIgnoringNil changes path to the given value only if the value and marshalled value are not nil.
+func (u *Update) SetIgnoringNil(path string, value interface{}) *Update {
+	if value == nil {
+		return u
+	}
+
+	v, err := marshal(value, flagNone)
+	if v == nil && err == nil {
+		return u
+	}
+	u.setError(err)
+
+	path, err = u.escape(path)
+	u.setError(err)
+	expr, err := u.subExpr("🝕 = ?", path, v)
+	u.setError(err)
+	u.set = append(u.set, expr)
+	return u
+}
+
 // SetExpr performs a custom set expression, substituting the args into expr as in filter expressions.
 // See: http://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_UpdateItem.html#DDB-UpdateItem-request-UpdateExpression
 //

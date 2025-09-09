@@ -119,7 +119,7 @@ func TestScanPaging(t *testing.T) {
 			Msg:    "garbage",
 		}
 	}
-	if _, err := table.Batch().Write().Put(insert...).Run(ctx); err != nil {
+	if _, err := table.Batch().Write().Put(insert...).Run(ctx, "test"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -203,7 +203,7 @@ func TestScanMagicLEK(t *testing.T) {
 		},
 	}
 	// prepare data
-	if _, err := table.Batch().Write().Put(widgets...).Run(ctx); err != nil {
+	if _, err := table.Batch().Write().Put(widgets...).Run(ctx, "test"); err != nil {
 		t.Fatal(err)
 	}
 

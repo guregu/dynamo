@@ -41,7 +41,7 @@ func TestBatchGetWrite(t *testing.T) {
 	batch1 := batches[0]
 	batch1.Merge(batches[1:]...)
 	var wcc ConsumedCapacity
-	wrote, err := batch1.ConsumedCapacity(&wcc).Run(ctx)
+	wrote, err := batch1.ConsumedCapacity(&wcc).Run(ctx, "test")
 	if wrote != totalBatchSize {
 		t.Error("unexpected wrote:", wrote, "≠", totalBatchSize)
 	}
@@ -94,7 +94,7 @@ func TestBatchGetWrite(t *testing.T) {
 	wrote, err = table1.Batch("UserID", "Time").Write().
 		Delete(keys...).
 		DeleteInRange(table2, "UserID", "Time", keys...).
-		Run(ctx)
+		Run(ctx, "test")
 	if wrote != totalBatchSize {
 		t.Error("unexpected wrote:", wrote, "≠", totalBatchSize)
 	}
@@ -183,7 +183,7 @@ func TestBatchEmptyInput(t *testing.T) {
 		t.Error("unexpected error", err)
 	}
 
-	_, err = table.Batch("UserID", "Time").Write().Run(ctx)
+	_, err = table.Batch("UserID", "Time").Write().Run(ctx, "test")
 	if err != ErrNoInput {
 		t.Error("unexpected error", err)
 	}

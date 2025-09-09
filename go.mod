@@ -8,6 +8,8 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.47.0
 	github.com/aws/smithy-go v1.22.5
 	github.com/cenkalti/backoff/v4 v4.3.0
+	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
+	go.uber.org/zap v1.27.0
 	golang.org/x/sync v0.16.0
 )
 
@@ -22,6 +24,13 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.5.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.6.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.11.1 // indirect
+	github.com/golang/protobuf v1.3.3 // indirect
+	go.uber.org/multierr v1.10.0 // indirect
+	golang.org/x/net v0.0.0-20201021035429-f5854403a974 // indirect
+	golang.org/x/sys v0.0.0-20211025201205-69cdffdb9359 // indirect
+	golang.org/x/text v0.3.3 // indirect
+	google.golang.org/genproto v0.0.0-20200423170343-7949de9c1215 // indirect
+	google.golang.org/grpc v1.29.1 // indirect
 )
 
 go 1.23.0

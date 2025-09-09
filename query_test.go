@@ -194,7 +194,7 @@ func TestQueryPaging(t *testing.T) {
 		},
 	}
 
-	if _, err := table.Batch().Write().Put(widgets...).Run(ctx); err != nil {
+	if _, err := table.Batch().Write().Put(widgets...).Run(ctx, "test"); err != nil {
 		t.Error("couldn't write paging prep data", err)
 		return
 	}
@@ -247,7 +247,7 @@ func TestQueryMagicLEK(t *testing.T) {
 	}
 
 	t.Run("prepare data", func(t *testing.T) {
-		if _, err := table.Batch().Write().Put(widgets...).Run(ctx); err != nil {
+		if _, err := table.Batch().Write().Put(widgets...).Run(ctx, "test"); err != nil {
 			t.Fatal(err)
 		}
 	})

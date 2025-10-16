@@ -107,7 +107,7 @@ dynamo handles struct tags similarly to the standard library `encoding/json` pac
 
 #### Renaming
 
-By default, dynamo will use the name of your fields as the name of the DynamoDB attribute it corresponds do. You can specify a different name with the `dynamo` struct tag like so: `dynamo:"other_name_goes_here"`. If two fields have the same name, dynamo will prioritize the higher-level field.
+By default, dynamo will use the name of your fields as the name of the DynamoDB attribute it corresponds to. You can specify a different name with the `dynamo` struct tag like so: `dynamo:"other_name_goes_here"`. If two fields have the same name, dynamo will prioritize the higher-level field.
 
 #### Omission
 

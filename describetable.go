@@ -63,6 +63,11 @@ type Throughput struct {
 	DecsToday int64
 }
 
+type KeySchema struct {
+	Key  string
+	Type KeyType
+}
+
 type Index struct {
 	Name        string
 	ARN         string
@@ -75,9 +80,13 @@ type Index struct {
 	// Attribute name of the hash key (a.k.a. partition key).
 	HashKey     string
 	HashKeyType KeyType
+	// TODO: for composite
+	HashKeys []KeySchema
 	// Attribute name of the range key (a.k.a. sort key) or blank if nonexistant.
 	RangeKey     string
 	RangeKeyType KeyType
+	// TODO: for composite
+	RangeKeys []KeySchema
 
 	// The provisioned throughput for this index.
 	Throughput Throughput
@@ -138,9 +147,12 @@ func newDescription(table *types.TableDescription) Description {
 		if index.Backfilling != nil {
 			idx.Backfilling = *index.Backfilling
 		}
-		idx.HashKey, idx.RangeKey = schemaKeys(index.KeySchema)
-		idx.HashKeyType = lookupADType(table.AttributeDefinitions, idx.HashKey)
-		idx.RangeKeyType = lookupADType(table.AttributeDefinitions, idx.RangeKey)
+		idx.HashKeys, idx.RangeKeys = compositeSchemaKeys(index.KeySchema, table.AttributeDefinitions)
+		if idx.HashKeys == nil {
+			idx.HashKey, idx.RangeKey = schemaKeys(index.KeySchema)
+			idx.HashKeyType = lookupADType(table.AttributeDefinitions, idx.HashKey)
+			idx.RangeKeyType = lookupADType(table.AttributeDefinitions, idx.RangeKey)
+		}
 		if index.ItemCount != nil {
 			idx.Items = *index.ItemCount
 		}
@@ -221,10 +233,22 @@ func (desc Description) keys(index string) map[string]struct{} {
 	if index != "" {
 		for _, gsi := range desc.GSI {
 			if gsi.Name == index {
-				keys[gsi.HashKey] = struct{}{}
-				if gsi.RangeKey != "" {
+				if len(gsi.HashKeys) > 0 {
+					for _, kv := range gsi.HashKeys {
+						keys[kv.Key] = struct{}{}
+					}
+				} else {
+					keys[gsi.HashKey] = struct{}{}
+				}
+
+				if len(gsi.RangeKeys) > 0 {
+					for _, kv := range gsi.RangeKeys {
+						keys[kv.Key] = struct{}{}
+					}
+				} else if gsi.RangeKey != "" {
 					keys[gsi.RangeKey] = struct{}{}
 				}
+
 				return keys
 			}
 		}
@@ -308,6 +332,21 @@ func schemaKeys(schema []types.KeySchemaElement) (hashKey, rangeKey string) {
 		case types.KeyTypeRange:
 			rangeKey = *ks.AttributeName
 		}
+	}
+	return
+}
+
+func compositeSchemaKeys(schema []types.KeySchemaElement, attr []types.AttributeDefinition) (hashKey, rangeKey []KeySchema) {
+	for _, ks := range schema {
+		switch ks.KeyType {
+		case types.KeyTypeHash:
+			hashKey = append(hashKey, KeySchema{*ks.AttributeName, lookupADType(attr, *ks.AttributeName)})
+		case types.KeyTypeRange:
+			rangeKey = append(rangeKey, KeySchema{*ks.AttributeName, lookupADType(attr, *ks.AttributeName)})
+		}
+	}
+	if len(hashKey) < 2 && len(rangeKey) < 2 {
+		return nil, nil
 	}
 	return
 }

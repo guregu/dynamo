@@ -156,14 +156,35 @@ func (ct *CreateTable) Project(index string, projection IndexProjection, include
 
 // Index specifies an index to add to this table.
 func (ct *CreateTable) Index(index Index) *CreateTable {
-	ct.add(index.HashKey, string(index.HashKeyType))
-	ks := []types.KeySchemaElement{
-		{
-			AttributeName: &index.HashKey,
-			KeyType:       types.KeyTypeHash,
-		},
+	var ks []types.KeySchemaElement
+
+	if len(index.HashKeys) > 0 {
+		for _, hk := range index.HashKeys {
+			ct.add(hk.Key, string(hk.Type))
+			ks = append(ks, types.KeySchemaElement{
+				AttributeName: &hk.Key,
+				KeyType:       types.KeyTypeHash,
+			})
+		}
+	} else {
+		ct.add(index.HashKey, string(index.HashKeyType))
+		ks = []types.KeySchemaElement{
+			{
+				AttributeName: &index.HashKey,
+				KeyType:       types.KeyTypeHash,
+			},
+		}
 	}
-	if index.RangeKey != "" {
+
+	if len(index.RangeKeys) > 0 {
+		for _, rk := range index.RangeKeys {
+			ct.add(rk.Key, string(rk.Type))
+			ks = append(ks, types.KeySchemaElement{
+				AttributeName: &rk.Key,
+				KeyType:       types.KeyTypeRange,
+			})
+		}
+	} else if index.RangeKey != "" {
 		ct.add(index.RangeKey, string(index.RangeKeyType))
 		ks = append(ks, types.KeySchemaElement{
 			AttributeName: &index.RangeKey,

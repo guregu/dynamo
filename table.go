@@ -378,3 +378,30 @@ func mergeConsumedCapacity(dst, src *ConsumedCapacity) {
 	}
 	dst.Requests += src.Requests
 }
+
+// ScanMetrics represents the metrics returned by a Scan or Query operation.
+// Use this to track the number of items scanned and returned across paginated requests.
+type ScanMetrics struct {
+	// Scanned is the number of items examined before any filter expression was applied.
+	// This corresponds to DynamoDB's ScannedCount.
+	Scanned int64
+	// Count is the number of items returned after filtering.
+	// This corresponds to DynamoDB's Count.
+	Count int64
+}
+
+func (sm *ScanMetrics) add(scanned, count int32) {
+	if sm == nil {
+		return
+	}
+	sm.Scanned += int64(scanned)
+	sm.Count += int64(count)
+}
+
+func mergeScanMetrics(dst, src *ScanMetrics) {
+	if dst == nil || src == nil {
+		return
+	}
+	dst.Scanned += src.Scanned
+	dst.Count += src.Count
+}

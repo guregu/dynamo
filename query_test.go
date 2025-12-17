@@ -336,3 +336,61 @@ func TestQueryBadKeys(t *testing.T) {
 		}
 	})
 }
+
+/*
+func TestQueryKeyExpr(t *testing.T) {
+	// if testDB == nil {
+	// 	t.Skip(offlineSkipMsg)
+	// }
+	table := Table{name: "TestDB"}
+	q := table.Get("Test", 1)
+	// q.Range("Foo", Between, "a", "z")
+	q.Range("Foo", BeginsWith, "foo")
+	kexpr, err := q.keyExpr()
+	if err != nil {
+		t.Error(err)
+	}
+	_ = kexpr
+	// t.Fatal(kexpr)
+}
+*/
+
+func TestQueryComposite(t *testing.T) {
+	if testDB == nil {
+		t.Skip(offlineSkipMsg)
+	}
+	table := testDB.Table(testTableWidgets)
+	ctx := context.Background()
+	var times []time.Time
+	{
+		start := time.Date(2025, time.December, 15, 0, 0, 0, 0, time.UTC)
+		for i := range 3 {
+			item := widget{
+				UserID: 67,
+				Time:   start.Add(time.Hour * 24 * time.Duration(i)),
+				Msg:    "first",
+			}
+			times = append(times, item.Time)
+			err := table.Put(item).Run(ctx)
+			if err != nil {
+				t.Error("unexpected error:", err)
+			}
+			item.Msg = "second"
+			err = table.Put(item).Run(ctx)
+			if err != nil {
+				t.Error("unexpected error:", err)
+			}
+		}
+	}
+	q := table.GetComposite(map[string]any{
+		"UserID": 67,
+		"Msg":    "second",
+	}).Index("UserID-Msg-Time-index").Range("Time", Greater, times[0])
+	var ws []widget
+	if err := q.All(ctx, &ws); err != nil {
+		t.Error(err)
+	}
+	if len(ws) != 2 {
+		t.Error("unexpected length of return:", len(ws))
+	}
+}

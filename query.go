@@ -11,6 +11,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
+type pair struct {
+	Key   string
+	Value types.AttributeValue
+}
+
 // Query is a request to get one or more items in a table.
 // Query uses the DynamoDB query for requests for multiple items, and GetItem for one.
 // See: http://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_Query.html
@@ -22,6 +27,7 @@ type Query struct {
 
 	hashKey   string
 	hashValue types.AttributeValue
+	hashKeys  []pair
 
 	rangeKey    string
 	rangeValues []types.AttributeValue
@@ -64,6 +70,24 @@ const (
 	Between        Operator = "BETWEEN"
 )
 
+func (op Operator) graphic() string {
+	switch op {
+	case Equal:
+		return "="
+	case NotEqual:
+		return "<>"
+	case Less:
+		return "<"
+	case LessOrEqual:
+		return "<="
+	case Greater:
+		return ">"
+	case GreaterOrEqual:
+		return ">="
+	}
+	return ""
+}
+
 // Order is used for specifying the order of results.
 type Order bool
 
@@ -86,6 +110,21 @@ func (table Table) Get(name string, value interface{}) *Query {
 	q.hashValue, q.err = marshal(value, flagNone)
 	if q.hashValue == nil {
 		q.setError(fmt.Errorf("dynamo: query hash key value is nil or omitted for attribute %q", q.hashKey))
+	}
+	return q
+}
+
+func (table Table) GetComposite(keyValues map[string]any) *Query {
+	q := &Query{
+		table: table,
+	}
+	for k, v := range keyValues {
+		enc, err := marshal(v, flagNone)
+		q.setError(err)
+		if enc == nil {
+			q.setError(fmt.Errorf("dynamo: query hash key value is nil or omitted for attribute %q", q.hashKey))
+		}
+		q.hashKeys = append(q.hashKeys, pair{k, enc})
 	}
 	return q
 }
@@ -546,11 +585,19 @@ func (q *Query) queryInput() *dynamodb.QueryInput {
 }
 
 func (q *Query) keyConditions() map[string]types.Condition {
-	conds := map[string]types.Condition{
-		q.hashKey: {
+	conds := map[string]types.Condition{}
+	if len(q.hashKeys) > 0 {
+		for _, kv := range q.hashKeys {
+			conds[kv.Key] = types.Condition{
+				AttributeValueList: []types.AttributeValue{kv.Value},
+				ComparisonOperator: types.ComparisonOperatorEq,
+			}
+		}
+	} else {
+		conds[q.hashKey] = types.Condition{
 			AttributeValueList: []types.AttributeValue{q.hashValue},
 			ComparisonOperator: types.ComparisonOperatorEq,
-		},
+		}
 	}
 	if q.rangeKey != "" && q.rangeOp != "" {
 		conds[q.rangeKey] = types.Condition{
@@ -560,6 +607,85 @@ func (q *Query) keyConditions() map[string]types.Condition {
 	}
 	return conds
 }
+
+/*
+func (q *Query) keyExpr() (string, error) {
+	// TODO: cache
+	var kexpr strings.Builder
+	if len(q.hashKeys) > 0 {
+		for i, kv := range q.hashKeys {
+			if i > 0 {
+				kexpr.WriteString(" AND ")
+			}
+			kexpr.WriteString(q.subName(kv.Key))
+			kexpr.WriteString(" = ")
+			v, err := q.subValue(kv.Value, flagNone)
+			if err != nil {
+				return "", err
+			}
+			kexpr.WriteString(v)
+		}
+	} else {
+		kexpr.WriteString(q.subName(q.hashKey))
+		kexpr.WriteString(" = ")
+		v, err := q.subValue(q.hashValue, flagNone)
+		if err != nil {
+			return "", err
+		}
+		kexpr.WriteString(v)
+	}
+
+	if q.rangeKey != "" {
+		kexpr.WriteString(" AND ")
+
+		switch q.rangeOp {
+		case Between:
+			if len(q.rangeValues) != 2 {
+				return "", fmt.Errorf("wrong number of arguments for BETWEEN operator in query: %d", len(q.rangeValues))
+			}
+			kexpr.WriteString(q.subName(q.rangeKey))
+			kexpr.WriteString(" BETWEEN ")
+			v1, err := q.subValue(q.rangeValues[0], flagNone)
+			if err != nil {
+				return "", err
+			}
+			kexpr.WriteString(v1)
+			kexpr.WriteString(" AND ")
+			v2, err := q.subValue(q.rangeValues[1], flagNone)
+			if err != nil {
+				return "", err
+			}
+			kexpr.WriteString(v2)
+		case BeginsWith:
+			kexpr.WriteString("begins_with(")
+			kexpr.WriteString(q.subName(q.rangeKey))
+			kexpr.WriteString(", ")
+			v, err := q.subValue(q.rangeValues, flagNone)
+			if err != nil {
+				return "", err
+			}
+			kexpr.WriteString(v)
+			kexpr.WriteString(")")
+		default:
+			kexpr.WriteString(q.subName(q.rangeKey))
+			kexpr.WriteByte(' ')
+			op := q.rangeOp.graphic()
+			if op == "" {
+				return "", fmt.Errorf("invalid range operator: %q", op)
+			}
+			kexpr.WriteString(op)
+			kexpr.WriteByte(' ')
+			v, err := q.subValue(q.rangeValues, flagNone)
+			if err != nil {
+				return "", err
+			}
+			kexpr.WriteString(v)
+		}
+	}
+
+	return kexpr.String(), nil
+}
+*/
 
 func (q *Query) getItemInput() *dynamodb.GetItemInput {
 	req := &dynamodb.GetItemInput{
@@ -595,8 +721,13 @@ func (q *Query) getTxItem() (types.TransactGetItem, error) {
 }
 
 func (q *Query) keys() Item {
-	keys := Item{
-		q.hashKey: q.hashValue,
+	keys := make(Item)
+	if len(q.hashKeys) > 0 {
+		for _, kv := range q.hashKeys {
+			keys[kv.Key] = kv.Value
+		}
+	} else {
+		keys[q.hashKey] = q.hashValue
 	}
 	if q.rangeKey != "" && len(q.rangeValues) > 0 {
 		keys[q.rangeKey] = q.rangeValues[0]

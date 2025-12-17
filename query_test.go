@@ -385,7 +385,7 @@ func TestQueryComposite(t *testing.T) {
 	q := table.GetComposite(map[string]any{
 		"UserID": 67,
 		"Msg":    "second",
-	}).Index("UserID-Msg-Time-index").Range("Time", Greater, times[0])
+	}).Range("Time", Greater, times[0]).Index("UserID-Msg-Time-index")
 	var ws []widget
 	if err := q.All(ctx, &ws); err != nil {
 		t.Error(err)

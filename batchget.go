@@ -193,6 +193,7 @@ func (bg *BatchGet) Iter() Iter {
 
 // IterWithTable is like [BatchGet.Iter], but will update the value pointed by tablePtr after each iteration.
 // This can be useful when getting from multiple tables to determine which table the latest item came from.
+// See: [BatchGet.ItemTableIter] for a nicer way to do this.
 //
 // For example, you can utilize this iterator to read the results into different structs.
 //

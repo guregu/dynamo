@@ -45,6 +45,7 @@ type Query struct {
 
 	err error
 	cc  *ConsumedCapacity
+	sm  *ScanMetrics
 }
 
 var (
@@ -245,6 +246,12 @@ func (q *Query) ConsumedCapacity(cc *ConsumedCapacity) *Query {
 	return q
 }
 
+// ScanMetrics will measure the number of items scanned and returned by this operation and add it to sm.
+func (q *Query) ScanMetrics(sm *ScanMetrics) *Query {
+	q.sm = sm
+	return q
+}
+
 // One executes this query and retrieves a single result,
 // unmarshaling the result to out.
 // This uses the DynamoDB GetItem API when possible, otherwise Query.
@@ -433,6 +440,7 @@ func (itr *queryIter) Next(ctx context.Context, out interface{}) bool {
 		return false
 	}
 	itr.query.cc.add(itr.output.ConsumedCapacity)
+	itr.query.sm.add(itr.output.ScannedCount, itr.output.Count)
 	if len(itr.output.LastEvaluatedKey) > len(itr.exLEK) {
 		itr.exLEK = itr.output.LastEvaluatedKey
 	}

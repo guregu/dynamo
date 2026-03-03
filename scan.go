@@ -34,6 +34,7 @@ type Scan struct {
 
 	err error
 	cc  *ConsumedCapacity
+	sm  *ScanMetrics
 }
 
 // Scan creates a new request to scan this table.
@@ -73,13 +74,17 @@ func (s *Scan) Segment(segment int, totalSegments int) *Scan {
 func (s *Scan) newSegments(segments int, leks []PagingKey) []*scanIter {
 	iters := make([]*scanIter, segments)
 	lekLen := len(leks)
-	for i := int(0); i < segments; i++ {
+	for i := 0; i < segments; i++ {
 		seg := *s
 		var cc *ConsumedCapacity
 		if s.cc != nil {
 			cc = new(ConsumedCapacity)
 		}
-		seg.Segment(i, segments).ConsumedCapacity(cc)
+		var sm *ScanMetrics
+		if s.sm != nil {
+			sm = new(ScanMetrics)
+		}
+		seg.Segment(i, segments).ConsumedCapacity(cc).ScanMetrics(sm)
 		if i < lekLen {
 			lek := leks[i]
 			if lek == nil {
@@ -150,6 +155,12 @@ func (s *Scan) ConsumedCapacity(cc *ConsumedCapacity) *Scan {
 	return s
 }
 
+// ScanMetrics will measure the number of items scanned and returned by this operation and add it to sm.
+func (s *Scan) ScanMetrics(sm *ScanMetrics) *Scan {
+	s.sm = sm
+	return s
+}
+
 // Iter returns a results iterator for this request.
 func (s *Scan) Iter() PagingIter {
 	return &scanIter{
@@ -163,16 +174,16 @@ func (s *Scan) Iter() PagingIter {
 // Canceling the context given here will cancel the processing of all segments.
 func (s *Scan) IterParallel(ctx context.Context, segments int) ParallelIter {
 	iters := s.newSegments(segments, nil)
-	ps := newParallelScan(iters, s.cc, false, unmarshalItem)
+	ps := newParallelScan(iters, s.cc, s.sm, false, unmarshalItem)
 	go ps.run(ctx)
 	return ps
 }
 
-// IterParallelFrom returns a results iterator continued from a previous ParallelIter's LastEvaluatedKeys.
+// IterParallelStartFrom returns a results iterator continued from a previous ParallelIter's LastEvaluatedKeys.
 // Canceling the context given here will cancel the processing of all segments.
 func (s *Scan) IterParallelStartFrom(ctx context.Context, keys []PagingKey) ParallelIter {
 	iters := s.newSegments(len(keys), keys)
-	ps := newParallelScan(iters, s.cc, false, unmarshalItem)
+	ps := newParallelScan(iters, s.cc, s.sm, false, unmarshalItem)
 	go ps.run(ctx)
 	return ps
 }
@@ -206,7 +217,7 @@ func (s *Scan) AllWithLastEvaluatedKey(ctx context.Context, out interface{}) (Pa
 // AllParallel executes this request by running the given number of segments in parallel, then unmarshaling all results to out, which must be a pointer to a slice.
 func (s *Scan) AllParallel(ctx context.Context, segments int, out interface{}) error {
 	iters := s.newSegments(segments, nil)
-	ps := newParallelScan(iters, s.cc, true, unmarshalAppendTo(out))
+	ps := newParallelScan(iters, s.cc, s.sm, true, unmarshalAppendTo(out))
 	go ps.run(ctx)
 	for ps.Next(ctx, out) {
 	}
@@ -217,7 +228,7 @@ func (s *Scan) AllParallel(ctx context.Context, segments int, out interface{}) e
 // Returns a slice of LastEvalutedKeys that can be used to continue the query later.
 func (s *Scan) AllParallelWithLastEvaluatedKeys(ctx context.Context, segments int, out interface{}) ([]PagingKey, error) {
 	iters := s.newSegments(segments, nil)
-	ps := newParallelScan(iters, s.cc, false, unmarshalAppendTo(out))
+	ps := newParallelScan(iters, s.cc, s.sm, false, unmarshalAppendTo(out))
 	go ps.run(ctx)
 	for ps.Next(ctx, out) {
 	}
@@ -229,7 +240,7 @@ func (s *Scan) AllParallelWithLastEvaluatedKeys(ctx context.Context, segments in
 // Returns a new slice of LastEvaluatedKeys after the scan finishes.
 func (s *Scan) AllParallelStartFrom(ctx context.Context, keys []PagingKey, out interface{}) ([]PagingKey, error) {
 	iters := s.newSegments(len(keys), keys)
-	ps := newParallelScan(iters, s.cc, false, unmarshalAppendTo(out))
+	ps := newParallelScan(iters, s.cc, s.sm, false, unmarshalAppendTo(out))
 	go ps.run(ctx)
 	for ps.Next(ctx, out) {
 	}
@@ -405,6 +416,7 @@ redo:
 		return false
 	}
 	itr.scan.cc.add(itr.output.ConsumedCapacity)
+	itr.scan.sm.add(itr.output.ScannedCount, itr.output.Count)
 	if len(itr.output.LastEvaluatedKey) > len(itr.exLEK) {
 		itr.exLEK = itr.output.LastEvaluatedKey
 	}
@@ -472,17 +484,19 @@ type parallelScan struct {
 	lekErr error
 
 	cc  *ConsumedCapacity
+	sm  *ScanMetrics
 	err error
 	mu  *sync.Mutex
 
 	unmarshal unmarshalFunc
 }
 
-func newParallelScan(iters []*scanIter, cc *ConsumedCapacity, skipLEK bool, unmarshal unmarshalFunc) *parallelScan {
+func newParallelScan(iters []*scanIter, cc *ConsumedCapacity, sm *ScanMetrics, skipLEK bool, unmarshal unmarshalFunc) *parallelScan {
 	ps := &parallelScan{
 		iters:     iters,
 		items:     make(chan Item),
 		cc:        cc,
+		sm:        sm,
 		mu:        new(sync.Mutex),
 		unmarshal: unmarshal,
 	}
@@ -521,9 +535,23 @@ func (ps *parallelScan) run(ctx context.Context) {
 				}
 			}
 
-			if ps.cc != nil && iter.scan.cc != nil {
+			shouldUpdateCC := ps.cc != nil && iter.scan.cc != nil
+			shouldUpdateSM := ps.sm != nil && iter.scan.sm != nil
+			// If we need to do both, let's hold the mutex for both updates, then skip
+			// Otherwise, grab the mutex and update whichever one is necessary
+			if shouldUpdateCC && shouldUpdateSM {
 				ps.mu.Lock()
 				mergeConsumedCapacity(ps.cc, iter.scan.cc)
+				mergeScanMetrics(ps.sm, iter.scan.sm)
+				ps.mu.Unlock()
+			} else if shouldUpdateSM || shouldUpdateCC {
+				ps.mu.Lock()
+				switch {
+				case shouldUpdateCC:
+					mergeConsumedCapacity(ps.cc, iter.scan.cc)
+				case shouldUpdateSM:
+					mergeScanMetrics(ps.sm, iter.scan.sm)
+				}
 				ps.mu.Unlock()
 			}
 

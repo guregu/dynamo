@@ -382,15 +382,48 @@ func TestQueryComposite(t *testing.T) {
 			}
 		}
 	}
-	q := table.GetComposite(map[string]any{
-		"UserID": 67,
-		"Msg":    "second",
-	}).Range("Time", Greater, times[0]).Index("UserID-Msg-Time-index")
-	var ws []widget
-	if err := q.All(ctx, &ws); err != nil {
-		t.Error(err)
-	}
-	if len(ws) != 2 {
-		t.Error("unexpected length of return:", len(ws))
-	}
+
+	t.Run("Greater+All", func(t *testing.T) {
+		q := table.GetComposite(map[string]any{
+			"UserID": 67,
+			"Msg":    "second",
+		}).Range("Time", Greater, times[0]).Index("UserID-Msg-Time-index")
+		var ws []widget
+		if err := q.All(ctx, &ws); err != nil {
+			t.Error(err)
+		}
+		if len(ws) != 2 {
+			t.Error("unexpected length of return:", len(ws))
+		}
+	})
+
+	t.Run("iter+LEK", func(t *testing.T) {
+		q := table.GetComposite(map[string]any{
+			"UserID": 67,
+			"Msg":    "second",
+		}).Range("Time", GreaterOrEqual, times[0]).Index("UserID-Msg-Time-index").SearchLimit(1)
+		itr := q.Iter()
+		for i := range times {
+			var w widget
+			itr.Next(ctx, &w)
+			if !w.Time.Equal(times[i]) {
+				t.Error("bad result:", w.Time, "≠", times[i])
+			}
+			if itr.Err() != nil {
+				t.Error("unexpected error", itr.Err())
+			}
+			more := itr.Next(ctx, &w)
+			if more {
+				t.Error("unexpected more", more)
+			}
+			lek, err := itr.LastEvaluatedKey(context.Background())
+			if err != nil {
+				t.Error("LEK error", lek)
+			}
+			itr = table.GetComposite(map[string]any{
+				"UserID": 67,
+				"Msg":    "second",
+			}).StartFrom(lek).Index("UserID-Msg-Time-index").SearchLimit(1).Iter()
+		}
+	})
 }

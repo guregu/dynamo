@@ -114,6 +114,12 @@ func (table Table) Get(name string, value interface{}) *Query {
 	return q
 }
 
+// GetComposite creates a new request to get an item using a composite key (multiple hash keys).
+// keyValues is map of the hash key (a.k.a. partition key) attribute names to values.
+// Use the Range method of Query to optionally specify one or more range keys (a.k.a. sort keys).
+// This is a feature of global secondary indexes, use the Index method of Query to specify the index name.
+//
+// See: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/GSI.html#GSI.MultiAttributeKeys
 func (table Table) GetComposite(keyValues map[string]any) *Query {
 	q := &Query{
 		table: table,

@@ -336,3 +336,94 @@ func TestQueryBadKeys(t *testing.T) {
 		}
 	})
 }
+
+/*
+func TestQueryKeyExpr(t *testing.T) {
+	// if testDB == nil {
+	// 	t.Skip(offlineSkipMsg)
+	// }
+	table := Table{name: "TestDB"}
+	q := table.Get("Test", 1)
+	// q.Range("Foo", Between, "a", "z")
+	q.Range("Foo", BeginsWith, "foo")
+	kexpr, err := q.keyExpr()
+	if err != nil {
+		t.Error(err)
+	}
+	_ = kexpr
+	// t.Fatal(kexpr)
+}
+*/
+
+func TestQueryComposite(t *testing.T) {
+	if testDB == nil {
+		t.Skip(offlineSkipMsg)
+	}
+	table := testDB.Table(testTableWidgets)
+	ctx := context.Background()
+	var times []time.Time
+	{
+		start := time.Date(2025, time.December, 15, 0, 0, 0, 0, time.UTC)
+		for i := range 3 {
+			item := widget{
+				UserID: 67,
+				Time:   start.Add(time.Hour * 24 * time.Duration(i)),
+				Msg:    "first",
+			}
+			times = append(times, item.Time)
+			err := table.Put(item).Run(ctx)
+			if err != nil {
+				t.Error("unexpected error:", err)
+			}
+			item.Msg = "second"
+			err = table.Put(item).Run(ctx)
+			if err != nil {
+				t.Error("unexpected error:", err)
+			}
+		}
+	}
+
+	t.Run("Greater+All", func(t *testing.T) {
+		q := table.GetComposite(map[string]any{
+			"UserID": 67,
+			"Msg":    "second",
+		}).Range("Time", Greater, times[0]).Index("UserID-Msg-Time-index")
+		var ws []widget
+		if err := q.All(ctx, &ws); err != nil {
+			t.Error(err)
+		}
+		if len(ws) != 2 {
+			t.Error("unexpected length of return:", len(ws))
+		}
+	})
+
+	t.Run("iter+LEK", func(t *testing.T) {
+		q := table.GetComposite(map[string]any{
+			"UserID": 67,
+			"Msg":    "second",
+		}).Range("Time", GreaterOrEqual, times[0]).Index("UserID-Msg-Time-index").SearchLimit(1)
+		itr := q.Iter()
+		for i := range times {
+			var w widget
+			itr.Next(ctx, &w)
+			if !w.Time.Equal(times[i]) {
+				t.Error("bad result:", w.Time, "≠", times[i])
+			}
+			if itr.Err() != nil {
+				t.Error("unexpected error", itr.Err())
+			}
+			more := itr.Next(ctx, &w)
+			if more {
+				t.Error("unexpected more", more)
+			}
+			lek, err := itr.LastEvaluatedKey(context.Background())
+			if err != nil {
+				t.Error("LEK error", lek)
+			}
+			itr = table.GetComposite(map[string]any{
+				"UserID": 67,
+				"Msg":    "second",
+			}).StartFrom(lek).Index("UserID-Msg-Time-index").SearchLimit(1).Iter()
+		}
+	})
+}

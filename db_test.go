@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -114,7 +115,16 @@ func TestMain(m *testing.M) {
 			switch {
 			case isTableNotExistsErr(err) && shouldCreate:
 				log.Println("Creating test table:", name)
-				if err := testDB.CreateTable(name, widget{}).Run(ctx); err != nil {
+				if err := testDB.CreateTable(name, widget{}).Index(Index{
+					Name: "UserID-Msg-Time-index",
+					HashKeys: []KeySchema{
+						{Key: "UserID", Type: NumberType},
+					},
+					RangeKeys: []KeySchema{
+						{Key: "Msg", Type: StringType},
+						{Key: "Time", Type: StringType},
+					},
+				}).Run(ctx); err != nil {
 					panic(err)
 				}
 				created = append(created, testDB.Table(name))
@@ -154,15 +164,7 @@ func TestListTables(t *testing.T) {
 		return
 	}
 
-	found := false
-	for _, t := range tables {
-		if t == testTableWidgets {
-			found = true
-			break
-		}
-	}
-
-	if !found {
+	if !slices.Contains(tables, testTableWidgets) {
 		t.Error("couldn't find testTable", testTableWidgets, "in:", tables)
 	}
 }

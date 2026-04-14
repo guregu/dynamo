@@ -80,12 +80,12 @@ type Index struct {
 	// Attribute name of the hash key (a.k.a. partition key).
 	HashKey     string
 	HashKeyType KeyType
-	// TODO: for composite
+	// For composite GSIs with multiple hash keys, provide HashKeys instead of HashKey.
 	HashKeys []KeySchema
 	// Attribute name of the range key (a.k.a. sort key) or blank if nonexistant.
 	RangeKey     string
 	RangeKeyType KeyType
-	// TODO: for composite
+	// For composite GSIs with multiple range keys, provide RangeKeys instead of RangeKey.
 	RangeKeys []KeySchema
 
 	// The provisioned throughput for this index.
